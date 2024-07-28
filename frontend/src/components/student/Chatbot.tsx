@@ -24,13 +24,13 @@ const Chatbot: React.FC<ChatbotProps> = ({ grade, semester, subject, unit, topic
   useEffect(() => {
     const token = localStorage.getItem('token');
     const wsUrl = process.env.REACT_APP_WEBSOCKET_URL;
+    const encodedSubject = encodeURIComponent(subject);
 
-    // 기존 WebSocket이 열려있으면 닫기
-    if (ws && ws.readyState === WebSocket.OPEN) {
+    if (ws) {
       ws.close();
     }
 
-    const newWs = new WebSocket(`${wsUrl}/?token=${token}`);
+    const newWs = new WebSocket(`${wsUrl}/?token=${token}&subject=${encodedSubject}`);
 
     newWs.onopen = () => {
       console.log('WebSocket connection established');
@@ -38,6 +38,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ grade, semester, subject, unit, topic
 
     newWs.onmessage = (event) => {
       const { user, bot } = JSON.parse(event.data);
+      console.log(user, bot);
       setChatHistory(prevChatHistory => [...prevChatHistory, { user, bot }]);
     };
 
@@ -45,14 +46,12 @@ const Chatbot: React.FC<ChatbotProps> = ({ grade, semester, subject, unit, topic
       console.error('WebSocket error:', error);
     };
 
-    newWs.onclose = () => {
-      console.log('WebSocket connection closed');
-    };
-
     setWs(newWs);
 
     return () => {
-      newWs.close();
+      if (newWs.readyState === WebSocket.OPEN) {
+        newWs.close();
+      }
     };
   }, []);
 
@@ -90,25 +89,23 @@ const Chatbot: React.FC<ChatbotProps> = ({ grade, semester, subject, unit, topic
         topic,
         userMessage: message
       }));
-      setMessage("");
+      console.log('-------send Message-------');
+      setMessage(""); // 메시지 전송 후 입력란 비우기
     }
   };
 
   const handleSaveChatSummary = async () => {
     try {
-      await api.post("/chatbot/save-summary", {
-        // grade,
-        // semester,
-        subject,
-        // unit,
-        // topic,
-      });
       setChatHistory([]);
-      alert("Chat summary saved successfully");
       onChatbotEnd();
+      alert("Chat summary saved successfully");
     } catch (error: any) {
       console.error("Error saving chat summary:", error);
       onChatbotEnd();
+    } finally {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.close();
+      }
     }
   };
 

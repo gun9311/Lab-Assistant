@@ -1,5 +1,5 @@
 import React, { createContext, useState, useContext, ReactNode } from 'react';
-import { Snackbar, Alert } from '@mui/material'; // 추가된 임포트
+import { Snackbar, Alert } from '@mui/material';
 
 interface ChatbotContextProps {
   isChatbotActive: boolean;
@@ -22,7 +22,7 @@ export const ChatbotProvider: React.FC<ChatbotProviderProps> = ({ children }) =>
       {children}
       <Snackbar 
         open={alertOpen} 
-        autoHideDuration={6000} 
+        autoHideDuration={2000} 
         onClose={() => setAlertOpen(false)}
         anchorOrigin={{ vertical: 'top', horizontal: 'center' }} // 화면 중앙에 표시
       >

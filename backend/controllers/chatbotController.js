@@ -1,21 +1,13 @@
-const { v4: uuidv4 } = require('uuid'); // UUID 생성 라이브러리
+const { v4: uuidv4 } = require('uuid');
 const { getNLPResponse } = require('../services/nlpService');
 const ChatSummary = require('../models/ChatSummary');
 const redisClient = require('../utils/redisClient'); // Redis 클라이언트 가져오기
 
 let clients = {}; // 실제 웹소켓 객체를 메모리에 저장
 
-const handleWebSocketConnection = async (ws, userId) => {
-  const clientsKey = `clients:${userId}`;
+const handleWebSocketConnection = async (ws, userId, subject) => {
   const chatHistoryKey = `chatHistories:${userId}`;
   const clientId = uuidv4(); // 고유한 클라이언트 ID 생성
-
-  let clientList = await redisClient.get(clientsKey);
-  if (!clientList) {
-    clientList = [];
-  } else {
-    clientList = JSON.parse(clientList);
-  }
 
   let chatHistory = await redisClient.get(chatHistoryKey);
   if (!chatHistory) {
@@ -24,10 +16,29 @@ const handleWebSocketConnection = async (ws, userId) => {
     chatHistory = JSON.parse(chatHistory);
   }
 
-  // 클라이언트 목록에 새로운 클라이언트 추가
-  clientList.push(clientId);
-  await redisClient.set(clientsKey, JSON.stringify(clientList));
-  clients[clientId] = ws; // 실제 웹소켓 객체를 메모리에 저장
+  // 클라이언트 연결 저장
+  clients[clientId] = ws; // 각 클라이언트의 ws 객체를 고유하게 저장
+  console.log('클라이언트 연결 저장 clients : ' + clients);
+
+  // 핑/퐁 메커니즘 설정
+  let isAlive = true;
+
+  ws.on('pong', () => {
+    isAlive = true;
+  });
+
+  const pingInterval = setInterval(async () => {
+    if (ws.readyState === ws.OPEN) {
+      if (!isAlive) {
+        console.log('----------!isAlive--------------');
+        await handleDisconnection(userId, subject, clientId, ws);
+      } else {
+        isAlive = false;
+        ws.ping();
+        console.log('----------ws.ping 호출됨--------------');
+      }
+    }
+  }, 60000); // 60초마다 핑 메시지 전송
 
   ws.on('message', async (message) => {
     const { grade, semester, subject, unit, topic, userMessage } = JSON.parse(message);
@@ -40,34 +51,36 @@ const handleWebSocketConnection = async (ws, userId) => {
     chatHistory.push({ user: userMessage, bot: botResponse });
     await redisClient.set(chatHistoryKey, JSON.stringify(chatHistory));
 
-    clientList.forEach(clientId => {
-      if (clients[clientId]) {
-        clients[clientId].send(JSON.stringify({ user: userMessage, bot: botResponse }));
-      }
-    });
+    ws.send(JSON.stringify({ user: userMessage, bot: botResponse }));
   });
 
   ws.on('close', async () => {
-    let clientList = await redisClient.get(clientsKey);
-    if (clientList) {
-      clientList = JSON.parse(clientList).filter(id => id !== clientId);
-      await redisClient.set(clientsKey, JSON.stringify(clientList));
-    }
-    delete clients[clientId]; // 메모리에서 웹소켓 객체 제거
+    console.log('----------ws.close 호출됨--------------');
+    clearInterval(pingInterval); // 핑/퐁 메커니즘 중지
+    await handleDisconnection(userId, subject, clientId, ws);
   });
 };
 
-const saveChatSummary = async (req, res) => {
-  const userId = req.user._id;
-  const { subject } = req.body;
+const handleDisconnection = async (userId, subject, clientId, ws) => {
+  await saveChatSummaryInternal(userId, subject); // 실제 subject 정보를 전달
+  // console.log('----------saveChatSummaryInternal 호출됨--------------');
 
-  const clientsKey = `clients:${userId}`;
+  delete clients[clientId]; // 메모리에서 웹소켓 객체 제거
+  console.log('객체 제거 clients : ' + clients);
+
+  if (ws.readyState === ws.OPEN || ws.readyState === ws.CLOSING) {
+    ws.terminate(); // 연결 종료
+  }
+};
+
+const saveChatSummaryInternal = async (userId, subject) => {
   const chatHistoryKey = `chatHistories:${userId}`;
 
   try {
     let chatHistory = await redisClient.get(chatHistoryKey);
     if (!chatHistory) {
-      return res.status(400).send({ error: 'No chat history found for this user' });
+      console.error('No chat history found for this user');
+      return;
     }
 
     chatHistory = JSON.parse(chatHistory);
@@ -94,11 +107,27 @@ const saveChatSummary = async (req, res) => {
 
     // 대화 내역 삭제
     await redisClient.del(chatHistoryKey);
-    await redisClient.del(clientsKey);
 
-    res.status(200).send({ message: 'Chat summary saved successfully' });
+    console.log('Chat summary saved successfully');
   } catch (error) {
     console.error('Failed to save chat summary:', error);
+  }
+};
+
+const saveChatSummary = async (req, res) => {
+  const userId = req.user._id;
+  const { subject } = req.body;
+  console.log('----------saveChatSummary 호출됨--------------');
+
+  try {
+    const clientId = Object.keys(clients).find(key => clients[key].userId === userId);
+    if (clientId) {
+      const ws = clients[clientId];
+      await handleDisconnection(userId, subject, clientId, ws);
+    }
+    
+    res.status(200).send({ message: 'Chat summary saved successfully' });
+  } catch (error) {
     res.status(500).send({ error: 'Failed to save chat summary' });
   }
 };

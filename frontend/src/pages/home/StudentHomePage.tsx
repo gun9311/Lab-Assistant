@@ -1,12 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Chatbot from '../../components/student/Chatbot';
 import LogoutButton from '../../components/auth/LogoutButton';
 import SubjectSelector from '../../components/student/SubjectSelector';
-import { Container, Typography, Button, Paper, Box } from '@mui/material';
+import { Container, Typography, Button, Paper, Box, Snackbar, Alert } from '@mui/material';
 import { useChatbotContext } from '../../context/ChatbotContext';
 
 const StudentHomePage: React.FC = () => {
-  const { isChatbotActive, setIsChatbotActive } = useChatbotContext();
+  const { isChatbotActive, setIsChatbotActive, setAlertOpen } = useChatbotContext();
   const [selection, setSelection] = useState({
     grade: '',
     semester: '',
@@ -14,6 +14,8 @@ const StudentHomePage: React.FC = () => {
     unit: '',
     topic: ''
   });
+  const [remainingTime, setRemainingTime] = useState<number | null>(null);
+  const [sessionEndedAlertOpen, setSessionEndedAlertOpen] = useState(false); // 추가된 상태
 
   const handleSelectionChange = (newSelection: typeof selection) => {
     setSelection(newSelection);
@@ -21,11 +23,56 @@ const StudentHomePage: React.FC = () => {
 
   const handleChatbotStart = () => {
     setIsChatbotActive(true);
+    setRemainingTime(3600); // 1시간 = 3600초
   };
 
   const handleChatbotEnd = () => {
     setIsChatbotActive(false);
-    window.location.reload(); // 페이지 새로고침
+    setRemainingTime(null);
+  };
+
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (isChatbotActive && remainingTime !== null) {
+      timer = setInterval(() => {
+        setRemainingTime(prevTime => {
+          if (prevTime !== null && prevTime > 0) {
+            return prevTime - 1;
+          } else {
+            clearInterval(timer);
+            handleChatbotEnd();
+            setSessionEndedAlertOpen(true); // 챗봇 세션 종료 알림 표시
+            return null;
+          }
+        });
+      }, 1000);
+    }
+
+    return () => {
+      if (timer) {
+        clearInterval(timer);
+      }
+    };
+  }, [isChatbotActive, remainingTime]);
+
+  useEffect(() => {
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (isChatbotActive) {
+        event.preventDefault();
+        event.returnValue = '';
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [isChatbotActive, setAlertOpen]);
+
+  const formatTime = (seconds: number) => {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes}:${remainingSeconds < 10 ? '0' : ''}${remainingSeconds}`;
   };
 
   return (
@@ -47,6 +94,13 @@ const StudentHomePage: React.FC = () => {
           </Box>
         )}
         {isChatbotActive && (
+          <Box textAlign="center" sx={{ mt: 2 }}>
+            <Typography variant="h6" color="secondary">
+              남은 시간: {formatTime(remainingTime || 0)}
+            </Typography>
+          </Box>
+        )}
+        {isChatbotActive && (
           <Chatbot
             grade={selection.grade}
             semester={selection.semester}
@@ -60,6 +114,16 @@ const StudentHomePage: React.FC = () => {
           <LogoutButton />
         </Box>
       </Paper>
+      <Snackbar 
+        open={sessionEndedAlertOpen} 
+        autoHideDuration={3000} 
+        onClose={() => setSessionEndedAlertOpen(false)}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert onClose={() => setSessionEndedAlertOpen(false)} severity="warning" sx={{ width: '100%' }}>
+          챗봇 세션이 종료되었습니다!
+        </Alert>
+      </Snackbar>
     </Container>
   );
 };

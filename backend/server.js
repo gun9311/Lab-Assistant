@@ -16,6 +16,7 @@ const { handleWebSocketConnection } = require('./controllers/chatbotController')
 const ChatSummary = require('./models/ChatSummary');
 const cron = require('node-cron');
 const redisClient = require('./utils/redisClient'); // Redis 클라이언트 가져오기
+const auth = require('./middleware/auth'); // auth 미들웨어 임포트
 
 require('dotenv').config();
 
@@ -50,7 +51,8 @@ const wss = new WebSocketServer({ server });
 wss.on('connection', (ws, req) => {
   const urlParams = new URLSearchParams(req.url.split('?')[1]);
   const token = urlParams.get('token');
-  if (!token) {
+  const subject = urlParams.get('subject');
+  if (!token || !subject) {
     ws.close();
     return;
   }
@@ -62,7 +64,7 @@ wss.on('connection', (ws, req) => {
     }
 
     ws.user = user;
-    handleWebSocketConnection(ws, user._id);
+    handleWebSocketConnection(ws, user._id, subject);
   });
 });
 
