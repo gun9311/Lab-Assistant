@@ -26,13 +26,13 @@ const TeacherLoginPage = () => {
     <Container component="main" maxWidth="xs">
       <Paper elevation={3} sx={{ padding: 4, marginTop: 8 }}>
         <Typography variant="h4" gutterBottom>
-          Teacher Login
+          교사 로그인
         </Typography>
         <TextField
           fullWidth
           variant="outlined"
           margin="normal"
-          label="Email"
+          label="이메일"
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
@@ -41,7 +41,7 @@ const TeacherLoginPage = () => {
           fullWidth
           variant="outlined"
           margin="normal"
-          label="Password"
+          label="비밀번호"
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}

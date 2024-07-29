@@ -1,6 +1,5 @@
 const User = require("../models/Admin");
 const QuizResult = require("../models/QuizResult");
-const Question = require("../models/Question");
 const ChatSummary = require("../models/ChatSummary");
 const Teacher = require('../models/Teacher');
 const Student = require('../models/Student');
@@ -34,39 +33,6 @@ const getStudentQuizResults = async (req, res) => {
     res.status(200).send(quizResults);
   } catch (error) {
     res.status(500).send({ error: "Failed to fetch quiz results" });
-  }
-};
-
-const getStudentQuestions = async (req, res) => {
-  const { studentId } = req.params;
-  try {
-    const questions = await Question.find({ student: studentId });
-    res.status(200).send(questions);
-  } catch (error) {
-    res.status(500).send({ error: "Failed to fetch questions" });
-  }
-};
-
-const getStudentChatSummary = async (req, res) => {
-  const { studentId } = req.params;
-  try {
-    const chatSummary = await ChatSummary.find({ student: studentId });
-    res.status(200).send(chatSummary);
-  } catch (error) {
-    res.status(500).send({ error: "Failed to fetch chat summary" });
-  }
-};
-
-const getStudentReport = async (req, res) => {
-  try {
-    const { studentId } = req.params;
-    const quizResults = await QuizResult.find({ studentId });
-    const chatSummaries = await ChatSummary.find({ studentId });
-
-    const report = await generateReport(quizResults, chatSummaries);
-    res.status(200).send(report);
-  } catch (error) {
-    res.status(500).send({ error: "Failed to generate student report" });
   }
 };
 
@@ -140,11 +106,6 @@ const deleteProfile = async (req, res) => {
 
 module.exports = {
   getStudents,
-  createStudent,
-  getStudentQuizResults,
-  getStudentQuestions,
-  getStudentChatSummary,
-  getStudentReport,
   getProfile, 
   updateProfile,
   deleteProfile,

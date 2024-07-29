@@ -8,7 +8,7 @@ const jwt = require('jsonwebtoken');
 const authRoutes = require('./routes/authRoutes');
 const quizRoutes = require('./routes/quizRoutes');
 const quizResultsRoutes = require('./routes/quizResultsRoutes');
-const chatbotRoutes = require('./routes/chatbotRoutes');
+const chatRoutes = require('./routes/chatRoutes');
 const userRoutes = require('./routes/userRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const subjectRoutes = require('./routes/subjectRoutes');
@@ -36,7 +36,7 @@ app.use(session({
 app.use(bodyParser.json());
 app.use('/api/auth', authRoutes);
 app.use('/api/quiz', quizRoutes);
-app.use('/api/chatbot', chatbotRoutes);
+app.use('/api/chat', chatRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/subjects', subjectRoutes);

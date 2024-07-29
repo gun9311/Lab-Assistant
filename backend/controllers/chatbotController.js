@@ -114,22 +114,4 @@ const saveChatSummaryInternal = async (userId, subject) => {
   }
 };
 
-const saveChatSummary = async (req, res) => {
-  const userId = req.user._id;
-  const { subject } = req.body;
-  console.log('----------saveChatSummary 호출됨--------------');
-
-  try {
-    const clientId = Object.keys(clients).find(key => clients[key].userId === userId);
-    if (clientId) {
-      const ws = clients[clientId];
-      await handleDisconnection(userId, subject, clientId, ws);
-    }
-    
-    res.status(200).send({ message: 'Chat summary saved successfully' });
-  } catch (error) {
-    res.status(500).send({ error: 'Failed to save chat summary' });
-  }
-};
-
-module.exports = { handleWebSocketConnection, saveChatSummary };
+module.exports = { handleWebSocketConnection };
