@@ -1,5 +1,6 @@
-import React from 'react';
-import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Typography, Box, Button, Collapse } from '@mui/material';
+import React, { useEffect, useState } from 'react';
+import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Typography, Box, Button, Collapse, CircularProgress } from '@mui/material';
+import api from '../../../utils/api';
 
 interface QuizResult {
   _id: string;
@@ -18,18 +19,73 @@ interface QuizResult {
 }
 
 interface QuizResultsProps {
-  filteredResults: QuizResult[];
-  selectedQuiz: QuizResult | null;
-  handleQuizResultClick: (quizResult: QuizResult) => void;
-  handleCloseDetails: () => void;
+  studentId?: number;
+  filteredResults?: QuizResult[];
+  selectedQuiz?: QuizResult | null;
+  selectedSemester?: string;
+  selectedSubject?: string;
+  handleQuizResultClick?: (quizResult: QuizResult) => void;
+  handleCloseDetails?: () => void;
 }
 
-const QuizResults: React.FC<QuizResultsProps> = ({ filteredResults, selectedQuiz, handleQuizResultClick, handleCloseDetails }) => {
+const QuizResults: React.FC<QuizResultsProps> = ({
+  studentId,
+  filteredResults,
+  selectedQuiz,
+  selectedSemester,
+  selectedSubject,
+  handleQuizResultClick,
+  handleCloseDetails
+}) => {
+  const [quizResults, setQuizResults] = useState<QuizResult[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  const [noData, setNoData] = useState<boolean>(false); // 추가된 상태: 퀴즈 내역이 전혀 없는 경우
+
+  useEffect(() => {
+    const fetchQuizResults = async () => {
+      if (studentId) {
+        setLoading(true);
+        try {
+          const response = await api.get(`/quiz-results/${studentId}`);
+          setQuizResults(response.data);
+          setNoData(response.data.length === 0);
+        } catch (err) {
+          setError('퀴즈 결과를 가져오는 중 오류가 발생했습니다.');
+          setNoData(true);
+        } finally {
+          setLoading(false);
+        }
+      }
+    };
+    fetchQuizResults();
+  }, [studentId]);
+
+  // 조건에 따라 결과 목록 설정
+  const results = studentId ? quizResults : filteredResults || [];
+
+  const filteredQuizResults = results.filter(result => 
+    (selectedSemester === 'All' || result.semester === selectedSemester) &&
+    (selectedSubject === 'All' || result.subject === selectedSubject)
+  );
+
+  if (studentId && loading) {
+    return <CircularProgress />;
+  }
+
+  if (studentId && error) {
+    return <Typography>Error: {error}</Typography>;
+  }
+
   return (
     <>
-      {filteredResults.length === 0 ? (
+      {noData ? (
         <Box textAlign="center" sx={{ mt: 2 }}>
-          <Typography variant="h6">퀴즈 내역이 없습니다.</Typography>
+          <Typography>퀴즈 내역이 없습니다.</Typography>
+        </Box>
+      ) : filteredQuizResults.length === 0 ? (
+        <Box textAlign="center" sx={{ mt: 2 }}>
+          <Typography>선택한 학기 또는 과목에 대한 퀴즈 내역이 없습니다.</Typography>
         </Box>
       ) : (
         <TableContainer component={Paper} sx={{ mt: 2 }}>
@@ -44,8 +100,8 @@ const QuizResults: React.FC<QuizResultsProps> = ({ filteredResults, selectedQuiz
               </TableRow>
             </TableHead>
             <TableBody>
-              {filteredResults.map(result => (
-                <TableRow key={result._id} onClick={() => handleQuizResultClick(result)}>
+              {filteredQuizResults.map(result => (
+                <TableRow key={result._id} onClick={() => handleQuizResultClick && handleQuizResultClick(result)}>
                   <TableCell>{new Date(result.createdAt).toLocaleDateString()}</TableCell>
                   <TableCell>{result.semester}</TableCell>
                   <TableCell>{result.subject}</TableCell>

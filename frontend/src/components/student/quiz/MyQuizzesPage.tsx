@@ -42,6 +42,7 @@ const MyQuizzesPage: React.FC = () => {
   const fetchQuizResults = async () => {
     try {
       const response = await api.get('/quiz-results'); // 퀴즈 결과를 가져오는 API 엔드포인트
+      console.log(response.data)
       setQuizResults(response.data);
       setFilteredResults(response.data);
     } catch (error: any) {

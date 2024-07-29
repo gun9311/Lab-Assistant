@@ -1,11 +1,27 @@
 import React, { useState, useEffect } from "react";
 import api from "../../utils/api";
-import { List, ListItem, ListItemText, Paper, Typography, IconButton, Collapse } from "@mui/material";
+import { List, ListItem, ListItemText, Paper, Typography, IconButton, Collapse, Box, Select, MenuItem, FormControl, InputLabel, SelectChangeEvent, useTheme, Divider } from "@mui/material";
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
-import QuizResults from "./QuizResults";
+import QuizResults from "../student/quiz/QuizResults";
 import ChatSummaryList from "./ChatSummaryList";
 import StudentReport from "./StudentReport";
+
+interface QuizResult {
+  _id: string;
+  subject: string;
+  semester: string;
+  unit: string;
+  score: number;
+  createdAt: string;
+  results: {
+    questionId: string;
+    taskText: string;
+    studentAnswer: string;
+    correctAnswer: string;
+    similarity: number;
+  }[];
+}
 
 type Student = {
   _id: number;
@@ -26,8 +42,12 @@ const StudentList: React.FC<StudentListProps> = ({
   grade,
   classNumber,
 }) => {
+  const theme = useTheme();
   const [students, setStudents] = useState<Student[]>([]);
-  const [expandedSections, setExpandedSections] = useState<{ [key: number]: { quiz: boolean, chat: boolean, report: boolean } }>({});
+  const [expandedSections, setExpandedSections] = useState<{ [key: number]: string }>({});
+  const [selectedQuiz, setSelectedQuiz] = useState<QuizResult | null>(null);
+  const [selectedSemester, setSelectedSemester] = useState<string>('All');
+  const [selectedSubject, setSelectedSubject] = useState<string>('All');
 
   useEffect(() => {
     const fetchStudents = async () => {
@@ -50,47 +70,125 @@ const StudentList: React.FC<StudentListProps> = ({
   }, [school, grade, classNumber]);
 
   const handleToggle = (studentId: number, section: 'quiz' | 'chat' | 'report') => {
-    setExpandedSections(prevState => ({
-      ...prevState,
-      [studentId]: {
-        ...prevState[studentId],
-        [section]: !prevState[studentId]?.[section]
+    setExpandedSections(prevState => {
+      if (prevState[studentId] === section) {
+        return { ...prevState, [studentId]: "" };
       }
-    }));
+      return { ...prevState, [studentId]: section };
+    });
+  };
+
+  const handleQuizResultClick = (quizResult: QuizResult) => {
+    setSelectedQuiz(quizResult);
+  };
+
+  const handleCloseDetails = () => {
+    setSelectedQuiz(null);
+  };
+
+  const handleSemesterChange = (event: SelectChangeEvent<string>) => {
+    setSelectedSemester(event.target.value);
+  };
+
+  const handleSubjectChange = (event: SelectChangeEvent<string>) => {
+    setSelectedSubject(event.target.value);
   };
 
   return (
-    <Paper elevation={3} sx={{ padding: 2, marginTop: 2 }}>
-      <Typography variant="h5" gutterBottom align="center">
+    <Paper elevation={3} sx={{ padding: theme.spacing(2), marginTop: theme.spacing(2), backgroundColor: theme.palette.background.paper }}>
+      <Typography variant="h5" gutterBottom align="center" sx={{ color: theme.palette.primary.main }}>
         학생 목록
       </Typography>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', marginBottom: theme.spacing(2) }}>
+        <FormControl sx={{ minWidth: 120 }}>
+          <InputLabel>학기 선택</InputLabel>
+          <Select
+            value={selectedSemester}
+            onChange={handleSemesterChange}
+          >
+            <MenuItem value="All">전체</MenuItem>
+            <MenuItem value="1학기">1학기</MenuItem>
+            <MenuItem value="2학기">2학기</MenuItem>
+          </Select>
+        </FormControl>
+        <FormControl sx={{ minWidth: 120 }}>
+          <InputLabel>과목 선택</InputLabel>
+          <Select
+            value={selectedSubject}
+            onChange={handleSubjectChange}
+          >
+            <MenuItem value="All">전체</MenuItem>
+            <MenuItem value="국어">국어</MenuItem>
+            <MenuItem value="수학">수학</MenuItem>
+            <MenuItem value="사회">사회</MenuItem>
+            <MenuItem value="과학">과학</MenuItem>
+            <MenuItem value="영어">영어</MenuItem>
+          </Select>
+        </FormControl>
+      </Box>
       <List>
         {students.map((student) => (
           <React.Fragment key={student._id}>
-            <ListItem>
+            <ListItem sx={{ backgroundColor: theme.palette.grey[100], borderRadius: theme.shape.borderRadius, marginBottom: theme.spacing(1), boxShadow: expandedSections[student._id] ? `0 4px 8px ${theme.palette.primary.main}` : 'none' }}>
               <ListItemText
                 primary={`${student.studentId} - ${student.name}`}
                 secondary={`학년: ${student.grade}, 반: ${student.class}`}
               />
-              <IconButton onClick={() => handleToggle(student._id, 'chat')}>
-                {expandedSections[student._id]?.chat ? <ExpandLessIcon /> : <ExpandMoreIcon />} 채팅 목록
+              <IconButton
+                onClick={() => handleToggle(student._id, 'chat')}
+                sx={{ backgroundColor: expandedSections[student._id] === 'chat' ? theme.palette.action.selected : 'transparent' }}
+              >
+                {expandedSections[student._id] === 'chat' ? <ExpandLessIcon /> : <ExpandMoreIcon />} 
+                <Typography variant="body2" sx={{ ml: 1, fontSize: '1rem' }}>채팅 목록</Typography>
               </IconButton>
-              <IconButton onClick={() => handleToggle(student._id, 'quiz')}>
-                {expandedSections[student._id]?.quiz ? <ExpandLessIcon /> : <ExpandMoreIcon />} 퀴즈 결과
+              <IconButton
+                onClick={() => handleToggle(student._id, 'quiz')}
+                sx={{ backgroundColor: expandedSections[student._id] === 'quiz' ? theme.palette.action.selected : 'transparent' }}
+              >
+                {expandedSections[student._id] === 'quiz' ? <ExpandLessIcon /> : <ExpandMoreIcon />} 
+                <Typography variant="body2" sx={{ ml: 1, fontSize: '1rem' }}>퀴즈 결과</Typography>
               </IconButton>
-              <IconButton onClick={() => handleToggle(student._id, 'report')}>
-                {expandedSections[student._id]?.report ? <ExpandLessIcon /> : <ExpandMoreIcon />} 학생 보고서
+              <IconButton
+                onClick={() => handleToggle(student._id, 'report')}
+                sx={{ backgroundColor: expandedSections[student._id] === 'report' ? theme.palette.action.selected : 'transparent' }}
+              >
+                {expandedSections[student._id] === 'report' ? <ExpandLessIcon /> : <ExpandMoreIcon />} 
+                <Typography variant="body2" sx={{ ml: 1, fontSize: '1rem' }}>학생 보고서</Typography>
               </IconButton>
             </ListItem>
-            <Collapse in={expandedSections[student._id]?.chat}>
-              {expandedSections[student._id]?.chat && <ChatSummaryList studentId={student._id} />}
+            <Collapse in={expandedSections[student._id] === 'chat'}>
+              {expandedSections[student._id] === 'chat' && (
+                <Box sx={{ padding: theme.spacing(2), marginBottom: theme.spacing(1) }}>
+                  <ChatSummaryList
+                    studentId={student._id}
+                    selectedSemester={selectedSemester}
+                    selectedSubject={selectedSubject}
+                  />
+                </Box>
+              )}
             </Collapse>
-            <Collapse in={expandedSections[student._id]?.quiz}>
-              {expandedSections[student._id]?.quiz && <QuizResults studentId={student._id} />}
+            <Collapse in={expandedSections[student._id] === 'quiz'}>
+              {expandedSections[student._id] === 'quiz' && (
+                <Box sx={{ padding: theme.spacing(2), marginBottom: theme.spacing(1) }}>
+                  <QuizResults 
+                    studentId={student._id}
+                    selectedSemester={selectedSemester}
+                    selectedSubject={selectedSubject}
+                    selectedQuiz={selectedQuiz}
+                    handleQuizResultClick={handleQuizResultClick}
+                    handleCloseDetails={handleCloseDetails}
+                  />
+                </Box>
+              )}
             </Collapse>
-            <Collapse in={expandedSections[student._id]?.report}>
-              {expandedSections[student._id]?.report && <StudentReport studentId={student._id} />}
+            <Collapse in={expandedSections[student._id] === 'report'}>
+              {expandedSections[student._id] === 'report' && (
+                <Box sx={{ padding: theme.spacing(2), marginBottom: theme.spacing(1) }}>
+                  <StudentReport studentId={student._id} />
+                </Box>
+              )}
             </Collapse>
+            <Divider />
           </React.Fragment>
         ))}
       </List>

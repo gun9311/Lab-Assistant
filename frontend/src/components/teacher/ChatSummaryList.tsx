@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../utils/api';
-import { Box, Typography, List, ListItem, ListItemText, MenuItem, Select, FormControl, InputLabel, SelectChangeEvent, Switch, FormControlLabel } from '@mui/material';
+import { Box, Typography, List, ListItem, ListItemText, Switch, FormControlLabel } from '@mui/material';
 
 type Summary = {
   summary: string;
@@ -14,18 +14,23 @@ type SubjectSummary = {
 
 type ChatSummaryListProps = {
   studentId: number;
+  selectedSemester: string;
+  selectedSubject: string;
 };
 
-const ChatSummaryList: React.FC<ChatSummaryListProps> = ({ studentId }) => {
+const ChatSummaryList: React.FC<ChatSummaryListProps> = ({ studentId, selectedSemester, selectedSubject }) => {
   const [chatSummaries, setChatSummaries] = useState<SubjectSummary[]>([]);
-  const [selectedSubject, setSelectedSubject] = useState<string>('All');
   const [onlyStudentQuestions, setOnlyStudentQuestions] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
+  const [noData, setNoData] = useState<boolean>(false); // 추가된 상태: 채팅 내역이 전혀 없는 경우
 
   useEffect(() => {
     const fetchChatSummaries = async () => {
+      setLoading(true);
       try {
-        const res = await api.get(`/chat/summary/${studentId}`);
+        const res = await api.get(`/chat/summary/${studentId}`, {
+          params: { semester: selectedSemester, subject: selectedSubject }
+        });
         console.log('API Response:', res.data);
 
         if (Array.isArray(res.data) && res.data.length > 0 && Array.isArray(res.data[0].subjects)) {
@@ -37,9 +42,15 @@ const ChatSummaryList: React.FC<ChatSummaryListProps> = ({ studentId }) => {
           });
 
           setChatSummaries(subjects);
+          setNoData(subjects.length === 0);
+        } else {
+          setChatSummaries([]);
+          setNoData(true);
         }
       } catch (error) {
         console.error('Error fetching chat summaries:', error);
+        setChatSummaries([]);
+        setNoData(true);
       } finally {
         setLoading(false);
       }
@@ -47,10 +58,6 @@ const ChatSummaryList: React.FC<ChatSummaryListProps> = ({ studentId }) => {
 
     fetchChatSummaries();
   }, [studentId]);
-
-  const handleSubjectChange = (event: SelectChangeEvent<string>) => {
-    setSelectedSubject(event.target.value);
-  };
 
   const handleFilterChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setOnlyStudentQuestions(event.target.checked);
@@ -73,29 +80,11 @@ const ChatSummaryList: React.FC<ChatSummaryListProps> = ({ studentId }) => {
     return <Typography>Loading...</Typography>;
   }
 
-  if (!Array.isArray(chatSummaries) || chatSummaries.length === 0) {
-    return <Typography>No chat summaries available</Typography>;
-  }
-
   return (
     <Box>
       <Typography variant="h6" gutterBottom>
-        채팅 내역
+        채팅 내역 (최근 일주일)
       </Typography>
-      <FormControl fullWidth sx={{ mb: 2 }}>
-        <InputLabel>과목 선택</InputLabel>
-        <Select
-          value={selectedSubject}
-          onChange={handleSubjectChange}
-        >
-          <MenuItem value="All">전체</MenuItem>
-          {chatSummaries.map((summary, index) => (
-            <MenuItem key={index} value={summary.subject}>
-              {summary.subject}
-            </MenuItem>
-          ))}
-        </Select>
-      </FormControl>
       <FormControlLabel
         control={
           <Switch
@@ -106,24 +95,34 @@ const ChatSummaryList: React.FC<ChatSummaryListProps> = ({ studentId }) => {
         label="학생 질문만 보기"
         sx={{ mb: 2 }}
       />
-      <List>
-        {studentFilteredSummaries.map((summary, index) => (
-          <Box key={index} sx={{ mb: 2 }}>
-            <Typography variant="subtitle1" sx={{ fontWeight: 'bold', color: '#3f51b5' }}>
-              {summary.subject}
-            </Typography>
-            {summary.summaries.map((item, idx) => (
-              <ListItem key={idx} sx={{ backgroundColor: '#f5f5f5', borderRadius: 1, mb: 1 }}>
-                <ListItemText
-                  primary={onlyStudentQuestions ? extractStudentQuestions(item.summary) : item.summary}
-                  secondary={new Date(item.createdAt).toLocaleString()}
-                  primaryTypographyProps={{ style: { whiteSpace: 'pre-line' } }}
-                />
-              </ListItem>
-            ))}
-          </Box>
-        ))}
-      </List>
+      {noData ? (
+        <Box textAlign="center" sx={{ mt: 2 }}>
+          <Typography>채팅 전혀 없습니다.</Typography>
+        </Box>
+      ) : studentFilteredSummaries.length === 0 ? (
+        <Box textAlign="center" sx={{ mt: 2 }}>
+          <Typography>선택한 과목에 대한 채팅 내역이 없습니다.</Typography>
+        </Box>
+      ) : (
+        <List>
+          {studentFilteredSummaries.map((summary, index) => (
+            <Box key={index} sx={{ mb: 2 }}>
+              <Typography variant="subtitle1" sx={{ fontWeight: 'bold', color: '#3f51b5' }}>
+                {summary.subject}
+              </Typography>
+              {summary.summaries.map((item, idx) => (
+                <ListItem key={idx} sx={{ backgroundColor: '#f5f5f5', borderRadius: 1, mb: 1 }}>
+                  <ListItemText
+                    primary={onlyStudentQuestions ? extractStudentQuestions(item.summary) : item.summary}
+                    secondary={new Date(item.createdAt).toLocaleString()}
+                    primaryTypographyProps={{ style: { whiteSpace: 'pre-line' } }}
+                  />
+                </ListItem>
+              ))}
+            </Box>
+          ))}
+        </List>
+      )}
     </Box>
   );
 };

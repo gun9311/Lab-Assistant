@@ -11,13 +11,7 @@ const Layout: React.FC = () => {
 
   return (
     <Container component="main">
-      {/* {role === 'student' ? (
-        <StudentProvider>
-          <Outlet />
-        </StudentProvider>
-      ) : ( */}
         <Outlet />
-      {/* )} */}
       <Navbar role={role} />
     </Container>
   );
