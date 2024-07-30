@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from "react";
 import api from "../../utils/api";
-import { List, ListItem, ListItemText, Paper, Typography, IconButton, Collapse, Box, Select, MenuItem, FormControl, InputLabel, SelectChangeEvent, useTheme, Divider } from "@mui/material";
+import { List, ListItem, ListItemText, Paper, Typography, IconButton, Collapse, Box, Select, MenuItem, FormControl, InputLabel, SelectChangeEvent, useTheme, Divider, Button } from "@mui/material";
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import QuizResults from "../student/quiz/QuizResults";
 import ChatSummaryList from "./ChatSummaryList";
 import StudentReport from "./StudentReport";
+import ReportGeneration from "./ReportGeneration";
 
 interface QuizResult {
   _id: string;
@@ -26,7 +27,7 @@ interface QuizResult {
 type Student = {
   _id: number;
   name: string;
-  grade: string;
+  grade: number;  // 숫자 타입으로 수정
   class: string;
   studentId: string;
 };
@@ -48,6 +49,7 @@ const StudentList: React.FC<StudentListProps> = ({
   const [selectedQuiz, setSelectedQuiz] = useState<QuizResult | null>(null);
   const [selectedSemester, setSelectedSemester] = useState<string>('All');
   const [selectedSubject, setSelectedSubject] = useState<string>('All');
+  const [showReportGeneration, setShowReportGeneration] = useState<boolean>(false);
 
   useEffect(() => {
     const fetchStudents = async () => {
@@ -94,6 +96,18 @@ const StudentList: React.FC<StudentListProps> = ({
     setSelectedSubject(event.target.value);
   };
 
+  const handleShowReportGeneration = () => {
+    setShowReportGeneration(true);
+  };
+
+  const handleBackToList = () => {
+    setShowReportGeneration(false);
+  };
+
+  if (showReportGeneration) {
+    return <ReportGeneration onBack={handleBackToList} school={school} grade={grade} classNumber={classNumber} students={students} />;
+  }
+
   return (
     <Paper elevation={3} sx={{ padding: theme.spacing(2), marginTop: theme.spacing(2), backgroundColor: theme.palette.background.paper }}>
       <Typography variant="h5" gutterBottom align="center" sx={{ color: theme.palette.primary.main }}>
@@ -111,7 +125,7 @@ const StudentList: React.FC<StudentListProps> = ({
             <MenuItem value="2학기">2학기</MenuItem>
           </Select>
         </FormControl>
-        <FormControl sx={{ minWidth: 120 }}>
+        <FormControl sx={{ minWidth: 120, marginLeft: theme.spacing(2) }}>
           <InputLabel>과목 선택</InputLabel>
           <Select
             value={selectedSubject}
@@ -125,6 +139,9 @@ const StudentList: React.FC<StudentListProps> = ({
             <MenuItem value="영어">영어</MenuItem>
           </Select>
         </FormControl>
+        <Button variant="contained" color="primary" onClick={handleShowReportGeneration} sx={{ marginLeft: 'auto' }}>
+          보고서 일괄 생성 및 조회
+        </Button>
       </Box>
       <List>
         {students.map((student) => (

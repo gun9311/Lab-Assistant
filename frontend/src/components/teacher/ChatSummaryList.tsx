@@ -97,7 +97,7 @@ const ChatSummaryList: React.FC<ChatSummaryListProps> = ({ studentId, selectedSe
       />
       {noData ? (
         <Box textAlign="center" sx={{ mt: 2 }}>
-          <Typography>채팅 전혀 없습니다.</Typography>
+          <Typography>채팅 내역이 없습니다.</Typography>
         </Box>
       ) : studentFilteredSummaries.length === 0 ? (
         <Box textAlign="center" sx={{ mt: 2 }}>

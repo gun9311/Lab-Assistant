@@ -12,6 +12,7 @@ const chatRoutes = require('./routes/chatRoutes');
 const userRoutes = require('./routes/userRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const subjectRoutes = require('./routes/subjectRoutes');
+const reportRoutes = require('./routes/reportRoutes'); // 새로운 라우트 추가
 const { handleWebSocketConnection } = require('./controllers/chatbotController');
 const ChatSummary = require('./models/ChatSummary');
 const cron = require('node-cron');
@@ -41,6 +42,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/subjects', subjectRoutes);
 app.use('/api/quiz-results', quizResultsRoutes);
+app.use('/api/reports', reportRoutes); // 새로운 라우트 추가
 
 const server = app.listen(process.env.PORT || 5000, () => {
   console.log(`Server running on port ${process.env.PORT || 5000}`);
