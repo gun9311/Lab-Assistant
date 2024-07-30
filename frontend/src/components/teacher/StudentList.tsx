@@ -140,7 +140,7 @@ const StudentList: React.FC<StudentListProps> = ({
           </Select>
         </FormControl>
         <Button variant="contained" color="primary" onClick={handleShowReportGeneration} sx={{ marginLeft: 'auto' }}>
-          보고서 일괄 생성 및 조회
+          보고서 생성 및 일괄 조회
         </Button>
       </Box>
       <List>

@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Box, Button, FormControl, InputLabel, MenuItem, Select, SelectChangeEvent, Typography, FormControlLabel, Checkbox, Paper, Divider, ListItemText } from "@mui/material";
 import api from '../../utils/api'; // 서버 요청을 위한 API 유틸리티
+import ReportComponent from './ReportComponent'; // ReportComponent 임포트
 
 interface Student {
   _id: number;
@@ -21,6 +22,8 @@ const ReportGeneration: React.FC<ReportGenerationProps> = ({ onBack, school, gra
   const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
   const [selectedStudents, setSelectedStudents] = useState<number[]>([]);
   const [reportLines, setReportLines] = useState<number>(3);
+  const [reportResults, setReportResults] = useState<any[]>([]); // 보고서 조회 결과를 저장하는 상태 변수
+  const [showReportComponent, setShowReportComponent] = useState(false); // 보고서 컴포넌트 표시 여부
 
   const handleSemesterChange = (event: SelectChangeEvent<string[]>) => {
     setSelectedSemesters(event.target.value as string[]);
@@ -78,10 +81,32 @@ const ReportGeneration: React.FC<ReportGenerationProps> = ({ onBack, school, gra
     setReportLines(event.target.value as number);
   };
 
+  const handleReportQuery = async () => {
+    try {
+      const response = await api.post('/reports/query', {
+        selectedSemesters,
+        selectedSubjects,
+        selectedStudents
+      });
+      setReportResults(response.data);
+      setShowReportComponent(true);
+    } catch (error) {
+      console.error('보고서 조회 요청 실패:', error);
+    }
+  };
+
+  const handleBackToGeneration = () => {
+    setShowReportComponent(false);
+  };
+
+  if (showReportComponent) {
+    return <ReportComponent reports={reportResults} onBack={handleBackToGeneration} />;
+  }
+
   return (
     <Box sx={{ padding: 2 }}>
       <Typography variant="h4" gutterBottom align="center">
-        보고서 일괄 생성 및 조회
+        보고서 생성 및 일괄 조회
       </Typography>
       <Box sx={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 1 }}>
         <Button onClick={handleSelectAllSemesters}>학기 전체 선택</Button>
@@ -151,7 +176,7 @@ const ReportGeneration: React.FC<ReportGenerationProps> = ({ onBack, school, gra
       </Paper>
       <Divider sx={{ marginY: 2 }} />
       <FormControl fullWidth sx={{ marginBottom: 2 }}>
-        <InputLabel>평가 라인 수(최대)</InputLabel>
+        <InputLabel>보고서 생성 시 평가 라인 수(최대)</InputLabel>
         <Select
           value={reportLines}
           onChange={handleReportLinesChange}
@@ -169,6 +194,9 @@ const ReportGeneration: React.FC<ReportGenerationProps> = ({ onBack, school, gra
         </Button>
         <Button variant="contained" color="primary" onClick={handleReportGeneration}>
           보고서 생성
+        </Button>
+        <Button variant="contained" color="secondary" onClick={handleReportQuery}>
+          보고서 조회
         </Button>
       </Box>
     </Box>

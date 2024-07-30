@@ -1,5 +1,5 @@
 const amqp = require('amqplib/callback_api');
-// const StudentReport = require('../models/StudentReport');
+const StudentReport = require('../models/StudentReport');
 // const QuizResult = require('../models/QuizResult');
 // const Subject = require('../models/Subject');
 
@@ -35,4 +35,26 @@ const generateReport = async (req, res) => {
   res.status(200).send({ message: 'Report generation request submitted successfully' });
 };
 
-module.exports = { generateReport };
+// 보고서 조회 요청 핸들러
+const queryReport = async (req, res) => {
+  const { selectedSemesters, selectedSubjects, selectedStudents } = req.body;
+
+  try {
+    const query = {
+      semester: { $in: selectedSemesters },
+      subject: { $in: selectedSubjects },
+      studentId: { $in: selectedStudents }
+    };
+
+    const reports = await StudentReport.find(query)
+      .populate('studentId', 'studentId name') // 학생의 출석번호와 이름을 포함하여 조인
+      .sort({ 'studentId.studentId': 1 });
+
+    res.status(200).send(reports);
+  } catch (error) {
+    console.error('Error querying reports:', error);
+    res.status(500).send({ message: 'Error querying reports' });
+  }
+};
+
+module.exports = { generateReport, queryReport };
