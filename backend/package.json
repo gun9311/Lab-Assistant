@@ -4,6 +4,8 @@
   "main": "index.js",
   "license": "MIT",
   "dependencies": {
+    "@aws-sdk/client-sqs": "^3.621.0",
+    "@aws-sdk/credential-providers": "^3.621.0",
     "amqplib": "^0.10.4",
     "axios": "^1.7.2",
     "body-parser": "^1.20.2",

@@ -1,5 +1,16 @@
+require('dotenv').config();
+const { SQSClient, SendMessageCommand } = require('@aws-sdk/client-sqs');
+const { fromEnv } = require('@aws-sdk/credential-providers');
 const Quiz = require('../models/Quiz');
 const Subject = require('../models/Subject'); // 경로를 필요에 따라 조정하세요
+
+// AWS SQS 설정
+const sqsClient = new SQSClient({
+  region: process.env.SQS_REGION,
+  credentials: fromEnv(), // 환경 변수에서 자격 증명 가져오기
+});
+
+const queueUrl = process.env.SQS_URL;
 
 const getQuiz = async (req, res) => {
   const { grade, semester, subject, unit } = req.query;
@@ -16,32 +27,39 @@ const getQuiz = async (req, res) => {
   }
 };
 
-const submitQuiz = (req, res) => {
-  const channel = req.channel; // req 객체에서 채널 가져오기
+const submitQuiz = async (req, res) => {
   const quizData = req.body;
 
-  // RabbitMQ 큐에 데이터 전송
-  channel.sendToQueue('quiz_queue', Buffer.from(JSON.stringify(quizData)), { persistent: true });
-  res.status(200).send({ message: 'Quiz submitted successfully' });
+  // SQS 큐에 데이터 전송
+  const params = {
+    MessageBody: JSON.stringify(quizData),
+    QueueUrl: queueUrl,
+  };
+
+  try {
+    const command = new SendMessageCommand(params);
+    await sqsClient.send(command);
+    res.status(200).send({ message: 'Quiz submitted successfully' });
+  } catch (error) {
+    console.error('Failed to send message to SQS:', error);
+    res.status(500).send({ message: 'Failed to send message to SQS' });
+  }
 };
 
 const addQuiz = async (req, res) => {
   const { subjectId, unitName, tasks } = req.body;
 
   try {
-    // 과목을 ID로 찾기
     const subject = await Subject.findById(subjectId);
     if (!subject) {
       return res.status(404).send({ error: '과목을 찾을 수 없습니다' });
     }
 
-    // 단원을 과목 내에서 찾기
     const unit = subject.units.find(u => u.name === unitName);
     if (!unit) {
       return res.status(404).send({ error: '단원을 찾을 수 없습니다' });
     }
 
-    // 기존 퀴즈를 찾기
     const existingQuiz = await Quiz.findOne({
       grade: subject.grade,
       semester: subject.semester,
@@ -50,12 +68,10 @@ const addQuiz = async (req, res) => {
     });
 
     if (existingQuiz) {
-      // 기존 퀴즈에 새로운 tasks 추가
       existingQuiz.tasks.push(...tasks);
       await existingQuiz.save();
       res.status(200).send(existingQuiz);
     } else {
-      // 새로운 퀴즈 데이터 생성
       const quizData = {
         grade: subject.grade,
         semester: subject.semester,
@@ -64,7 +80,6 @@ const addQuiz = async (req, res) => {
         tasks
       };
 
-      // 새로운 퀴즈 저장
       const newQuiz = new Quiz(quizData);
       await newQuiz.save();
       res.status(200).send(newQuiz);
