@@ -1,4 +1,5 @@
-const amqp = require('amqplib/callback_api');
+const { SQSClient, ReceiveMessageCommand, DeleteMessageCommand } = require('@aws-sdk/client-sqs');
+const { fromEnv } = require('@aws-sdk/credential-providers');
 const mongoose = require('mongoose');
 const { Schema } = mongoose;
 require('dotenv').config();  // dotenv 패키지를 사용하여 환경 변수를 로드합니다.
@@ -75,92 +76,103 @@ mongoose.connect(process.env.MONGODB_URL, {})
   .then(() => console.log('MongoDB connected'))
   .catch(err => console.error('MongoDB connection error:', err));
 
-amqp.connect(process.env.RABBITMQ_URL, (err, connection) => {
-  if (err) {
-    throw err;
-  }
-  connection.createChannel((err, channel) => {
-    if (err) {
-      throw err;
-    }
-    channel.assertQueue('report_queue', { durable: true });
-    channel.prefetch(1);
 
-    channel.consume('report_queue', async (msg) => {
-      const reportData = JSON.parse(msg.content.toString());
-      const { selectedSemesters, selectedSubjects, selectedStudents, reportLines } = reportData;
 
-      try {
-        for (const studentId of selectedStudents) {
-        //   console.log(studentId);
-          const student = await Student.findOne({ '_id': studentId });
-        //   console.log(student);
-          const grade = student.grade;
-          for (const semester of selectedSemesters) {
-            for (const subject of selectedSubjects) {
-              // 해당 학생, 학기, 과목에 대한 퀴즈 결과를 점수 순으로 가져오기
-              const quizResults = await QuizResult.find({ studentId, semester, subject })
-                .sort({ score: -1 })
-                .limit(reportLines);
 
-            //   console.log ('퀴즈결과'+quizResults);
+// AWS SQS 설정
+const sqsClient = new SQSClient({
+  region: process.env.SQS_REGION,
+  credentials: fromEnv(),
+});
 
-              let comments = [];
+const queueUrl = process.env.SQS_URL;
 
-              for (const result of quizResults) {
-                const unit = result.unit;
-                const score = result.score;
+const processMessage = async (message) => {
+  const reportData = JSON.parse(message.Body);
+  const { selectedSemesters, selectedSubjects, selectedStudents, reportLines } = reportData;
 
-                // console.log ('단원'+unit);
-                // console.log ('점수'+score);
-                // console.log ('학년'+grade);
+  try {
+    for (const studentId of selectedStudents) {
+      const student = await Student.findOne({ '_id': studentId });
+      const grade = student.grade;
+      for (const semester of selectedSemesters) {
+        for (const subject of selectedSubjects) {
+          const quizResults = await QuizResult.find({ studentId, semester, subject })
+            .sort({ score: -1 })
+            .limit(reportLines);
 
-                const subjectData = await Subject.findOne({ name: subject, grade, semester });
-                // console.log('과목정보'+subjectData)
-                if (subjectData) {
-                  const unitData = subjectData.units.find(u => u.name === unit);
-                //   console.log (unitData);
-                  if (unitData) {
-                    if (score >= 80) {
-                      const highRatings = unitData.ratings.find(r => r.level === '상');
-                    //   console.log (highRatings);
-                      if (highRatings) {
-                        comments.push(highRatings.comments[Math.floor(Math.random() * highRatings.comments.length)]);
-                      }
-                    } else if (score >= 60) {
-                      const midRatings = unitData.ratings.find(r => r.level === '중');
-                    //   console.log (midRatings);
-                      if (midRatings) {
-                        comments.push(midRatings.comments[Math.floor(Math.random() * midRatings.comments.length)]);
-                      }
-                    } else {
-                      const lowRatings = unitData.ratings.find(r => r.level === '하');
-                    //   console.log (lowRatings);
-                      if (lowRatings) {
-                        comments.push(lowRatings.comments[Math.floor(Math.random() * lowRatings.comments.length)]);
-                      }
-                    }
+          let comments = [];
+
+          for (const result of quizResults) {
+            const unit = result.unit;
+            const score = result.score;
+
+            const subjectData = await Subject.findOne({ name: subject, grade, semester });
+            if (subjectData) {
+              const unitData = subjectData.units.find(u => u.name === unit);
+              if (unitData) {
+                if (score >= 80) {
+                  const highRatings = unitData.ratings.find(r => r.level === '상');
+                  if (highRatings) {
+                    comments.push(highRatings.comments[Math.floor(Math.random() * highRatings.comments.length)]);
+                  }
+                } else if (score >= 60) {
+                  const midRatings = unitData.ratings.find(r => r.level === '중');
+                  if (midRatings) {
+                    comments.push(midRatings.comments[Math.floor(Math.random() * midRatings.comments.length)]);
+                  }
+                } else {
+                  const lowRatings = unitData.ratings.find(r => r.level === '하');
+                  if (lowRatings) {
+                    comments.push(lowRatings.comments[Math.floor(Math.random() * lowRatings.comments.length)]);
                   }
                 }
               }
-
-              // 평어 보고서 저장 또는 업데이트
-              const reportComment = comments.join(' ');
-
-              await StudentReport.findOneAndUpdate(
-                { studentId, subject, semester },
-                { comment: reportComment },
-                { upsert: true }
-              );
             }
           }
-        }
 
-        channel.ack(msg);
-      } catch (error) {
-        console.error('Failed to generate report:', error);
-        channel.nack(msg, false, false); // 메시지 다시 처리하지 않음
+          const reportComment = comments.join(' ');
+
+          await StudentReport.findOneAndUpdate(
+            { studentId, subject, semester },
+            { comment: reportComment },
+            { upsert: true }
+          );
+        }
       }
-    }, { noAck: false });
-  });
-});
+    }
+
+    // 메시지 삭제
+    const deleteParams = {
+      QueueUrl: queueUrl,
+      ReceiptHandle: message.ReceiptHandle,
+    };
+    await sqsClient.send(new DeleteMessageCommand(deleteParams));
+    console.log('Message deleted:', message.ReceiptHandle); // 메시지 삭제 확인 로그
+  } catch (error) {
+    console.error('Failed to generate report:', error);
+  }
+};
+
+const pollMessages = async () => {
+  const params = {
+    QueueUrl: queueUrl,
+    MaxNumberOfMessages: 10,
+    WaitTimeSeconds: 20,
+    VisibilityTimeout: 300, // 메시지 가시성 타임아웃을 300초로 설정
+  };
+
+  try {
+    const data = await sqsClient.send(new ReceiveMessageCommand(params));
+    if (data.Messages) {
+      for (const message of data.Messages) {
+        await processMessage(message);
+      }
+    }
+  } catch (error) {
+    console.error('Error receiving messages from SQS:', error);
+  }
+};
+
+// 지속적으로 메시지를 폴링하여 처리
+setInterval(pollMessages, 10000); // 10초 간격으로 폴링
