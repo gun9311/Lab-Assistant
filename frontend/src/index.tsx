@@ -6,12 +6,14 @@ import './index.css';
 import App from './App';
 import * as serviceWorkerRegistration from './serviceWorkerRegistration';
 
+const basename = process.env.NODE_ENV === 'production' ? '/Lab-Assistant' : '/';
+
 const container = document.getElementById('root');
 const root = createRoot(container!);
 
 root.render(
   // <React.StrictMode>
-    <BrowserRouter>
+    <BrowserRouter basename={basename}>
       <App />
     </BrowserRouter>
   // </React.StrictMode>,
