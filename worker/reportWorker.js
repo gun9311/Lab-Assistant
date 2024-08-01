@@ -85,7 +85,7 @@ const sqsClient = new SQSClient({
   credentials: fromEnv(),
 });
 
-const queueUrl = process.env.SQS_URL;
+const queueUrl = process.env.REPORT_QUEUE_URL;
 
 const processMessage = async (message) => {
   const reportData = JSON.parse(message.Body);

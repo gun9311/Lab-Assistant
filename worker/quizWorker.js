@@ -18,7 +18,7 @@ const sqsClient = new SQSClient({
   credentials: fromEnv(), // 환경 변수에서 자격 증명 가져오기
 });
 
-const queueUrl = process.env.SQS_URL;
+const queueUrl = process.env.QUIZ_QUEUE_URL;
 
 const processMessage = async (message) => {
   const quizData = JSON.parse(message.Body);
