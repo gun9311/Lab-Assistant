@@ -4,6 +4,7 @@ import { setToken, setRefreshToken, setRole, setUserId, setSchoolName, setGradeS
 import { Container, TextField, Button, Typography, Paper, MenuItem, Select, InputLabel, FormControl } from '@mui/material';
 import Autocomplete from '@mui/material/Autocomplete';
 import { educationOffices } from '../../educationOffices';
+import apiNoAuth from '../../utils/apiNoAuth';
 
 interface School {
   label: string;
@@ -50,7 +51,7 @@ const StudentLoginPage = () => {
 
   const handleLogin = async () => {
     try {
-      const res = await axios.post('/api/auth/login', {
+      const res = await apiNoAuth.post('/auth/login', {
         role: 'student',
         school,
         grade,

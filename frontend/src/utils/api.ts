@@ -3,7 +3,7 @@ import { getToken, setToken, getRefreshToken, clearAuth } from './auth';
 import { SubjectData, UnitData, RatingData, QuizData } from './types'; // RatingData 추가
 
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: process.env.REACT_APP_API_URL,
   headers: {
     Authorization: `Bearer ${getToken()}`,
   },
@@ -18,7 +18,7 @@ api.interceptors.response.use(
       const refreshToken = getRefreshToken();
 
       try {
-        const { data } = await axios.post('/api/auth/refresh-token', { refreshToken });
+        const { data } = await axios.post(`${process.env.REACT_APP_API_URL}/auth/refresh-token`, { refreshToken });
         setToken(data.accessToken);
         originalRequest.headers['Authorization'] = `Bearer ${data.accessToken}`;
         return api(originalRequest);
@@ -38,5 +38,5 @@ export const addUnits = (unitData: UnitData) => api.post('/subjects/add-units', 
 export const getSubjects = () => api.get('/subjects');
 export const addUnitRating = (ratingData: RatingData) => api.post('/subjects/add-unit-rating', ratingData);
 export const addQuiz = (quizData: QuizData) => api.post('/quiz', quizData);
-  
+
 export default api;

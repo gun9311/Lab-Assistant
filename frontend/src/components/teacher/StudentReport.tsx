@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
 import { Paper, Typography, Container } from '@mui/material';
+import api from '../../utils/api';
 
 type Report = {
   quizPerformance: string;
@@ -23,7 +23,7 @@ const StudentReport: React.FC<StudentReportProps> = ({ studentId }) => {
 
   const fetchStudentReport = async () => {
     try {
-      const res = await axios.get(`/api/report/student/${studentId}`);
+      const res = await api.get(`/report/student/${studentId}`);
       setReport(res.data);
     } catch (error) {
       console.error('Error fetching student report:', error);

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Box, Button, TextField, Typography, Paper, Container } from '@mui/material';
-import axios from 'axios';
+import apiNoAuth from '../../utils/apiNoAuth';
 
 const AdminRegisterPage = () => {
   const [name, setName] = useState('');
@@ -11,7 +11,7 @@ const AdminRegisterPage = () => {
 
   const handleRegister = async () => {
     try {
-      await axios.post('/api/auth/register/admin', { name, password });
+      await apiNoAuth.post('/auth/register/admin', { name, password });
       alert('Admin registered successfully');
       navigate('/admin-login'); // history.push 대신 navigate 사용
     } catch (error: any) {

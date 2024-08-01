@@ -3,6 +3,7 @@ import axios from 'axios';
 import { Container, TextField, Button, Typography, Paper, MenuItem, Select, InputLabel, FormControl } from '@mui/material';
 import Autocomplete from '@mui/material/Autocomplete';
 import { educationOffices } from '../../educationOffices';
+import apiNoAuth from '../../utils/apiNoAuth';
 
 interface School {
   label: string;
@@ -48,7 +49,7 @@ const TeacherRegisterPage = () => {
 
   const handleRegister = async () => {
     try {
-      const res = await axios.post('/api/auth/register/teacher', { email, password, name, school, phone });
+      const res = await apiNoAuth.post('/auth/register/teacher', { email, password, name, school, phone });
       console.log('교사 등록 완료:', res.data);
       // 성공 처리 추가
     } catch (error) {

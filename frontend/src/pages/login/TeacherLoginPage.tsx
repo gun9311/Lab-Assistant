@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import axios from 'axios';
 import { setToken, setRefreshToken, setRole, setUserId, setSchoolName } from '../../utils/auth';
 import { Container, TextField, Button, Typography, Box, Paper } from '@mui/material';
+import apiNoAuth from '../../utils/apiNoAuth';
 
 const TeacherLoginPage = () => {
   const [email, setEmail] = useState('');
@@ -10,7 +10,7 @@ const TeacherLoginPage = () => {
 
   const handleLogin = async () => {
     try {
-      const res = await axios.post('/api/auth/login', { role: 'teacher', email, password });
+      const res = await apiNoAuth.post('/auth/login', { role: 'teacher', email, password });
       setToken(res.data.accessToken);
       setRefreshToken(res.data.refreshToken);
       setRole(res.data.role);

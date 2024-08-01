@@ -1,11 +1,11 @@
 import React from "react";
-import axios from "axios";
 import { clearAuth, getUserId } from "../../utils/auth";
+import apiNoAuth from "../../utils/apiNoAuth";
 
 const handleLogout = async () => {
   try {
     const userId = getUserId();
-    await axios.post("/api/auth/logout", { userId });
+    await apiNoAuth.post("/auth/logout", { userId }); // 수정된 부분
     clearAuth();
     window.location.href = "/home";
   } catch (error) {
