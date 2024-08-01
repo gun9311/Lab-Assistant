@@ -10,7 +10,7 @@ const sqsClient = new SQSClient({
   credentials: fromEnv(), // 환경 변수에서 자격 증명 가져오기
 });
 
-const queueUrl = process.env.SQS_URL;
+const queueUrl = process.env.QUIZ_QUEUE_URL;
 
 const getQuiz = async (req, res) => {
   const { grade, semester, subject, unit } = req.query;
