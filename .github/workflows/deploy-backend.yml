@@ -57,3 +57,5 @@ jobs:
           REPORT_QUEUE_URL: ${{ secrets.REPORT_QUEUE_URL }}
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          REACT_APP_WEBSOCKET_URL: ${{ secrets.REACT_APP_WEBSOCKET_URL }}
+          REACT_APP_API_URL: ${{ secrets.REACT_APP_API_URL }}
