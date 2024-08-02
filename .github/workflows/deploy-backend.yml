@@ -31,6 +31,11 @@ jobs:
           push: true
           tags: ${{ secrets.DOCKER_USERNAME }}/lab-backend:latest
 
+      - name: Set up SSH agent
+        uses: webfactory/ssh-agent@v0.5.3
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
       - name: Deploy to Server
         if: github.ref == 'refs/heads/main'
         run: |
@@ -40,3 +45,7 @@ jobs:
             docker rm lab-backend || true
             docker run -d --name lab-backend -p 3000:3000 --env-file /path/to/.env ${{ secrets.DOCKER_USERNAME }}/lab-backend:latest
           EOF
+        env:
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SERVER_IP: ${{ secrets.SERVER_IP }}
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}

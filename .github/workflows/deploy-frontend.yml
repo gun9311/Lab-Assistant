@@ -31,6 +31,11 @@ jobs:
           push: true
           tags: ${{ secrets.DOCKER_USERNAME }}/lab-frontend:latest
 
+      - name: Set up SSH agent
+        uses: webfactory/ssh-agent@v0.5.3
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
       - name: Deploy to Server
         if: github.ref == 'refs/heads/main'
         run: |
@@ -38,5 +43,9 @@ jobs:
             docker pull ${{ secrets.DOCKER_USERNAME }}/lab-frontend:latest
             docker stop lab-frontend || true
             docker rm lab-frontend || true
-            docker run -d --name lab-frontend --network=host ${{ secrets.DOCKER_USERNAME }}/lab-frontend:latest
+            docker run -d --name lab-frontend -p 80:80 --network=host ${{ secrets.DOCKER_USERNAME }}/lab-frontend:latest
           EOF
+        env:
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SERVER_IP: ${{ secrets.SERVER_IP }}
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
