@@ -33,7 +33,7 @@ app.use(session({
   resave: false,
   saveUninitialized: false
 }));
-
+// 
 app.use(bodyParser.json());
 app.use('/api/auth', authRoutes);
 app.use('/api/quiz', quizRoutes);
