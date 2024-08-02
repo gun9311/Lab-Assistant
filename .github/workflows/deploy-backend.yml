@@ -40,6 +40,10 @@ jobs:
         if: github.ref == 'refs/heads/main'
         run: |
           ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} << 'EOF'
+            sudo usermod -aG docker ${{ secrets.SSH_USER }}
+            docker pull ${{ secrets.DOCKER_USERNAME }}/lab-backend:latest
+            docker stop lab-backend || true
+            docker rm lab-backend || true
             export DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}
             export MONGODB_URL=${{ secrets.MONGODB_URL }}
             export JWT_SECRET=${{ secrets.JWT_SECRET }}
