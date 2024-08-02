@@ -40,25 +40,20 @@ jobs:
         if: github.ref == 'refs/heads/main'
         run: |
           ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} << 'EOF'
-            sudo usermod -aG docker ${{ secrets.SSH_USER }}
-            docker pull ${{ secrets.DOCKER_USERNAME }}/lab-backend:latest
-            docker stop lab-backend || true
-            docker rm lab-backend || true
-            docker run -d --name lab-backend -p 3000:3000 \
-              -e MONGODB_URL=${{ secrets.MONGODB_URL }} \
-              -e JWT_SECRET=${{ secrets.JWT_SECRET }} \
-              -e JWT_REFRESH_SECRET=${{ secrets.JWT_REFRESH_SECRET }} \
-              -e REDIS_URL=${{ secrets.REDIS_URL }} \
-              -e SESSION_SECRET=${{ secrets.SESSION_SECRET }} \
-              -e OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }} \
-              -e SQS_REGION=${{ secrets.SQS_REGION }} \
-              -e QUIZ_QUEUE_URL=${{ secrets.QUIZ_QUEUE_URL }} \
-              -e REPORT_QUEUE_URL=${{ secrets.REPORT_QUEUE_URL }} \
-              -e AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }} \
-              -e AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }} \
-              ${{ secrets.DOCKER_USERNAME }}/lab-backend:latest
+            docker-compose -f /path/to/docker-compose.yml up -d lab-backend
           EOF
         env:
           SSH_USER: ${{ secrets.SSH_USER }}
           SERVER_IP: ${{ secrets.SERVER_IP }}
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          MONGODB_URL: ${{ secrets.MONGODB_URL }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET }}
+          REDIS_URL: ${{ secrets.REDIS_URL }}
+          SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          SQS_REGION: ${{ secrets.SQS_REGION }}
+          QUIZ_QUEUE_URL: ${{ secrets.QUIZ_QUEUE_URL }}
+          REPORT_QUEUE_URL: ${{ secrets.REPORT_QUEUE_URL }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
