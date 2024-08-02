@@ -40,7 +40,7 @@ jobs:
         if: github.ref == 'refs/heads/main'
         run: |
           ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} << 'EOF'
-            docker-compose -f /path/to/docker-compose.yml up -d lab-backend
+            docker-compose -f /home/ubuntu/docker-compose.yml up -d lab-backend
           EOF
         env:
           SSH_USER: ${{ secrets.SSH_USER }}
