@@ -41,7 +41,6 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} << 'EOF'
             sudo usermod -aG docker ${{ secrets.SSH_USER }}
-            newgrp docker <<EONG
             docker pull ${{ secrets.DOCKER_USERNAME }}/lab-backend:latest
             docker stop lab-backend || true
             docker rm lab-backend || true
@@ -58,7 +57,6 @@ jobs:
               -e AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }} \
               -e AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }} \
               ${{ secrets.DOCKER_USERNAME }}/lab-backend:latest
-            EONG
           EOF
         env:
           SSH_USER: ${{ secrets.SSH_USER }}

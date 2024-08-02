@@ -41,7 +41,6 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} << 'EOF'
             sudo usermod -aG docker ${{ secrets.SSH_USER }}
-            newgrp docker <<EONG
             docker pull ${{ secrets.DOCKER_USERNAME }}/lab-frontend:latest
             docker stop lab-frontend || true
             docker rm lab-frontend || true
@@ -49,7 +48,6 @@ jobs:
               -e REACT_APP_WEBSOCKET_URL=${{ secrets.REACT_APP_WEBSOCKET_URL }} \
               -e REACT_APP_API_URL=${{ secrets.REACT_APP_API_URL }} \
               ${{ secrets.DOCKER_USERNAME }}/lab-frontend:latest
-            EONG
           EOF
         env:
           SSH_USER: ${{ secrets.SSH_USER }}
