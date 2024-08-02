@@ -1,16 +1,16 @@
 {
   "files": {
-    "main.css": "/static/css/main.e2540d7e.css",
-    "main.js": "/static/js/main.7c9c8b05.js",
-    "static/media/home-robot.webp": "/static/media/home-robot.6c4167fb07f93e718416.webp",
-    "static/media/student-icon.png": "/static/media/student-icon.d253f67f8de2a6bd8877.png",
-    "static/media/admin-icon.png": "/static/media/admin-icon.48133b9b271e5d41b14f.png",
-    "index.html": "/index.html",
-    "main.e2540d7e.css.map": "/static/css/main.e2540d7e.css.map",
-    "main.7c9c8b05.js.map": "/static/js/main.7c9c8b05.js.map"
+    "main.css": "/Lab-Assistant/static/css/main.e2540d7e.css",
+    "main.js": "/Lab-Assistant/static/js/main.dd3ae94d.js",
+    "static/media/home-robot.webp": "/Lab-Assistant/static/media/home-robot.6c4167fb07f93e718416.webp",
+    "static/media/student-icon.png": "/Lab-Assistant/static/media/student-icon.d253f67f8de2a6bd8877.png",
+    "static/media/admin-icon.png": "/Lab-Assistant/static/media/admin-icon.48133b9b271e5d41b14f.png",
+    "index.html": "/Lab-Assistant/index.html",
+    "main.e2540d7e.css.map": "/Lab-Assistant/static/css/main.e2540d7e.css.map",
+    "main.dd3ae94d.js.map": "/Lab-Assistant/static/js/main.dd3ae94d.js.map"
   },
   "entrypoints": [
     "static/css/main.e2540d7e.css",
-    "static/js/main.7c9c8b05.js"
+    "static/js/main.dd3ae94d.js"
   ]
 }
