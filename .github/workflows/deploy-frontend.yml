@@ -58,7 +58,8 @@ jobs:
             export AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
             export REACT_APP_WEBSOCKET_URL=${{ secrets.REACT_APP_WEBSOCKET_URL }}
             export REACT_APP_API_URL=${{ secrets.REACT_APP_API_URL }}
-            docker-compose -f /home/ubuntu/docker-compose.yml up -d lab-frontend
+            docker-compose -f /home/ubuntu/docker-compose.yml up -d
+            # docker-compose -f /home/ubuntu/docker-compose.yml up -d lab-frontend
           EOF
         env:
           SSH_USER: ${{ secrets.SSH_USER }}
