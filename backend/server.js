@@ -47,7 +47,7 @@ app.use('/api/reports', reportRoutes); // 새로운 라우트 추가
 const server = app.listen(process.env.PORT || 5000, () => {
   console.log(`Server running on port ${process.env.PORT || 5000}`);
 });
-// 
+
 const wss = new WebSocketServer({ server });
 
 wss.on('connection', (ws, req) => {
