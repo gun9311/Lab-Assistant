@@ -34,7 +34,7 @@ jobs:
             MONGODB_URL=${{ secrets.MONGODB_URL }}
             JWT_SECRET=${{ secrets.JWT_SECRET }}
             JWT_REFRESH_SECRET=${{ secrets.JWT_REFRESH_SECRET }}
-            REDIS_URL=${{ secrets.REDIS_URL }}
+            REDIS_URL=redis://redis:6379
             SESSION_SECRET=${{ secrets.SESSION_SECRET }}
             OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
             SQS_REGION=${{ secrets.SQS_REGION }}
@@ -56,5 +56,8 @@ jobs:
             docker pull ${{ secrets.DOCKER_USERNAME }}/lab-backend:latest
             docker stop lab-backend || true
             docker rm lab-backend || true
-            docker-compose -f /home/ubuntu/docker-compose.yml up -d lab-backend
+            DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }} docker-compose -f /home/ubuntu/docker-compose.yml up -d lab-backend
           EOF
+        env:
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SERVER_IP: ${{ secrets.SERVER_IP }}
