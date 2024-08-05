@@ -23,6 +23,8 @@ jobs:
       - name: Install dependencies and build
         run: |
           cd frontend
+          echo "REACT_APP_API_URL=${{ secrets.REACT_APP_API_URL }}" >> .env
+          echo "REACT_APP_WEBSOCKET_URL=${{ secrets.REACT_APP_WEBSOCKET_URL }}" >> .env
           yarn install
           yarn build
 
@@ -45,6 +47,4 @@ jobs:
           # 서버에 연결하여 배포 처리
           ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} << 'EOF'
             docker-compose -f /home/${{ secrets.SSH_USER }}/docker-compose.yml up -d nginx
-            docker cp /home/${{ secrets.SSH_USER }}/html/. nginx:/usr/share/nginx/html/
-            docker-compose -f /home/${{ secrets.SSH_USER }}/docker-compose.yml restart nginx
           EOF
