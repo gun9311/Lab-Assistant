@@ -38,9 +38,13 @@ jobs:
       - name: Deploy to Server
         if: github.ref == 'refs/heads/main'
         run: |
-          scp -r frontend/build/* ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }}:/usr/share/nginx/html/
+          # 빌드된 파일을 서버로 복사
+          scp -r frontend/build/* ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }}:/home/${{ secrets.SSH_USER }}/html/
+          # 서버에 연결하여 배포 처리
           ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} << 'EOF'
             docker-compose -f /home/${{ secrets.SSH_USER }}/docker-compose.yml up -d nginx
+            # docker cp /home/${{ secrets.SSH_USER }}/html/. nginx:/usr/share/nginx/html/
+            # docker-compose -f /home/${{ secrets.SSH_USER }}/docker-compose.yml restart nginx
           EOF
 
       # - name: Deploy to Server
