@@ -47,5 +47,5 @@ jobs:
             docker pull ${{ secrets.DOCKER_USERNAME }}/lab-frontend:latest
             docker stop lab-frontend || true
             docker rm lab-frontend || true
-            docker-compose -f /home/ubuntu/docker-compose.yml up -d lab-frontend
+            DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }} docker-compose -f /home/ubuntu/docker-compose.yml up -d lab-frontend
           EOF
