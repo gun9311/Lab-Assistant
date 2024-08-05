@@ -30,6 +30,9 @@ jobs:
           context: ./frontend
           push: true
           tags: ${{ secrets.DOCKER_USERNAME }}/lab-frontend:latest
+          build-args: |
+            REACT_APP_API_URL=${{ secrets.REACT_APP_API_URL }}
+            REACT_APP_WEBSOCKET_URL=${{ secrets.REACT_APP_WEBSOCKET_URL }}
 
       - name: Set up SSH agent
         uses: webfactory/ssh-agent@v0.5.3
@@ -78,4 +81,3 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           REACT_APP_WEBSOCKET_URL: ${{ secrets.REACT_APP_WEBSOCKET_URL }}
           REACT_APP_API_URL: ${{ secrets.REACT_APP_API_URL }}
-
