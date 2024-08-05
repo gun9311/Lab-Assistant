@@ -58,6 +58,3 @@ jobs:
             docker rm lab-backend || true
             DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }} docker-compose -f /home/ubuntu/docker-compose.yml up -d lab-backend
           EOF
-        env:
-          SSH_USER: ${{ secrets.SSH_USER }}
-          SERVER_IP: ${{ secrets.SERVER_IP }}
