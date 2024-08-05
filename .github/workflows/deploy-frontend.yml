@@ -18,7 +18,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v2
         with:
-          node-version: '20' # 사용 중인 Node.js 버전으로 변경
+          node-version: '20'
 
       - name: Install dependencies and build
         run: |
@@ -45,21 +45,6 @@ jobs:
           # 서버에 연결하여 배포 처리
           ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} << 'EOF'
             docker-compose -f /home/${{ secrets.SSH_USER }}/docker-compose.yml up -d nginx
-      # - name: Deploy to Server
-      #   if: github.ref == 'refs/heads/main'
-      #   run: |
-      #     scp -r frontend/build/* ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }}:/path/to/nginx/html/
-
-      #     ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} << 'EOF'
-      #       docker-compose -f /home/ubuntu/docker-compose.yml up -d nginx
-      #     EOF
-          # ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} << 'EOF'
-          #   # 빌드된 정적 파일을 서버의 Nginx 컨테이너 디렉토리로 복사
-          #   rsync -av --delete frontend/build/ /path/to/nginx/html/
-
-          #   # 백엔드 컨테이너 업데이트
-          #   docker pull ${{ secrets.DOCKER_USERNAME }}/lab-backend:latest
-          #   docker stop lab-backend || true
-          #   docker rm lab-backend || true
-          #   docker-compose -f /home/ubuntu/docker-compose.yml up -d lab-backend nginx
-          # EOF
+            docker cp /home/${{ secrets.SSH_USER }}/html/. nginx:/usr/share/nginx/html/
+            docker-compose -f /home/${{ secrets.SSH_USER }}/docker-compose.yml restart nginx
+          EOF
