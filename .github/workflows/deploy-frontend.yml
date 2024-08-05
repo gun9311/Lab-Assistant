@@ -34,13 +34,18 @@ jobs:
       - name: Deploy to Server
         if: github.ref == 'refs/heads/main'
         run: |
-          ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} << 'EOF'
-            # 빌드된 정적 파일을 서버의 Nginx 컨테이너 디렉토리로 복사
-            rsync -av --delete frontend/build/ /path/to/nginx/html/
+          scp -r frontend/build/* ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }}:/path/to/nginx/html/
 
-            # 백엔드 컨테이너 업데이트
-            docker pull ${{ secrets.DOCKER_USERNAME }}/lab-backend:latest
-            docker stop lab-backend || true
-            docker rm lab-backend || true
-            docker-compose -f /home/ubuntu/docker-compose.yml up -d lab-backend nginx
+          ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} << 'EOF'
+            docker-compose -f /home/ubuntu/docker-compose.yml up -d nginx
           EOF
+          # ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} << 'EOF'
+          #   # 빌드된 정적 파일을 서버의 Nginx 컨테이너 디렉토리로 복사
+          #   rsync -av --delete frontend/build/ /path/to/nginx/html/
+
+          #   # 백엔드 컨테이너 업데이트
+          #   docker pull ${{ secrets.DOCKER_USERNAME }}/lab-backend:latest
+          #   docker stop lab-backend || true
+          #   docker rm lab-backend || true
+          #   docker-compose -f /home/ubuntu/docker-compose.yml up -d lab-backend nginx
+          # EOF
