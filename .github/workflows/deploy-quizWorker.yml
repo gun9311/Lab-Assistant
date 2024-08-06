@@ -52,30 +52,33 @@ jobs:
       #   run: |
       #     ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.WORKER_IP }} echo "SSH connection test successful"
 
-      # - name: Build Docker image
-      #   run: |
-      #     cd quizWorker
-      #     docker build -t ${{ secrets.DOCKER_USERNAME }}/quizworker:latest .
-
-      # - name: Push Docker image to Docker Hub
-      #   env:
-      #     DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
-      #     DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
-      #   run: |
-      #     echo $DOCKER_PASSWORD | docker login -u $DOCKER_USERNAME --password-stdin
-      #     docker push ${{ secrets.DOCKER_USERNAME }}/quizworker:latest
+      - name: Build Docker image
+        run: |
+          docker build --build-arg MONGODB_URL=${{ secrets.MONGODB_URL }} \
+                       --build-arg SQS_REGION=${{ secrets.SQS_REGION }} \
+                       --build-arg QUIZ_QUEUE_URL=${{ secrets.QUIZ_QUEUE_URL }} \
+                       --build-arg AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }} \
+                       --build-arg AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }} \
+                       -t ${{ secrets.DOCKER_USERNAME }}/quizworker:latest .
+      
+      - name: Push Docker image to Docker Hub
+        env:
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+        run: |
+          echo $DOCKER_PASSWORD | docker login -u $DOCKER_USERNAME --password-stdin
+          docker push ${{ secrets.DOCKER_USERNAME }}/quizworker:latest
 
       - name: Deploy to Server
         if: github.ref == 'refs/heads/main'
         run: |
-          ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.WORKER_IP }} << 'EOF'
             docker pull ${{ secrets.DOCKER_USERNAME }}/quizworker:latest
             docker stop quizworker-container || true
             docker rm quizworker-container || true
             docker run -d --name quizworker-container -p 3000:3000 ${{ secrets.DOCKER_USERNAME }}/quizworker:latest
           EOF
-            
-
+          
       # - name: Deploy to EC2
       #   uses: appleboy/ssh-action@v0.1.4
       #   with:
