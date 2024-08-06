@@ -54,6 +54,7 @@ jobs:
 
       - name: Build Docker image
         run: |
+          cd quizWorker
           docker build --build-arg MONGODB_URL=${{ secrets.MONGODB_URL }} \
                        --build-arg SQS_REGION=${{ secrets.SQS_REGION }} \
                        --build-arg QUIZ_QUEUE_URL=${{ secrets.QUIZ_QUEUE_URL }} \
