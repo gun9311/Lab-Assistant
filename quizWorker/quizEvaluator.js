@@ -27,7 +27,7 @@ const resultSchema = new mongoose.Schema({
   studentAnswer: { type: String, required: true }, // 학생의 답변
   similarity: { type: Number, required: true } // 유사도 점수 (0 ~ 100)
 });
-
+// 
 const quizResultSchema = new mongoose.Schema({
   studentId: { type: Schema.Types.ObjectId, ref: 'Student', required: true }, // 학생 ID
   subject: { type: String, required: true }, // 과목
