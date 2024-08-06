@@ -48,9 +48,9 @@ jobs:
         run: |
           ssh-keyscan -H ${{ secrets.WORKER_IP }} >> ~/.ssh/known_hosts
 
-      - name: Test SSH connection
-        run: |
-          ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.WORKER_IP }} echo "SSH connection test successful"
+      # - name: Test SSH connection
+      #   run: |
+      #     ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.WORKER_IP }} echo "SSH connection test successful"
 
       # - name: Build Docker image
       #   run: |
