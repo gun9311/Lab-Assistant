@@ -39,11 +39,14 @@ jobs:
 
       #- name: Run tests
       #  run: yarn test
+      - name: Set up SSH agent
+        uses: webfactory/ssh-agent@v0.5.3
+        with:
+          ssh-private-key: ${{ secrets.WORKER_SSH_PRIVATE_KEY }}
 
-      - name: Create SSH key file
+      - name: Add server to known_hosts
         run: |
-          echo "${{ secrets.WORKER_SSH_PRIVATE_KEY }}" > /tmp/ssh_key
-          chmod 600 /tmp/ssh_key
+          ssh-keyscan -H ${{ secrets.WORKER_IP }} >> ~/.ssh/known_hosts
 
       - name: Test SSH connection
         run: |
