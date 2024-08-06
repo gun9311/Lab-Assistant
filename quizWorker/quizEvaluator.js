@@ -89,7 +89,6 @@ const evaluateQuiz = async (quizData) => {
 
 const calculateSimilarity = (studentAnswer, correctAnswer) => {
   return new Promise((resolve, reject) => {
-    // const pythonPath = 'C:\\Users\\Master\\Desktop\\Lab-Assistant\\worker\\env\\Scripts\\python.exe';
     const pythonPath = process.env.NODE_ENV === 'production'
       ? '/app/venv/bin/python3'
       : 'C:\\Users\\Master\\Desktop\\Lab-Assistant\\worker\\env\\Scripts\\python.exe';
