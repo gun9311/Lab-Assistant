@@ -41,7 +41,7 @@ jobs:
       #  run: yarn test
 
       - name: Build Docker image
-        run: docker build -t ${{ secrets.DOCKER_USERNAME }}/quizWorker .
+        run: docker build -t ${{ secrets.DOCKER_USERNAME }}/quizworker:latest .
 
       - name: Push Docker image to Docker Hub
         env:
@@ -49,7 +49,7 @@ jobs:
           DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
         run: |
           echo $DOCKER_PASSWORD | docker login -u $DOCKER_USERNAME --password-stdin
-          docker push ${{ secrets.DOCKER_USERNAME }}/quizWorker:latest
+          docker push ${{ secrets.DOCKER_USERNAME }}/quizworker:latest
 
       - name: Deploy to EC2
         uses: appleboy/ssh-action@v0.1.4
@@ -58,7 +58,7 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            docker pull ${{ secrets.DOCKER_USERNAME }}/quizWorker:latest
-            docker stop quizWorker-container || true
-            docker rm quizWorker-container || true
-            docker run -d --name quizWorker-container -p 3000:3000 ${{ secrets.DOCKER_USERNAME }}/quizWorker:latest
+            docker pull ${{ secrets.DOCKER_USERNAME }}/quizworker:latest
+            docker stop quizworker-container || true
+            docker rm quizworker-container || true
+            docker run -d --name quizworker-container -p 3000:3000 ${{ secrets.DOCKER_USERNAME }}/quizworker:latest
