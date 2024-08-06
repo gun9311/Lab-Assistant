@@ -70,7 +70,7 @@ jobs:
         with:
           host: ${{ secrets.WORKER_IP }}
           username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          key: ${{ secrets.WORKER_SSH_PRIVATE_KEY }}
           script: |
             docker pull ${{ secrets.DOCKER_USERNAME }}/quizworker:latest
             docker stop quizworker-container || true
