@@ -40,9 +40,14 @@ jobs:
       #- name: Run tests
       #  run: yarn test
 
+      - name: Create SSH key file
+        run: |
+          echo "${{ secrets.WORKER_SSH_PRIVATE_KEY }}" > /tmp/ssh_key
+          chmod 600 /tmp/ssh_key
+
       - name: Test SSH connection
         run: |
-          ssh -i ${{ secrets.WORKER_SSH_SECRET_KEY }} -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.WORKER_IP }} echo "SSH connection test successful"
+          ssh -i /tmp/ssh_key -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.WORKER_IP }} echo "SSH connection test successful"
 
       # - name: Build Docker image
       #   run: |
