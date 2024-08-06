@@ -69,7 +69,7 @@ const evaluateQuiz = async (quizData) => {
       similarity: roundedSimilarity
     });
   }
-
+// 
   const averageScore = results.reduce((sum, result) => sum + result.similarity, 0) / results.length;
 
   const quizResultData = {
