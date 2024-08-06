@@ -18,6 +18,9 @@ RUN apt-get update && \
 RUN python3 -m venv venv
 ENV PATH="/app/venv/bin:$PATH"
 
+# Set environment variable for production
+ENV NODE_ENV=production
+
 # Copy the Python requirements file
 COPY requirements.txt ./
 
@@ -26,6 +29,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the rest of the application code
 COPY . .
+
+# Ensure similarity.py is executable
+RUN chmod +x similarity.py
 
 # Specify the command to run the application
 CMD ["node", "quizWorker.js"]

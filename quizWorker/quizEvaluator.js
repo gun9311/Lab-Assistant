@@ -89,8 +89,18 @@ const evaluateQuiz = async (quizData) => {
 
 const calculateSimilarity = (studentAnswer, correctAnswer) => {
   return new Promise((resolve, reject) => {
-    const pythonPath = 'C:\\Users\\Master\\Desktop\\Lab-Assistant\\worker\\env\\Scripts\\python.exe';
-    const result = spawnSync(pythonPath, ['similarity.py', studentAnswer, correctAnswer], { encoding: 'utf-8' });
+    // const pythonPath = 'C:\\Users\\Master\\Desktop\\Lab-Assistant\\worker\\env\\Scripts\\python.exe';
+    const pythonPath = process.env.NODE_ENV === 'production'
+      ? '/app/venv/bin/python3'
+      : 'C:\\Users\\Master\\Desktop\\Lab-Assistant\\worker\\env\\Scripts\\python.exe';
+
+    const scriptPath = process.env.NODE_ENV === 'production'
+      ? '/app/similarity.py'
+      : 'C:\\Users\\Master\\Desktop\\Lab-Assistant\\quizWorker\\similarity.py';
+      
+      const result = spawnSync(pythonPath, [scriptPath, studentAnswer, correctAnswer], { encoding: 'utf-8' });
+
+    // const result = spawnSync(pythonPath, ['similarity.py', studentAnswer, correctAnswer], { encoding: 'utf-8' });
 
     if (result.error) {
       console.error(`Python process error: ${result.error}`);
