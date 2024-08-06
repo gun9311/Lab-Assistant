@@ -65,14 +65,25 @@ jobs:
       #     echo $DOCKER_PASSWORD | docker login -u $DOCKER_USERNAME --password-stdin
       #     docker push ${{ secrets.DOCKER_USERNAME }}/quizworker:latest
 
-      - name: Deploy to EC2
-        uses: appleboy/ssh-action@v0.1.4
-        with:
-          host: ${{ secrets.WORKER_IP }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.WORKER_SSH_PRIVATE_KEY }}
-          script: |
+      - name: Deploy to Server
+        if: github.ref == 'refs/heads/main'
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SERVER_IP }} << 'EOF'
             docker pull ${{ secrets.DOCKER_USERNAME }}/quizworker:latest
             docker stop quizworker-container || true
             docker rm quizworker-container || true
             docker run -d --name quizworker-container -p 3000:3000 ${{ secrets.DOCKER_USERNAME }}/quizworker:latest
+          EOF
+            
+
+      # - name: Deploy to EC2
+      #   uses: appleboy/ssh-action@v0.1.4
+      #   with:
+      #     host: ${{ secrets.WORKER_IP }}
+      #     username: ${{ secrets.SSH_USER }}
+      #     key: ${{ secrets.WORKER_SSH_PRIVATE_KEY }}
+      #     script: |
+      #       docker pull ${{ secrets.DOCKER_USERNAME }}/quizworker:latest
+      #       docker stop quizworker-container || true
+      #       docker rm quizworker-container || true
+      #       docker run -d --name quizworker-container -p 3000:3000 ${{ secrets.DOCKER_USERNAME }}/quizworker:latest
