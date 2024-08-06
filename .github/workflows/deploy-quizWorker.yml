@@ -42,7 +42,7 @@ jobs:
 
       - name: Test SSH connection
         run: |
-          ssh -i ${{ secrets.SSH_PRIVATE_KEY }} -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.WORKER_IP }} echo "SSH connection test successful"
+          ssh -i ${{ secrets.WORKER_SSH_SECRET_KEY }} -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.WORKER_IP }} echo "SSH connection test successful"
 
       # - name: Build Docker image
       #   run: |
