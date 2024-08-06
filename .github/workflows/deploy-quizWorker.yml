@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - 'quizWorker/**'
+  workflow_dispatch:
 
 jobs:
   build:
