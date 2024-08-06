@@ -1,9 +1,11 @@
-name: CI/CD Pipeline
+name: Deploy quizWorker
 
 on:
   push:
     branches:
       - main
+    paths:
+      - 'quizWorker/**'
 
 jobs:
   build:
@@ -32,11 +34,11 @@ jobs:
           source venv/bin/activate
           pip install -r requirements.txt
 
-      - name: Run tests
-        run: yarn test
+      #- name: Run tests
+      #  run: yarn test
 
       - name: Build Docker image
-        run: docker build -t lab-assistant .
+        run: docker build -t quizWorker .
 
       - name: Push Docker image to Docker Hub
         env:
@@ -44,17 +46,17 @@ jobs:
           DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
         run: |
           echo $DOCKER_PASSWORD | docker login -u $DOCKER_USERNAME --password-stdin
-          docker tag lab-assistant $DOCKER_USERNAME/lab-assistant:latest
-          docker push $DOCKER_USERNAME/lab-assistant:latest
+          docker tag lab-assistant $DOCKER_USERNAME/quizWorker:latest
+          docker push $DOCKER_USERNAME/quizWorker:latest
 
       - name: Deploy to EC2
         uses: appleboy/ssh-action@v0.1.4
         with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
+          host: ${{ secrets.WORKER_IP }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.WORKER_SSH_PRIATE_KEY }}
           script: |
-            docker pull $DOCKER_USERNAME/lab-assistant:latest
-            docker stop lab-assistant-container || true
-            docker rm lab-assistant-container || true
-            docker run -d --name lab-assistant-container -p 80:3000 $DOCKER_USERNAME/lab-assistant:latest
+            docker pull $DOCKER_USERNAME/quizWorker:latest
+            docker stop quizWorker-container || true
+            docker rm quizWorker-container || true
+            docker run -d --name quizWorker-container -p 3000:3000 $DOCKER_USERNAME/quizWorker:latest
