@@ -15,33 +15,35 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v2
-        with:
-          node-version: '20'
+      # - name: Set up Node.js
+        # uses: actions/setup-node@v2
+        # with:
+          # node-version: '20'
 
-      - name: Install Node.js dependencies
-        run: |
-          cd quizWorker
-          yarn install
+      # - name: Install Node.js dependencies
+      #   run: |
+      #     cd quizWorker
+      #     yarn install
 
-      - name: Set up Python
-        uses: actions/setup-python@v2
-        with:
-          python-version: '3.x'
+      # - name: Set up Python
+      #   uses: actions/setup-python@v2
+      #   with:
+      #     python-version: '3.x'
 
-      - name: Install Python dependencies
-        run: |
-          cd quizWorker
-          python3 -m venv venv
-          source venv/bin/activate
-          pip install -r requirements.txt
+      # - name: Install Python dependencies
+      #   run: |
+      #     cd quizWorker
+      #     python3 -m venv venv
+      #     source venv/bin/activate
+      #     pip install -r requirements.txt
 
       #- name: Run tests
       #  run: yarn test
 
       - name: Build Docker image
-        run: docker build -t ${{ secrets.DOCKER_USERNAME }}/quizworker:latest .
+        run: |
+          cd quizWorker
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/quizworker:latest .
 
       - name: Push Docker image to Docker Hub
         env:
