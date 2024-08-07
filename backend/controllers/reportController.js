@@ -9,7 +9,7 @@ const sqsClient = new SQSClient({
   credentials: fromEnv(),  // 환경 변수에서 자격 증명 가져오기
 });
 
-const queueUrl = process.env.REPORT_QUEUE_UR;
+const queueUrl = process.env.REPORT_QUEUE_URL;
 
 // 보고서 생성 요청 핸들러
 const generateReport = async (req, res) => {
