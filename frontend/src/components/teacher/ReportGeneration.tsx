@@ -65,7 +65,7 @@ const ReportGeneration: React.FC<ReportGenerationProps> = ({ onBack, school, gra
 
   const handleReportGeneration = async () => {
     try {
-      const response = await api.post('/reports/generate', {
+      const response = await api.post('/report/generate', {
         selectedSemesters,
         selectedSubjects,
         selectedStudents,
@@ -83,7 +83,7 @@ const ReportGeneration: React.FC<ReportGenerationProps> = ({ onBack, school, gra
 
   const handleReportQuery = async () => {
     try {
-      const response = await api.post('/reports/query', {
+      const response = await api.post('/report/query', {
         selectedSemesters,
         selectedSubjects,
         selectedStudents

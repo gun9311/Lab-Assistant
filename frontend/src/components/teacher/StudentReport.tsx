@@ -1,61 +1,82 @@
 import React, { useState, useEffect } from 'react';
-import { Paper, Typography, Container } from '@mui/material';
+import { Paper, Typography, Container, Box } from '@mui/material';
 import api from '../../utils/api';
-
-type Report = {
-  quizPerformance: string;
-  chatInteraction: string;
-  overallFeedback: string;
-};
 
 type StudentReportProps = {
   studentId: number;
+  selectedSemester: string; // 학기 필터링
+  selectedSubject: string; // 과목 필터링
 };
 
-const StudentReport: React.FC<StudentReportProps> = ({ studentId }) => {
-  const [report, setReport] = useState<Report | null>(null);
+type Report = {
+  subject: string;
+  semester: string;
+  comment: string;
+};
+
+const StudentReport: React.FC<StudentReportProps> = ({ studentId, selectedSemester, selectedSubject }) => {
+  const [reports, setReports] = useState<Report[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
-    if (studentId) {
-      fetchStudentReport();
-    }
-  }, [studentId]);
+    const fetchReports = async () => {
+      try {
+        const res = await api.post('/report/student', {
+          studentId,
+          selectedSemesters: selectedSemester !== 'All' ? [selectedSemester] : [],
+          selectedSubjects: selectedSubject !== 'All' ? [selectedSubject] : []
+        });
+        setReports(res.data);
+      } catch (error) {
+        console.error('Error fetching reports:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const fetchStudentReport = async () => {
-    try {
-      const res = await api.get(`/report/student/${studentId}`);
-      setReport(res.data);
-    } catch (error) {
-      console.error('Error fetching student report:', error);
+    fetchReports();
+  }, [studentId, selectedSemester, selectedSubject]);
+
+  const groupedReports = reports.reduce((acc, report) => {
+    if (!acc[report.semester]) {
+      acc[report.semester] = [];
     }
-  };
+    acc[report.semester].push(report);
+    return acc;
+  }, {} as Record<string, Report[]>);
+
+  if (loading) {
+    return (
+      <Paper elevation={3} sx={{ padding: 2, marginTop: 2 }}>
+        <Typography variant="h6" gutterBottom>Loading...</Typography>
+      </Paper>
+    );
+  }
+
+  if (reports.length === 0) {
+    return (
+      <Paper elevation={3} sx={{ padding: 2, marginTop: 2 }}>
+        <Typography variant="h6" gutterBottom>학생 보고서</Typography>
+        <Typography variant="body1">조회된 보고서가 없습니다. 보고서를 생성하세요.</Typography>
+      </Paper>
+    );
+  }
 
   return (
-    <Container component="main" maxWidth="md">
-      <Paper elevation={3} sx={{ padding: 2, marginTop: 2 }}>
-        <Typography variant="h5" gutterBottom align="center">
-          학생 보고서
-        </Typography>
-        {report ? (
-          <div>
-            <Typography variant="h6" gutterBottom>
-              퀴즈 성과
-            </Typography>
-            <Typography paragraph>{report.quizPerformance}</Typography>
-            <Typography variant="h6" gutterBottom>
-              채팅 상호작용
-            </Typography>
-            <Typography paragraph>{report.chatInteraction}</Typography>
-            <Typography variant="h6" gutterBottom>
-              종합 피드백
-            </Typography>
-            <Typography paragraph>{report.overallFeedback}</Typography>
-          </div>
-        ) : (
-          <Typography paragraph>보고서가 없습니다</Typography>
-        )}
-      </Paper>
-    </Container>
+    <Paper elevation={3} sx={{ padding: 2, marginTop: 2 }}>
+      <Typography variant="h6" gutterBottom>학생 보고서</Typography>
+      {Object.keys(groupedReports).map(semester => (
+        <Box key={semester} sx={{ marginBottom: 2 }}>
+          <Typography variant="h6" gutterBottom>{semester}</Typography>
+          {groupedReports[semester].map(report => (
+            <Box key={report.subject} sx={{ paddingLeft: 2, marginBottom: 1 }}>
+              <Typography variant="subtitle1">{report.subject}</Typography>
+              <Typography variant="body2">{report.comment}</Typography>
+            </Box>
+          ))}
+        </Box>
+      ))}
+    </Paper>
   );
 };
 

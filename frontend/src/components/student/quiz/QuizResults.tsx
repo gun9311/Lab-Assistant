@@ -64,10 +64,16 @@ const QuizResults: React.FC<QuizResultsProps> = ({
   // 조건에 따라 결과 목록 설정
   const results = studentId ? quizResults : filteredResults || [];
 
-  const filteredQuizResults = results.filter(result => 
-    (selectedSemester === 'All' || result.semester === selectedSemester) &&
-    (selectedSubject === 'All' || result.subject === selectedSubject)
-  );
+  // const filteredQuizResults = results.filter(result => 
+  //   (selectedSemester === 'All' || result.semester === selectedSemester) &&
+  //   (selectedSubject === 'All' || result.subject === selectedSubject)
+  // );
+  const filteredQuizResults = (selectedSemester && selectedSubject)
+    ? results.filter(result => 
+        (selectedSemester === 'All' || result.semester === selectedSemester) &&
+        (selectedSubject === 'All' || result.subject === selectedSubject)
+      )
+    : results;
 
   if (studentId && loading) {
     return <CircularProgress />;
