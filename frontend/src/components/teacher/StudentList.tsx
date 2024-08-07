@@ -201,7 +201,11 @@ const StudentList: React.FC<StudentListProps> = ({
             <Collapse in={expandedSections[student._id] === 'report'}>
               {expandedSections[student._id] === 'report' && (
                 <Box sx={{ padding: theme.spacing(2), marginBottom: theme.spacing(1) }}>
-                  <StudentReport studentId={student._id} />
+                  <StudentReport 
+                    studentId={student._id} 
+                    selectedSemester={selectedSemester}
+                    selectedSubject={selectedSubject}
+                  />
                 </Box>
               )}
             </Collapse>
