@@ -17,6 +17,7 @@ const { handleWebSocketConnection } = require('./controllers/chatbotController')
 const ChatSummary = require('./models/ChatSummary');
 const cron = require('node-cron');
 const redisClient = require('./utils/redisClient'); // Redis 클라이언트 가져오기
+const cors = require('cors')
 const auth = require('./middleware/auth'); // auth 미들웨어 임포트
 
 require('dotenv').config();
@@ -26,6 +27,8 @@ mongoose.connect(process.env.MONGODB_URL)
   .catch(err => console.error(err));
 
 const app = express();
+
+app.use(cors());
 
 app.use(session({
   store: new RedisStore({ client: redisClient }),
@@ -42,7 +45,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/subjects', subjectRoutes);
 app.use('/api/quiz-results', quizResultsRoutes);
-app.use('/api/reports', reportRoutes); // 새로운 라우트 추가
+app.use('/api/report', reportRoutes); // 새로운 라우트 추가
 
 const server = app.listen(process.env.PORT || 5000, () => {
   console.log(`Server running on port ${process.env.PORT || 5000}`);
