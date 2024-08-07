@@ -55,4 +55,25 @@ const queryReport = async (req, res) => {
   }
 };
 
-module.exports = { generateReport, queryReport };
+// 특정 학생 보고서 조회 요청 핸들러
+const getStudentReports = async (req, res) => {
+  const { studentId, selectedSemesters, selectedSubjects } = req.body;
+
+  try {
+    const query = {
+      studentId,
+      semester: selectedSemesters.length > 0 ? { $in: selectedSemesters } : { $exists: true },
+      subject: selectedSubjects.length > 0 ? { $in: selectedSubjects } : { $exists: true },
+    };
+
+    const reports = await StudentReport.find(query)
+      .sort({ semester: 1, subject: 1 });
+
+    res.status(200).send(reports);
+  } catch (error) {
+    console.error('Error querying student reports:', error);
+    res.status(500).send({ message: 'Error querying student reports' });
+  }
+};
+
+module.exports = { generateReport, queryReport, getStudentReports };
