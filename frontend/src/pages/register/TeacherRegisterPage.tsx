@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Container, TextField, Button, Typography, Paper, MenuItem, Select, InputLabel, FormControl } from '@mui/material';
+import { Container, TextField, Button, Typography, Paper, MenuItem, Select, InputLabel, FormControl, Snackbar, Alert } from '@mui/material';
 import Autocomplete from '@mui/material/Autocomplete';
 import { educationOffices } from '../../educationOffices';
 import apiNoAuth from '../../utils/apiNoAuth';
+import { useNavigate } from 'react-router-dom';
 
 interface School {
   label: string;
@@ -19,6 +20,8 @@ const TeacherRegisterPage = () => {
   const [school, setSchool] = useState('');
   const [phone, setPhone] = useState('');
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (educationOffice) {
@@ -51,7 +54,10 @@ const TeacherRegisterPage = () => {
     try {
       const res = await apiNoAuth.post('/auth/register/teacher', { email, password, name, school, phone });
       console.log('교사 등록 완료:', res.data);
-      // 성공 처리 추가
+      setSuccess(true);
+      setTimeout(() => {
+        navigate('/home');
+      }, 1300);
     } catch (error) {
       setError('교사 등록에 실패했습니다');
     }
@@ -126,6 +132,16 @@ const TeacherRegisterPage = () => {
           회원가입
         </Button>
         {error && <Typography color="error" sx={{ mt: 2 }}>{error}</Typography>}
+        <Snackbar 
+          open={success} 
+          autoHideDuration={3000} 
+          onClose={() => setSuccess(false)}
+          anchorOrigin={{ vertical: 'top', horizontal: 'center' }} // 알림 위치 설정
+        >  
+          <Alert onClose={() => setSuccess(false)} severity="success" sx={{ width: '100%' }}>
+            회원가입이 성공적으로 완료되었습니다!
+          </Alert>
+        </Snackbar>
       </Paper>
     </Container>
   );

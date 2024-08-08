@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Box, Button, FormControl, InputLabel, MenuItem, Select, SelectChangeEvent, Typography, FormControlLabel, Checkbox, Paper, Divider, ListItemText } from "@mui/material";
+import { Box, Button, FormControl, InputLabel, MenuItem, Select, SelectChangeEvent, Typography, FormControlLabel, Checkbox, Paper, Divider, ListItemText, Alert } from "@mui/material";
 import api from '../../utils/api'; // 서버 요청을 위한 API 유틸리티
 import ReportComponent from './ReportComponent'; // ReportComponent 임포트
 
@@ -24,6 +24,7 @@ const ReportGeneration: React.FC<ReportGenerationProps> = ({ onBack, school, gra
   const [reportLines, setReportLines] = useState<number>(3);
   const [reportResults, setReportResults] = useState<any[]>([]); // 보고서 조회 결과를 저장하는 상태 변수
   const [showReportComponent, setShowReportComponent] = useState(false); // 보고서 컴포넌트 표시 여부
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const handleSemesterChange = (event: SelectChangeEvent<string[]>) => {
     setSelectedSemesters(event.target.value as string[]);
@@ -64,6 +65,10 @@ const ReportGeneration: React.FC<ReportGenerationProps> = ({ onBack, school, gra
   };
 
   const handleReportGeneration = async () => {
+    if (selectedSemesters.length === 0 || selectedSubjects.length === 0 || selectedStudents.length === 0) {
+      setErrorMessage("학기, 과목, 학생을 모두 선택해야 합니다.");
+      return;
+    }
     try {
       const response = await api.post('/report/generate', {
         selectedSemesters,
@@ -72,8 +77,11 @@ const ReportGeneration: React.FC<ReportGenerationProps> = ({ onBack, school, gra
         reportLines
       });
       console.log('보고서 생성 요청 성공:', response.data);
+      setErrorMessage(null);
+      alert("보고서가 성공적으로 생성되었습니다.");
     } catch (error) {
       console.error('보고서 생성 요청 실패:', error);
+      setErrorMessage("보고서 생성 요청에 실패했습니다.");
     }
   };
 
@@ -82,6 +90,10 @@ const ReportGeneration: React.FC<ReportGenerationProps> = ({ onBack, school, gra
   };
 
   const handleReportQuery = async () => {
+    if (selectedSemesters.length === 0 || selectedSubjects.length === 0 || selectedStudents.length === 0) {
+      setErrorMessage("학기, 과목, 학생을 모두 선택해야 합니다.");
+      return;
+    }
     try {
       const response = await api.post('/report/query', {
         selectedSemesters,
@@ -90,8 +102,10 @@ const ReportGeneration: React.FC<ReportGenerationProps> = ({ onBack, school, gra
       });
       setReportResults(response.data);
       setShowReportComponent(true);
+      setErrorMessage(null);
     } catch (error) {
       console.error('보고서 조회 요청 실패:', error);
+      setErrorMessage("보고서 조회 요청에 실패했습니다.");
     }
   };
 
@@ -160,19 +174,25 @@ const ReportGeneration: React.FC<ReportGenerationProps> = ({ onBack, school, gra
         </Box>
       </Box>
       <Paper sx={{ maxHeight: 200, overflow: 'auto', padding: 2, border: '1px solid rgba(0, 0, 0, 0.12)', borderRadius: '4px' }}>
-        {students.map(student => (
-          <FormControlLabel
-            key={student._id}
-            control={
-              <Checkbox
-                checked={selectedStudents.includes(student._id)}
-                onChange={() => handleStudentChange(student._id)}
-              />
-            }
-            label={`${student.studentId} - ${student.name}`}
-            sx={{ width: '100%' }}
-          />
-        ))}
+        {students.length > 0 ? (
+          students.map(student => (
+            <FormControlLabel
+              key={student._id}
+              control={
+                <Checkbox
+                  checked={selectedStudents.includes(student._id)}
+                  onChange={() => handleStudentChange(student._id)}
+                />
+              }
+              label={`${student.studentId} - ${student.name}`}
+              sx={{ width: '100%' }}
+            />
+          ))
+        ) : (
+          <Typography variant="body2" color="textSecondary" align="center">
+            선택한 학년과 반에 등록된 학생이 없습니다.
+          </Typography>
+        )}
       </Paper>
       <Divider sx={{ marginY: 2 }} />
       <FormControl fullWidth sx={{ marginBottom: 2 }}>
@@ -183,11 +203,12 @@ const ReportGeneration: React.FC<ReportGenerationProps> = ({ onBack, school, gra
         >
           {[1, 2, 3, 4, 5].map(lines => (
             <MenuItem key={lines} value={lines}>
-              {lines} 줄
+              {lines} 줄 (보고서 생성 시에만 사용됩니다)
             </MenuItem>
           ))}
         </Select>
       </FormControl>
+      {errorMessage && <Alert severity="error">{errorMessage}</Alert>}
       <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2 }}>
         <Button variant="outlined" onClick={onBack}>
           뒤로가기
