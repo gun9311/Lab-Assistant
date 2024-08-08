@@ -1,6 +1,3 @@
-const User = require("../models/Admin");
-const QuizResult = require("../models/QuizResult");
-const ChatSummary = require("../models/ChatSummary");
 const Teacher = require('../models/Teacher');
 const Student = require('../models/Student');
 
@@ -12,27 +9,6 @@ const getStudents = async (req, res) => {
     res.status(200).send(students);
   } catch (error) {
     res.status(500).send({ error: 'Failed to fetch students' });
-  }
-};
-
-const createStudent = async (req, res) => {
-  const { username, password, grade } = req.body;
-  try {
-    const student = new User({ username, password, role: "student", grade });
-    await student.save();
-    res.status(201).send(student);
-  } catch (error) {
-    res.status(400).send({ error: "Failed to create student" });
-  }
-};
-
-const getStudentQuizResults = async (req, res) => {
-  const { studentId } = req.params;
-  try {
-    const quizResults = await QuizResult.find({ student: studentId });
-    res.status(200).send(quizResults);
-  } catch (error) {
-    res.status(500).send({ error: "Failed to fetch quiz results" });
   }
 };
 
@@ -61,6 +37,9 @@ const updateProfile = async (req, res) => {
   const isValidOperation = updates.every(update => allowedUpdates.includes(update));
 
   if (!isValidOperation) {
+    const filteredUpdates = updates.filter(update => allowedUpdates.includes(update)); // 허용된 필드만 추출
+    console.log('Invalid updates:', updates); // 허용되지 않는 업데이트 로깅
+    console.log('Filtered updates:', filteredUpdates); // 필터링된 업데이트 로깅
     return res.status(400).send({ error: 'Invalid updates!' });
   }
 
@@ -73,6 +52,7 @@ const updateProfile = async (req, res) => {
     }
 
     if (!user) {
+      console.log('User not found:', req.user._id); // 사용자를 찾지 못했을 때 로깅
       return res.status(404).send();
     }
 
@@ -81,9 +61,11 @@ const updateProfile = async (req, res) => {
 
     res.send(user);
   } catch (error) {
+    console.error('Error updating profile:', error); // 업데이트 에러 로깅
     res.status(400).send(error);
   }
 };
+
 
 const deleteProfile = async (req, res) => {
   try {
