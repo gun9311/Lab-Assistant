@@ -108,6 +108,26 @@ const StudentList: React.FC<StudentListProps> = ({
     return <ReportGeneration onBack={handleBackToList} school={school} grade={grade} classNumber={classNumber} students={students} />;
   }
 
+  if (!grade || !classNumber) {
+    return (
+      <Paper elevation={3} sx={{ padding: theme.spacing(2), marginTop: theme.spacing(2), backgroundColor: theme.palette.background.paper }}>
+        <Typography variant="h5" gutterBottom align="center" sx={{ color: theme.palette.primary.main }}>
+          학년과 반을 선택해주세요.
+        </Typography>
+      </Paper>
+    );
+  }
+
+  if (students.length === 0) {
+    return (
+      <Paper elevation={3} sx={{ padding: theme.spacing(2), marginTop: theme.spacing(2), backgroundColor: theme.palette.background.paper }}>
+        <Typography variant="h5" gutterBottom align="center" sx={{ color: theme.palette.primary.main }}>
+          선택한 학년과 반에 학생이 없습니다.
+        </Typography>
+      </Paper>
+    );
+  }
+
   return (
     <Paper elevation={3} sx={{ padding: theme.spacing(2), marginTop: theme.spacing(2), backgroundColor: theme.palette.background.paper }}>
       <Typography variant="h5" gutterBottom align="center" sx={{ color: theme.palette.primary.main }}>
