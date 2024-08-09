@@ -53,7 +53,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ grade, semester, subject, unit, topic
         newWs.close();
       }
     };
-  }, []);
+  }, [subject]);
 
   useEffect(() => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -64,13 +64,16 @@ const Chatbot: React.FC<ChatbotProps> = ({ grade, semester, subject, unit, topic
       recognitionInstance.lang = "ko-KR";
 
       recognitionInstance.onstart = () => setIsListening(true);
-      recognitionInstance.onend = () => setIsListening(false);
+      recognitionInstance.onend = () => {
+        setIsListening(false);
+        setMessage(""); // 음성 인식이 끝나면 메시지를 비웁니다.
+      };
       recognitionInstance.onerror = (event: Event) => console.error("Speech recognition error", event);
       recognitionInstance.onresult = (event: SpeechRecognitionEvent) => {
         const transcript = Array.from(event.results)
           .map(result => result[0].transcript)
           .join("");
-        setMessage(transcript);
+        setMessage(transcript); // 임시 텍스트 업데이트
       };
 
       setRecognition(recognitionInstance);
@@ -79,7 +82,6 @@ const Chatbot: React.FC<ChatbotProps> = ({ grade, semester, subject, unit, topic
     }
   }, []);
 
-  // 새로운 권한 요청 및 저장 처리
   useEffect(() => {
     const checkMicPermission = async () => {
       try {
@@ -121,6 +123,10 @@ const Chatbot: React.FC<ChatbotProps> = ({ grade, semester, subject, unit, topic
       }));
       console.log('-------send Message-------');
       setMessage(""); // 메시지 전송 후 입력란 비우기
+
+      if (recognition) {
+        recognition.stop(); // 메시지 전송 후 음성 인식 중지
+      }
     }
   };
 
