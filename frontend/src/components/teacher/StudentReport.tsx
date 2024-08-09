@@ -4,8 +4,8 @@ import api from '../../utils/api';
 
 type StudentReportProps = {
   studentId: number;
-  selectedSemester: string; // 학기 필터링
-  selectedSubject: string; // 과목 필터링
+  selectedSemester: string;
+  selectedSubject: string;
 };
 
 type Report = {

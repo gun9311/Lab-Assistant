@@ -64,8 +64,8 @@ const TeacherRegisterPage = () => {
   };
 
   return (
-    <Container component="main" maxWidth="xs">
-      <Paper elevation={3} sx={{ padding: 4, marginTop: 8 }}>
+    <Container component="main" maxWidth="xs" sx={{ marginTop: { xs: 4, sm: 8 } }}>
+      <Paper elevation={3} sx={{ padding: { xs: 2, sm: 4 } }}>
         <Typography variant="h4" gutterBottom>
           교사 회원가입
         </Typography>
@@ -132,12 +132,12 @@ const TeacherRegisterPage = () => {
           회원가입
         </Button>
         {error && <Typography color="error" sx={{ mt: 2 }}>{error}</Typography>}
-        <Snackbar 
-          open={success} 
-          autoHideDuration={3000} 
+        <Snackbar
+          open={success}
+          autoHideDuration={3000}
           onClose={() => setSuccess(false)}
-          anchorOrigin={{ vertical: 'top', horizontal: 'center' }} // 알림 위치 설정
-        >  
+          anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+        >
           <Alert onClose={() => setSuccess(false)} severity="success" sx={{ width: '100%' }}>
             회원가입이 성공적으로 완료되었습니다!
           </Alert>

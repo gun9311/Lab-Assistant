@@ -1,12 +1,5 @@
 import React, { useState } from "react";
-import {
-  Box,
-  Button,
-  TextField,
-  Typography,
-  Paper,
-  Alert,
-} from "@mui/material";
+import { Box, Button, TextField, Typography, Paper, Alert } from "@mui/material";
 import { getUserId } from "../../../utils/auth";
 import api from "../../../utils/api";
 
@@ -23,10 +16,7 @@ type Quiz = {
   tasks: Task[];
 };
 
-const QuizComponent: React.FC<{ quiz: Quiz; onSubmit: () => void }> = ({
-  quiz,
-  onSubmit,
-}) => {
+const QuizComponent: React.FC<{ quiz: Quiz; onSubmit: () => void }> = ({ quiz, onSubmit }) => {
   const [answers, setAnswers] = useState<{ [key: string]: string }>({});
   const [error, setError] = useState<string | null>(null);
 
@@ -36,14 +26,13 @@ const QuizComponent: React.FC<{ quiz: Quiz; onSubmit: () => void }> = ({
 
   const handleSubmit = async () => {
     const quizData = {
-      studentId: getUserId(), // 실제로는 로그인된 학생의 ID를 사용해야 합니다.
+      studentId: getUserId(),
       subject: quiz.subject,
       semester: quiz.semester,
       unit: quiz.unit,
       answers: Object.entries(answers).map(([questionId, studentAnswer]) => ({
         questionId,
-        taskText:
-          quiz.tasks.find((task) => task._id === questionId)?.taskText || "",
+        taskText: quiz.tasks.find((task) => task._id === questionId)?.taskText || "",
         studentAnswer,
       })),
     };

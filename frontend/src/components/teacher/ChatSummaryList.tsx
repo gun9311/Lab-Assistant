@@ -22,7 +22,7 @@ const ChatSummaryList: React.FC<ChatSummaryListProps> = ({ studentId, selectedSe
   const [chatSummaries, setChatSummaries] = useState<SubjectSummary[]>([]);
   const [onlyStudentQuestions, setOnlyStudentQuestions] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
-  const [noData, setNoData] = useState<boolean>(false); // 추가된 상태: 채팅 내역이 전혀 없는 경우
+  const [noData, setNoData] = useState<boolean>(false);
 
   useEffect(() => {
     const fetchChatSummaries = async () => {
@@ -31,12 +31,10 @@ const ChatSummaryList: React.FC<ChatSummaryListProps> = ({ studentId, selectedSe
         const res = await api.get(`/chat/summary/${studentId}`, {
           params: { semester: selectedSemester, subject: selectedSubject }
         });
-        console.log('API Response:', res.data);
 
         if (Array.isArray(res.data) && res.data.length > 0 && Array.isArray(res.data[0].subjects)) {
           const subjects: SubjectSummary[] = res.data[0].subjects;
 
-          // Summaries를 최신순으로 정렬
           subjects.forEach((subject: SubjectSummary) => {
             subject.summaries.sort((a: Summary, b: Summary) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
           });

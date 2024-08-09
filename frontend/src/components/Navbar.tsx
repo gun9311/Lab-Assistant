@@ -49,11 +49,39 @@ const Navbar: React.FC<{ role: string }> = ({ role }) => {
   };
 
   return (
-    <BottomNavigation value={value} onChange={handleChange} showLabels>
-      <BottomNavigationAction label={getHomeLabel()} icon={<Home />} />
-      <BottomNavigationAction label="프로필" icon={<Person />} />
-      <BottomNavigationAction label="알림" icon={<Notifications />} />
-      {role === 'student' && <BottomNavigationAction label="나의 퀴즈" icon={<Quiz />} />}
+    <BottomNavigation
+      value={value}
+      onChange={handleChange}
+      showLabels
+      sx={{
+        position: 'fixed',
+        bottom: 0,
+        width: '100%',
+        zIndex: 1000,
+        '@media (min-width: 600px)': {
+          width: '50%',
+          left: '25%',
+        },
+      }}
+    >
+      <BottomNavigationAction 
+        label={getHomeLabel()} 
+        icon={<Home />} 
+      />
+      <BottomNavigationAction 
+        label="프로필" 
+        icon={<Person />} 
+      />
+      <BottomNavigationAction 
+        label="알림" 
+        icon={<Notifications />} 
+      />
+      {role === 'student' && (
+        <BottomNavigationAction 
+          label="나의 퀴즈" 
+          icon={<Quiz />} 
+        />
+      )}
     </BottomNavigation>
   );
 };

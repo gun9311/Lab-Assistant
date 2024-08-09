@@ -24,7 +24,7 @@ export const ChatbotProvider: React.FC<ChatbotProviderProps> = ({ children }) =>
         open={alertOpen} 
         autoHideDuration={2000} 
         onClose={() => setAlertOpen(false)}
-        anchorOrigin={{ vertical: 'top', horizontal: 'center' }} // 화면 중앙에 표시
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
       >
         <Alert onClose={() => setAlertOpen(false)} severity="warning" sx={{ width: '100%' }}>
           챗봇을 종료해주세요!

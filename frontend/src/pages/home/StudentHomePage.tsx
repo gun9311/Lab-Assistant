@@ -15,7 +15,7 @@ const StudentHomePage: React.FC = () => {
     topic: ''
   });
   const [remainingTime, setRemainingTime] = useState<number | null>(null);
-  const [sessionEndedAlertOpen, setSessionEndedAlertOpen] = useState(false); // 추가된 상태
+  const [sessionEndedAlertOpen, setSessionEndedAlertOpen] = useState(false);
 
   const handleSelectionChange = (newSelection: typeof selection) => {
     setSelection(newSelection);
@@ -41,7 +41,7 @@ const StudentHomePage: React.FC = () => {
           } else {
             clearInterval(timer);
             handleChatbotEnd();
-            setSessionEndedAlertOpen(true); // 챗봇 세션 종료 알림 표시
+            setSessionEndedAlertOpen(true);
             return null;
           }
         });
@@ -110,9 +110,6 @@ const StudentHomePage: React.FC = () => {
             onChatbotEnd={handleChatbotEnd}
           />
         )}
-        <Box textAlign="center" sx={{ mt: 2 }}>
-          <LogoutButton />
-        </Box>
       </Paper>
       <Snackbar 
         open={sessionEndedAlertOpen} 

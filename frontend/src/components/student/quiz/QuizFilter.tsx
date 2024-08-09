@@ -20,7 +20,7 @@ const QuizFilter: React.FC<QuizFilterProps> = ({ selection, handleSelectionChang
     <Grid container justifyContent="space-between" alignItems="center" spacing={2} sx={{ mb: 2 }}>
       <Grid item xs={12} sm={6}>
         <Grid container spacing={2}>
-          <Grid item xs={12} sm={4}>
+          <Grid item xs={12} sm={6}>
             <FormControl variant="outlined" fullWidth>
               <InputLabel>학기</InputLabel>
               <Select
@@ -36,7 +36,7 @@ const QuizFilter: React.FC<QuizFilterProps> = ({ selection, handleSelectionChang
               </Select>
             </FormControl>
           </Grid>
-          <Grid item xs={12} sm={4}>
+          <Grid item xs={12} sm={6}>
             <FormControl variant="outlined" fullWidth>
               <InputLabel>과목</InputLabel>
               <Select
@@ -57,8 +57,8 @@ const QuizFilter: React.FC<QuizFilterProps> = ({ selection, handleSelectionChang
           </Grid>
         </Grid>
       </Grid>
-      <Grid item xs={12} sm={2}>
-        <Box display="flex" justifyContent="flex-middle" width="100%">
+      <Grid item xs={12} sm={4}>
+        <Box display="flex" justifyContent={{ xs: 'center', sm: 'flex-end' }} width="100%">
           <Button variant="contained" color="primary" onClick={handleQuizStart}>
             퀴즈 풀기
           </Button>

@@ -14,8 +14,8 @@ const TeacherHomePage: React.FC = () => {
         <Typography variant="h4" gutterBottom align="center">
           {school}
         </Typography>
-        <Box display="flex" justifyContent="space-between" sx={{ mb: 2 }}>
-          <FormControl fullWidth sx={{ mr: 1 }}>
+        <Box display="flex" flexDirection={{ xs: 'column', sm: 'row' }} justifyContent="space-between" sx={{ mb: 2 }}>
+          <FormControl fullWidth sx={{ mr: { sm: 1, xs: 0 }, mb: { xs: 2, sm: 0 } }}>
             <InputLabel>학년</InputLabel>
             <Select
               value={grade || ""}
@@ -28,7 +28,7 @@ const TeacherHomePage: React.FC = () => {
               <MenuItem value={6}>6</MenuItem>
             </Select>
           </FormControl>
-          <FormControl fullWidth sx={{ ml: 1 }}>
+          <FormControl fullWidth sx={{ ml: { sm: 1, xs: 0 } }}>
             <TextField
               label="반"
               type="text"
