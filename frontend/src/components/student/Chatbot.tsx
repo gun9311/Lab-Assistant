@@ -79,6 +79,36 @@ const Chatbot: React.FC<ChatbotProps> = ({ grade, semester, subject, unit, topic
     }
   }, []);
 
+  // 새로운 권한 요청 및 저장 처리
+  useEffect(() => {
+    const checkMicPermission = async () => {
+      try {
+        const permission = await navigator.permissions.query({ name: 'microphone' as PermissionName });
+        if (permission.state === 'denied') {
+          alert('마이크 권한이 거부되었습니다. 권한을 허용해주세요.');
+          return;
+        }
+        if (permission.state === 'granted') {
+          localStorage.setItem('micPermissionGranted', 'true');
+        } else {
+          // 권한을 요청하는 로직
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          if (stream) {
+            localStorage.setItem('micPermissionGranted', 'true');
+            stream.getTracks().forEach(track => track.stop());
+          }
+        }
+      } catch (error) {
+        console.error('마이크 권한 요청 중 오류가 발생했습니다:', error);
+      }
+    };
+
+    const micPermissionGranted = localStorage.getItem('micPermissionGranted');
+    if (!micPermissionGranted) {
+      checkMicPermission();
+    }
+  }, []);
+
   const handleSendMessage = async () => {
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({
