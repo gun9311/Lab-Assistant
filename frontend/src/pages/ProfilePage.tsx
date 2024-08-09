@@ -157,7 +157,7 @@ const ProfilePage = () => {
               disabled={!editMode}
             />
             {editMode ? (
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', marginTop: 2 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', marginTop: 2, flexDirection: { xs: 'column', sm: 'row' } }}>
                 <Button variant="outlined" color="secondary" onClick={() => setEditMode(false)}>
                   취소
                 </Button>
@@ -166,7 +166,7 @@ const ProfilePage = () => {
                 </Button>
               </Box>
             ) : (
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', marginTop: 2 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', marginTop: 2, flexDirection: { xs: 'column', sm: 'row' } }}>
                 <Button variant="outlined" color="error" onClick={() => openDialog(handleDelete, '프로필을 삭제하시겠습니까?')}>
                   삭제
                 </Button>

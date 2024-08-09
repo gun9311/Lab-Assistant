@@ -122,7 +122,7 @@ const ReportGeneration: React.FC<ReportGenerationProps> = ({ onBack, school, gra
       <Typography variant="h4" gutterBottom align="center">
         보고서 생성 및 일괄 조회
       </Typography>
-      <Box sx={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 1 }}>
+      <Box sx={{ display: 'flex', justifyContent: { xs: 'center', sm: 'flex-end' }, marginBottom: 1 }}>
         <Button onClick={handleSelectAllSemesters}>학기 전체 선택</Button>
         <Button onClick={handleDeselectAllSemesters}>학기 전체 해제</Button>
       </Box>
@@ -144,7 +144,7 @@ const ReportGeneration: React.FC<ReportGenerationProps> = ({ onBack, school, gra
           </MenuItem>
         </Select>
       </FormControl>
-      <Box sx={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 1 }}>
+      <Box sx={{ display: 'flex', justifyContent: { xs: 'center', sm: 'flex-end' }, marginBottom: 1 }}>
         <Button onClick={handleSelectAllSubjects}>과목 전체 선택</Button>
         <Button onClick={handleDeselectAllSubjects}>과목 전체 해제</Button>
       </Box>
@@ -168,7 +168,7 @@ const ReportGeneration: React.FC<ReportGenerationProps> = ({ onBack, school, gra
         <Typography variant="h6" gutterBottom>
           학생 선택
         </Typography>
-        <Box>
+        <Box sx={{ display: 'flex', justifyContent: { xs: 'center', sm: 'flex-end' }, width: { xs: '100%', sm: 'auto' } }}>
           <Button onClick={handleSelectAllStudents}>학생 전체 선택</Button>
           <Button onClick={handleDeselectAllStudents}>학생 전체 해제</Button>
         </Box>
@@ -209,8 +209,8 @@ const ReportGeneration: React.FC<ReportGenerationProps> = ({ onBack, school, gra
         </Select>
       </FormControl>
       {errorMessage && <Alert severity="error">{errorMessage}</Alert>}
-      <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2 }}>
-        <Button variant="outlined" onClick={onBack}>
+      <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'center', gap: 2 }}>
+        <Button variant="outlined" onClick={onBack} sx={{ mb: { xs: 1, sm: 0 } }}>
           뒤로가기
         </Button>
         <Button variant="contained" color="primary" onClick={handleReportGeneration}>

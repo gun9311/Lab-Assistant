@@ -1,9 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Box, Button, TextField, Typography, Paper, IconButton } from '@mui/material';
 import MicIcon from '@mui/icons-material/Mic';
 import MicOffIcon from '@mui/icons-material/MicOff';
 import SendIcon from '@mui/icons-material/Send';
-import api from '../../utils/api';
 
 type ChatbotProps = {
   grade: string;
@@ -20,6 +19,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ grade, semester, subject, unit, topic
   const [isListening, setIsListening] = useState<boolean>(false);
   const [recognition, setRecognition] = useState<SpeechRecognition | null>(null);
   const [ws, setWs] = useState<WebSocket | null>(null);
+  const chatBoxRef = useRef<HTMLDivElement>(null); // Ref 생성
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -66,14 +66,14 @@ const Chatbot: React.FC<ChatbotProps> = ({ grade, semester, subject, unit, topic
       recognitionInstance.onstart = () => setIsListening(true);
       recognitionInstance.onend = () => {
         setIsListening(false);
-        setMessage(""); // 음성 인식이 끝나면 메시지를 비웁니다.
+        setMessage("");
       };
       recognitionInstance.onerror = (event: Event) => console.error("Speech recognition error", event);
       recognitionInstance.onresult = (event: SpeechRecognitionEvent) => {
         const transcript = Array.from(event.results)
           .map(result => result[0].transcript)
           .join("");
-        setMessage(transcript); // 임시 텍스트 업데이트
+        setMessage(transcript);
       };
 
       setRecognition(recognitionInstance);
@@ -82,34 +82,12 @@ const Chatbot: React.FC<ChatbotProps> = ({ grade, semester, subject, unit, topic
     }
   }, []);
 
+  // 새 메시지가 추가될 때 스크롤을 아래로 이동시키는 useEffect
   useEffect(() => {
-    const checkMicPermission = async () => {
-      try {
-        const permission = await navigator.permissions.query({ name: 'microphone' as PermissionName });
-        if (permission.state === 'denied') {
-          alert('마이크 권한이 거부되었습니다. 권한을 허용해주세요.');
-          return;
-        }
-        if (permission.state === 'granted') {
-          localStorage.setItem('micPermissionGranted', 'true');
-        } else {
-          // 권한을 요청하는 로직
-          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-          if (stream) {
-            localStorage.setItem('micPermissionGranted', 'true');
-            stream.getTracks().forEach(track => track.stop());
-          }
-        }
-      } catch (error) {
-        console.error('마이크 권한 요청 중 오류가 발생했습니다:', error);
-      }
-    };
-
-    const micPermissionGranted = localStorage.getItem('micPermissionGranted');
-    if (!micPermissionGranted) {
-      checkMicPermission();
+    if (chatBoxRef.current) {
+      chatBoxRef.current.scrollTop = chatBoxRef.current.scrollHeight;
     }
-  }, []);
+  }, [chatHistory]);
 
   const handleSendMessage = async () => {
     if (ws && ws.readyState === WebSocket.OPEN) {
@@ -121,11 +99,10 @@ const Chatbot: React.FC<ChatbotProps> = ({ grade, semester, subject, unit, topic
         topic,
         userMessage: message
       }));
-      console.log('-------send Message-------');
-      setMessage(""); // 메시지 전송 후 입력란 비우기
+      setMessage("");
 
       if (recognition) {
-        recognition.stop(); // 메시지 전송 후 음성 인식 중지
+        recognition.stop();
       }
     }
   };
@@ -190,7 +167,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ grade, semester, subject, unit, topic
           <MicOffIcon />
         </IconButton>
       </Box>
-      <Box className="chatbot-response" sx={{ mt: 2 }}>
+      <Box ref={chatBoxRef} className="chatbot-response" sx={{ mt: 2, maxHeight: '300px', overflowY: 'auto' }}>
         {chatHistory.map((chat, index) => (
           <Typography key={index} variant="body1" sx={{ p: 2, bgcolor: "#f1f1f1", borderRadius: 1 }}>
             <strong>사용자:</strong> {chat.user} <br />

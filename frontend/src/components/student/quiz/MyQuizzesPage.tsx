@@ -41,8 +41,7 @@ const MyQuizzesPage: React.FC = () => {
 
   const fetchQuizResults = async () => {
     try {
-      const response = await api.get('/quiz-results'); // 퀴즈 결과를 가져오는 API 엔드포인트
-      console.log(response.data)
+      const response = await api.get('/quiz-results');
       setQuizResults(response.data);
       setFilteredResults(response.data);
     } catch (error: any) {
@@ -87,9 +86,9 @@ const MyQuizzesPage: React.FC = () => {
 
   const handleQuizLoad = async () => {
     try {
-      const response = await api.get('/quiz', { params: selection }); // 퀴즈 문제를 가져오는 API 엔드포인트
+      const response = await api.get('/quiz', { params: selection });
       setCurrentQuiz(response.data);
-      setError(null); // 성공 시 에러 메시지 초기화
+      setError(null);
     } catch (error: any) {
       console.error('Failed to start quiz:', error);
       setError(error.response?.data?.message || '퀴즈를 시작하는 데 실패했습니다.');
@@ -97,9 +96,9 @@ const MyQuizzesPage: React.FC = () => {
   };
 
   const handleQuizSubmit = () => {
-    setCurrentQuiz(null); // 퀴즈 제출 후 상태 초기화
-    setIsQuizMode(false); // 퀴즈 모드 종료
-    fetchQuizResults(); // 퀴즈 결과 다시 불러오기
+    setCurrentQuiz(null);
+    setIsQuizMode(false);
+    fetchQuizResults();
   };
 
   if (isQuizMode) {

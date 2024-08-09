@@ -27,7 +27,7 @@ interface QuizResult {
 type Student = {
   _id: number;
   name: string;
-  grade: number;  // 숫자 타입으로 수정
+  grade: number;
   class: string;
   studentId: string;
 };
@@ -133,7 +133,7 @@ const StudentList: React.FC<StudentListProps> = ({
       <Typography variant="h5" gutterBottom align="center" sx={{ color: theme.palette.primary.main }}>
         학생 목록
       </Typography>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', marginBottom: theme.spacing(2) }}>
+      <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', marginBottom: theme.spacing(2) }}>
         <FormControl sx={{ minWidth: 120 }}>
           <InputLabel>학기 선택</InputLabel>
           <Select
@@ -145,7 +145,7 @@ const StudentList: React.FC<StudentListProps> = ({
             <MenuItem value="2학기">2학기</MenuItem>
           </Select>
         </FormControl>
-        <FormControl sx={{ minWidth: 120, marginLeft: theme.spacing(2) }}>
+        <FormControl sx={{ minWidth: 120, marginLeft: { xs: 0, sm: theme.spacing(2) }, marginTop: { xs: theme.spacing(2), sm: 0 } }}>
           <InputLabel>과목 선택</InputLabel>
           <Select
             value={selectedSubject}
@@ -159,7 +159,7 @@ const StudentList: React.FC<StudentListProps> = ({
             <MenuItem value="영어">영어</MenuItem>
           </Select>
         </FormControl>
-        <Button variant="contained" color="primary" onClick={handleShowReportGeneration} sx={{ marginLeft: 'auto' }}>
+        <Button variant="contained" color="primary" onClick={handleShowReportGeneration} sx={{ marginLeft: { xs: 0, sm: 'auto' }, marginTop: { xs: theme.spacing(2), sm: 0 } }}>
           보고서 생성 및 일괄 조회
         </Button>
       </Box>

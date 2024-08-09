@@ -40,7 +40,7 @@ const QuizResults: React.FC<QuizResultsProps> = ({
   const [quizResults, setQuizResults] = useState<QuizResult[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [noData, setNoData] = useState<boolean>(false); // 추가된 상태: 퀴즈 내역이 전혀 없는 경우
+  const [noData, setNoData] = useState<boolean>(false);
 
   useEffect(() => {
     const fetchQuizResults = async () => {
@@ -61,13 +61,8 @@ const QuizResults: React.FC<QuizResultsProps> = ({
     fetchQuizResults();
   }, [studentId]);
 
-  // 조건에 따라 결과 목록 설정
   const results = studentId ? quizResults : filteredResults || [];
 
-  // const filteredQuizResults = results.filter(result => 
-  //   (selectedSemester === 'All' || result.semester === selectedSemester) &&
-  //   (selectedSubject === 'All' || result.subject === selectedSubject)
-  // );
   const filteredQuizResults = (selectedSemester && selectedSubject)
     ? results.filter(result => 
         (selectedSemester === 'All' || result.semester === selectedSemester) &&

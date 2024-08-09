@@ -73,8 +73,8 @@ const StudentLoginPage = () => {
   };
 
   return (
-    <Container component="main" maxWidth="xs">
-      <Paper elevation={3} sx={{ padding: 4, marginTop: 8 }}>
+    <Container component="main" maxWidth="xs" sx={{ marginTop: { xs: 4, sm: 8 } }}>
+      <Paper elevation={3} sx={{ padding: { xs: 2, sm: 4 } }}>
         <Typography variant="h4" gutterBottom>
           학생 로그인
         </Typography>

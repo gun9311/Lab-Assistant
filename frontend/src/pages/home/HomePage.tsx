@@ -14,8 +14,8 @@ const HomePage = () => {
         <Typography variant="h4" gutterBottom sx={{ fontFamily: 'Roboto, sans-serif', fontWeight: 'bold', color: 'green' }}>
           Welcome! T-bot
         </Typography>
-        <Box sx={{ mt: 3, display: 'flex', justifyContent: 'space-around' }}>
-          <Box sx={{ width: '45%' }}>
+        <Box sx={{ mt: 3, display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-around', gap: 2 }}>
+          <Box sx={{ width: '100%' }}>
             <Link to="/teacher-login" style={{ textDecoration: 'none' }}>
               <Button 
                 variant="contained" 
@@ -38,7 +38,7 @@ const HomePage = () => {
               </Button>
             </Link>
           </Box>
-          <Box sx={{ width: '45%' }}>
+          <Box sx={{ width: '100%' }}>
             <Link to="/student-login" style={{ textDecoration: 'none' }}>
               <Button 
                 variant="contained" 
@@ -70,19 +70,8 @@ const HomePage = () => {
               size="small" 
               startIcon={<img src={adminIcon} alt="관리자" width="16" height="16" />}
             >
-              {/* 관리자 로그인 */}
             </Button>
           </Link>
-          {/* <Link to="/admin-register" style={{ textDecoration: 'none' }}> */}
-            {/* <Button 
-              variant="text" 
-              color="secondary" 
-              size="small" 
-              startIcon={<img src={adminIcon} alt="관리자" width="16" height="16" />}
-            >
-              관리자 회원가입
-            </Button> */}
-          {/* </Link> */}
         </Box>
       </Paper>
     </Container>
