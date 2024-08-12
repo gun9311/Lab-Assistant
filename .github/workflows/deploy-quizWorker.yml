@@ -79,6 +79,7 @@ jobs:
             docker stop quizworker-container || true
             docker rm quizworker-container || true
             docker run -d --name quizworker-container -p 3000:3000 ${{ secrets.DOCKER_USERNAME }}/quizworker:latest
+            docker image prune -a -f
           EOF
           
       # - name: Deploy to EC2
