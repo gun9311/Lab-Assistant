@@ -58,9 +58,11 @@ const Navbar: React.FC<{ role: string }> = ({ role }) => {
         bottom: 0,
         width: '100%',
         zIndex: 1000,
-        '@media (min-width: 600px)': {
-          width: '50%',
-          left: '25%',
+        '@media (min-width: 1200px)': {
+          position: 'relative',  // 큰 화면에서는 상대적인 위치를 사용
+          bottom: 'auto',        // 'bottom' 속성 제거
+          marginTop: 'auto',     // 상단에 여백을 추가하여 페이지의 끝에 위치하도록
+          width: '100%',
         },
       }}
     >

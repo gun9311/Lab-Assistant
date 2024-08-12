@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../utils/api';
-import { Box, Typography, List, ListItem, ListItemText, Switch, FormControlLabel } from '@mui/material';
+import { Box, Typography, List, ListItem, ListItemText, Switch, FormControlLabel, Divider } from '@mui/material';
 
 type Summary = {
   summary: string;
@@ -80,19 +80,21 @@ const ChatSummaryList: React.FC<ChatSummaryListProps> = ({ studentId, selectedSe
 
   return (
     <Box>
-      <Typography variant="h6" gutterBottom>
-        채팅 내역 (최근 일주일)
-      </Typography>
-      <FormControlLabel
-        control={
-          <Switch
-            checked={onlyStudentQuestions}
-            onChange={handleFilterChange}
-          />
-        }
-        label="학생 질문만 보기"
-        sx={{ mb: 2 }}
-      />
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+        <Typography variant="h6">
+          최근 3일간 채팅내역
+        </Typography>
+        <FormControlLabel
+          control={
+            <Switch
+              checked={onlyStudentQuestions}
+              onChange={handleFilterChange}
+            />
+          }
+          label="학생 질문만 보기"
+        />
+      </Box>
+      <Divider sx={{ mb: 2 }} />
       {noData ? (
         <Box textAlign="center" sx={{ mt: 2 }}>
           <Typography>채팅 내역이 없습니다.</Typography>

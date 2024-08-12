@@ -6,7 +6,7 @@ const Teacher = require('../models/Teacher');
 const Student = require('../models/Student');
 
 const login = async (req, res) => {
-  const { role, password, ...loginData } = req.body;
+  const { role, password, fcmToken, ...loginData } = req.body;
 
   try {
     let user;
@@ -29,6 +29,15 @@ const login = async (req, res) => {
       return res.status(401).send({ error: "Invalid login credentials" });
     }
 
+    // FCM 토큰을 tokens 필드에 추가
+    if (fcmToken) {
+      const tokenExists = user.tokens.some(tokenObj => tokenObj.token === fcmToken);
+      if (!tokenExists) {
+        user.tokens.push({ token: fcmToken });
+        await user.save();
+      }
+    }
+
     const accessToken = jwt.sign(
       { _id: user._id, role: user.role },
       process.env.JWT_SECRET,
@@ -42,8 +51,7 @@ const login = async (req, res) => {
 
     await redisClient
       .set(user._id.toString(), refreshToken, "EX", 7 * 24 * 60 * 60)
-      .then(() => {
-      })
+      .then(() => {})
       .catch((err) => {
         console.error("Failed to save refresh token in Redis:", err);
       });
@@ -62,7 +70,7 @@ const login = async (req, res) => {
     if (role == 'student') {
       response.grade = user.grade; // 학년을 응답에 추가
     }
-    
+
     res.send(response);
   } catch (error) {
     console.error("Error during login:", error);

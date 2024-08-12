@@ -1,28 +1,12 @@
-import React, { useState, useEffect } from "react";
-import api from "../../utils/api";
-import { List, ListItem, ListItemText, Paper, Typography, IconButton, Collapse, Box, Select, MenuItem, FormControl, InputLabel, SelectChangeEvent, useTheme, Divider, Button } from "@mui/material";
+import React, { useState } from "react";
+import { List, ListItem, ListItemText, Paper, Typography, IconButton, Collapse, Box, useTheme, Divider, FormControl, InputLabel, Select, MenuItem } from "@mui/material";
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import QuizResults from "../student/quiz/QuizResults";
 import ChatSummaryList from "./ChatSummaryList";
 import StudentReport from "./StudentReport";
-import ReportGeneration from "./ReportGeneration";
 
-interface QuizResult {
-  _id: string;
-  subject: string;
-  semester: string;
-  unit: string;
-  score: number;
-  createdAt: string;
-  results: {
-    questionId: string;
-    taskText: string;
-    studentAnswer: string;
-    correctAnswer: string;
-    similarity: number;
-  }[];
-}
+type QuizResult = any; // 필요하다면 정확한 타입으로 수정
 
 type Student = {
   _id: number;
@@ -36,40 +20,20 @@ type StudentListProps = {
   school: string | null;
   grade: number | null;
   classNumber: string;
+  students: Student[];
 };
 
 const StudentList: React.FC<StudentListProps> = ({
   school,
   grade,
   classNumber,
+  students,
 }) => {
   const theme = useTheme();
-  const [students, setStudents] = useState<Student[]>([]);
   const [expandedSections, setExpandedSections] = useState<{ [key: number]: string }>({});
   const [selectedQuiz, setSelectedQuiz] = useState<QuizResult | null>(null);
   const [selectedSemester, setSelectedSemester] = useState<string>('All');
   const [selectedSubject, setSelectedSubject] = useState<string>('All');
-  const [showReportGeneration, setShowReportGeneration] = useState<boolean>(false);
-
-  useEffect(() => {
-    const fetchStudents = async () => {
-      try {
-        const res = await api.get("/users/teacher/students", {
-          params: { school, grade, class: classNumber },
-        });
-        const sortedStudents = res.data.sort((a: Student, b: Student) =>
-          a.studentId.localeCompare(b.studentId)
-        );
-        setStudents(sortedStudents);
-      } catch (error) {
-        console.error("Error fetching students:", error);
-      }
-    };
-
-    if (school && grade && classNumber) {
-      fetchStudents();
-    }
-  }, [school, grade, classNumber]);
 
   const handleToggle = (studentId: number, section: 'quiz' | 'chat' | 'report') => {
     setExpandedSections(prevState => {
@@ -87,26 +51,6 @@ const StudentList: React.FC<StudentListProps> = ({
   const handleCloseDetails = () => {
     setSelectedQuiz(null);
   };
-
-  const handleSemesterChange = (event: SelectChangeEvent<string>) => {
-    setSelectedSemester(event.target.value);
-  };
-
-  const handleSubjectChange = (event: SelectChangeEvent<string>) => {
-    setSelectedSubject(event.target.value);
-  };
-
-  const handleShowReportGeneration = () => {
-    setShowReportGeneration(true);
-  };
-
-  const handleBackToList = () => {
-    setShowReportGeneration(false);
-  };
-
-  if (showReportGeneration) {
-    return <ReportGeneration onBack={handleBackToList} school={school} grade={grade} classNumber={classNumber} students={students} />;
-  }
 
   if (!grade || !classNumber) {
     return (
@@ -133,36 +77,43 @@ const StudentList: React.FC<StudentListProps> = ({
       <Typography variant="h5" gutterBottom align="center" sx={{ color: theme.palette.primary.main }}>
         학생 목록
       </Typography>
-      <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', marginBottom: theme.spacing(2) }}>
-        <FormControl sx={{ minWidth: 120 }}>
-          <InputLabel>학기 선택</InputLabel>
+      
+      {/* 학기와 과목 선택 UI */}
+      <Box display="flex" justifyContent="space-between" mb={2}>
+        <FormControl variant="outlined" sx={{ minWidth: 120 }}>
+          <InputLabel id="semester-select-label">학기</InputLabel>
           <Select
+            labelId="semester-select-label"
             value={selectedSemester}
-            onChange={handleSemesterChange}
+            onChange={(e) => setSelectedSemester(e.target.value as string)}
+            label="학기"
           >
             <MenuItem value="All">전체</MenuItem>
             <MenuItem value="1학기">1학기</MenuItem>
             <MenuItem value="2학기">2학기</MenuItem>
+            {/* 필요에 따라 학기를 더 추가 */}
           </Select>
         </FormControl>
-        <FormControl sx={{ minWidth: 120, marginLeft: { xs: 0, sm: theme.spacing(2) }, marginTop: { xs: theme.spacing(2), sm: 0 } }}>
-          <InputLabel>과목 선택</InputLabel>
+
+        <FormControl variant="outlined" sx={{ minWidth: 120 }}>
+          <InputLabel id="subject-select-label">과목</InputLabel>
           <Select
+            labelId="subject-select-label"
             value={selectedSubject}
-            onChange={handleSubjectChange}
+            onChange={(e) => setSelectedSubject(e.target.value as string)}
+            label="과목"
           >
             <MenuItem value="All">전체</MenuItem>
             <MenuItem value="국어">국어</MenuItem>
-            <MenuItem value="수학">수학</MenuItem>
-            <MenuItem value="사회">사회</MenuItem>
-            <MenuItem value="과학">과학</MenuItem>
             <MenuItem value="영어">영어</MenuItem>
+            <MenuItem value="수학">수학</MenuItem>
+            <MenuItem value="과학">과학</MenuItem>
+            <MenuItem value="사회">사회</MenuItem>
+            {/* 필요에 따라 과목을 더 추가 */}
           </Select>
         </FormControl>
-        <Button variant="contained" color="primary" onClick={handleShowReportGeneration} sx={{ marginLeft: { xs: 0, sm: 'auto' }, marginTop: { xs: theme.spacing(2), sm: 0 } }}>
-          보고서 생성 및 일괄 조회
-        </Button>
       </Box>
+
       <List>
         {students.map((student) => (
           <React.Fragment key={student._id}>
@@ -190,7 +141,7 @@ const StudentList: React.FC<StudentListProps> = ({
                 sx={{ backgroundColor: expandedSections[student._id] === 'report' ? theme.palette.action.selected : 'transparent' }}
               >
                 {expandedSections[student._id] === 'report' ? <ExpandLessIcon /> : <ExpandMoreIcon />} 
-                <Typography variant="body2" sx={{ ml: 1, fontSize: '1rem' }}>학생 보고서</Typography>
+                <Typography variant="body2" sx={{ ml: 1, fontSize: '1rem' }}>평가</Typography>
               </IconButton>
             </ListItem>
             <Collapse in={expandedSections[student._id] === 'chat'}>

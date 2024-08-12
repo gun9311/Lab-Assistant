@@ -8,7 +8,7 @@ const teacherSchema = new mongoose.Schema({
   school: { type: String, required: true },
   phone: { type: String },
   role: { type: String, default: 'teacher' },
-  tokens: [{ token: { type: String, required: true } }],
+  tokens: [{ token: { type: String, required: true } }], // FCM 토큰 저장
 });
 
 teacherSchema.pre('save', async function(next) {
