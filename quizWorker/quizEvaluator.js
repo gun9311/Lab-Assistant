@@ -72,7 +72,7 @@ const evaluateQuiz = async (quizData) => {
     });
   }
 
-  const averageScore = results.reduce((sum, result) => sum + result.similarity, 0) / results.length;
+  const averageScore = Math.round((results.reduce((sum, result) => sum + result.similarity, 0) / results.length) * 100) / 100;
 
   const quizResultData = {
     studentId: new mongoose.Types.ObjectId(quizData.studentId),
@@ -115,8 +115,6 @@ const calculateSimilarity = (studentAnswer, correctAnswer) => {
       
       const result = spawnSync(pythonPath, [scriptPath, studentAnswer, correctAnswer], { encoding: 'utf-8' });
 
-    // const result = spawnSync(pythonPath, ['similarity.py', studentAnswer, correctAnswer], { encoding: 'utf-8' });
-
     if (result.error) {
       console.error(`Python process error: ${result.error}`);
       return reject(result.error);
@@ -139,18 +137,14 @@ const calculateSimilarity = (studentAnswer, correctAnswer) => {
 const saveQuizResult = async (quizData) => {
   const { studentId, subject, semester, unit, results, score } = quizData;
   try {
-    let quizResult = await QuizResult.findOne({ studentId, subject, semester, unit });
-    if (!quizResult) {
-      quizResult = new QuizResult({ studentId, subject, semester, unit, results, score });
-    } else {
-      quizResult.results.push(...results);
-      quizResult.score = quizResult.results.reduce((sum, result) => sum + result.similarity, 0) / quizResult.results.length;
-    }
+    // 항상 새로운 QuizResult 문서를 생성
+    const quizResult = new QuizResult({ studentId, subject, semester, unit, results, score });
     await quizResult.save();
   } catch (error) {
     console.error('Failed to save quiz result:', error);
     throw error;
   }
 };
+
 
 module.exports = { evaluateQuiz };
