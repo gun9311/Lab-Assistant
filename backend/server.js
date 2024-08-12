@@ -12,7 +12,8 @@ const chatRoutes = require('./routes/chatRoutes');
 const userRoutes = require('./routes/userRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const subjectRoutes = require('./routes/subjectRoutes');
-const reportRoutes = require('./routes/reportRoutes'); // 새로운 라우트 추가
+const reportRoutes = require('./routes/reportRoutes'); 
+const notificationRoutes = require('./routes/notificationRoutes'); 
 const { handleWebSocketConnection } = require('./controllers/chatbotController');
 const ChatSummary = require('./models/ChatSummary');
 const cron = require('node-cron');
@@ -21,6 +22,7 @@ const cors = require('cors')
 const auth = require('./middleware/auth'); // auth 미들웨어 임포트
 
 require('dotenv').config();
+require('./services/fcmService');
 
 mongoose.connect(process.env.MONGODB_URL)
   .then(() => console.log('MongoDB connected'))
@@ -45,7 +47,8 @@ app.use('/api/users', userRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/subjects', subjectRoutes);
 app.use('/api/quiz-results', quizResultsRoutes);
-app.use('/api/report', reportRoutes); // 새로운 라우트 추가
+app.use('/api/report', reportRoutes); 
+app.use('/api/notifications', notificationRoutes); // 새로운 라우트 추가
 
 const server = app.listen(process.env.PORT || 5000, () => {
   console.log(`Server running on port ${process.env.PORT || 5000}`);

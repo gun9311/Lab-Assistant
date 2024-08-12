@@ -11,7 +11,7 @@ const studentSchema = new mongoose.Schema({
   email: { type: String },
   phone: { type: String },
   role: { type: String, default: 'student' },
-  tokens: [{ token: { type: String, required: true } }],
+  tokens: [{ token: { type: String, required: true } }], // FCM 토큰 저장
 });
 
 // 복합 unique 인덱스 설정
