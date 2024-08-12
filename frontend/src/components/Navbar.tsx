@@ -1,12 +1,14 @@
 import React from 'react';
-import { BottomNavigation, BottomNavigationAction } from '@mui/material';
+import { BottomNavigation, BottomNavigationAction, Badge } from '@mui/material';
 import { Home, Person, Notifications, Quiz } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useChatbotContext } from '../context/ChatbotContext';
+import { useNotificationContext } from '../context/NotificationContext';
 
 const Navbar: React.FC<{ role: string }> = ({ role }) => {
   const navigate = useNavigate();
   const { isChatbotActive, setAlertOpen } = useChatbotContext();
+  const { notifications } = useNotificationContext();
   const [value, setValue] = React.useState(0);
 
   const handleChange = (event: React.ChangeEvent<{}>, newValue: number) => {
@@ -14,11 +16,19 @@ const Navbar: React.FC<{ role: string }> = ({ role }) => {
       setAlertOpen(true);
       return;
     }
-
+  
     setValue(newValue);
     switch (newValue) {
       case 0:
-        navigate('/');
+        if (role === 'student') {
+          navigate('/student');
+        } else if (role === 'teacher') {
+          navigate('/teacher');
+        } else if (role === 'admin') {
+          navigate('/admin');
+        } else {
+          navigate('/');
+        }
         break;
       case 1:
         navigate('/profile');
@@ -35,7 +45,7 @@ const Navbar: React.FC<{ role: string }> = ({ role }) => {
         break;
     }
   };
-
+  
   const getHomeLabel = () => {
     switch (role) {
       case 'student':
@@ -48,6 +58,9 @@ const Navbar: React.FC<{ role: string }> = ({ role }) => {
     }
   };
 
+  // 읽지 않은 알림의 수 계산
+  const unreadNotificationsCount = notifications.filter(notification => !notification.read).length;
+
   return (
     <BottomNavigation
       value={value}
@@ -59,9 +72,9 @@ const Navbar: React.FC<{ role: string }> = ({ role }) => {
         width: '100%',
         zIndex: 1000,
         '@media (min-width: 1200px)': {
-          position: 'relative',  // 큰 화면에서는 상대적인 위치를 사용
-          bottom: 'auto',        // 'bottom' 속성 제거
-          marginTop: 'auto',     // 상단에 여백을 추가하여 페이지의 끝에 위치하도록
+          position: 'relative',
+          bottom: 'auto',
+          marginTop: 'auto',
           width: '100%',
         },
       }}
@@ -76,7 +89,11 @@ const Navbar: React.FC<{ role: string }> = ({ role }) => {
       />
       <BottomNavigationAction 
         label="알림" 
-        icon={<Notifications />} 
+        icon={
+          <Badge badgeContent={unreadNotificationsCount} color="secondary">
+            <Notifications />
+          </Badge>
+        } 
       />
       {role === 'student' && (
         <BottomNavigationAction 

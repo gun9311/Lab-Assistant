@@ -5,6 +5,7 @@ import { Container, TextField, Button, Typography, Paper, MenuItem, Select, Inpu
 import Autocomplete from '@mui/material/Autocomplete';
 import { educationOffices } from '../../educationOffices';
 import apiNoAuth from '../../utils/apiNoAuth';
+import { requestPermissionAndGetToken } from '../../firebase';
 
 interface School {
   label: string;
@@ -21,6 +22,7 @@ const StudentLoginPage = () => {
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [isTokenFound, setTokenFound] = useState(false);
 
   useEffect(() => {
     if (educationOffice) {
@@ -51,6 +53,14 @@ const StudentLoginPage = () => {
 
   const handleLogin = async () => {
     try {
+      // FCM 토큰 가져오기 (권한 요청 포함)
+      const fcmToken = await requestPermissionAndGetToken(setTokenFound);
+
+      if (!fcmToken) {
+        setError('알림 권한이 필요합니다. 알림 권한을 허용해주세요.');
+        return;
+      }
+
       const res = await apiNoAuth.post('/auth/login', {
         role: 'student',
         school,
@@ -59,6 +69,7 @@ const StudentLoginPage = () => {
         studentId,
         name,
         password,
+        fcmToken, // FCM 토큰 추가
       });
       setToken(res.data.accessToken);
       setRefreshToken(res.data.refreshToken);

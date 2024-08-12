@@ -2,15 +2,25 @@ import React, { useState } from 'react';
 import { setToken, setRefreshToken, setRole, setUserId, setSchoolName } from '../../utils/auth';
 import { Container, TextField, Button, Typography, Paper } from '@mui/material';
 import apiNoAuth from '../../utils/apiNoAuth';
+import { requestPermissionAndGetToken } from '../../firebase';  // FCM 권한 요청 및 토큰 발급 함수 import
 
 const TeacherLoginPage = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [isTokenFound, setTokenFound] = useState(false);
 
   const handleLogin = async () => {
     try {
-      const res = await apiNoAuth.post('/auth/login', { role: 'teacher', email, password });
+      // FCM 토큰 가져오기 (권한 요청 포함)
+      const fcmToken = await requestPermissionAndGetToken(setTokenFound);
+
+      if (!fcmToken) {
+        setError('알림 권한이 필요합니다. 알림 권한을 허용해주세요.');
+        return;
+      }
+
+      const res = await apiNoAuth.post('/auth/login', { role: 'teacher', email, password, fcmToken });
       setToken(res.data.accessToken);
       setRefreshToken(res.data.refreshToken);
       setRole(res.data.role);
