@@ -42,6 +42,7 @@ jobs:
             REPORT_QUEUE_URL=${{ secrets.REPORT_QUEUE_URL }}
             AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
             AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
+            FIREBASE_PRIVATE_KEY=${{ secrets.FIREBASE_PRIVATE_KEY }}
 
       - name: Set up SSH agent
         uses: webfactory/ssh-agent@v0.5.3
