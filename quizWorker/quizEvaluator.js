@@ -102,7 +102,7 @@ const evaluateQuiz = async (quizData) => {
     score: averageScore
   };
 };
-
+// 
 const calculateSimilarity = (studentAnswer, correctAnswer) => {
   return new Promise((resolve, reject) => {
     const pythonPath = process.env.NODE_ENV === 'production'
