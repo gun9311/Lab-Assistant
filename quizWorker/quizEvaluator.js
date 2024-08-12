@@ -1,6 +1,8 @@
 const { spawnSync } = require('child_process');
 const mongoose = require('mongoose');
 const { Schema } = mongoose;
+const axios = require('axios');
+require('dotenv').config();
 
 const taskSchema = new mongoose.Schema({
   taskText: { type: String, required: true }, // 문제 텍스트
@@ -82,6 +84,20 @@ const evaluateQuiz = async (quizData) => {
   };
 
   await saveQuizResult(quizResultData);
+
+  // 평가가 완료되었음을 백엔드 서버로 알림
+  try {
+    await axios.post(process.env.NOTIFICATION_API_URL, {
+      studentId: quizData.studentId,
+      quizId: quizData.quizId, // 퀴즈의 ID를 보내서 어떤 퀴즈인지 식별 가능
+      subject: quizData.subject,
+      semester: quizData.semester,
+      unit: quizData.unit
+    });
+  } catch (error) {
+    console.error('Failed to notify backend server about quiz completion:', error);
+  }
+
   return {
     score: averageScore
   };
