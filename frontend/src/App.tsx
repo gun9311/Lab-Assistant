@@ -62,6 +62,9 @@ const AppContent: React.FC = () => {
   const [notification, setNotification] = useState<NotificationPayload | null>(null);
   const { addNotification } = useNotificationContext();
   const role = getRole();
+  
+  // isQuizMode 상태를 추가
+  const [isQuizMode, setIsQuizMode] = useState<boolean>(false);
 
   useEffect(() => {
     onMessageListener()
@@ -82,7 +85,6 @@ const AppContent: React.FC = () => {
   return (
     <>
       <Routes>
-        {/* 로그인된 사용자가 로그인/회원가입 페이지로 접근할 경우 리디렉션 처리 */}
         {role && (
           <>
             <Route path="/admin-login" element={<Navigate to={`/${role}`} />} />
@@ -93,11 +95,10 @@ const AppContent: React.FC = () => {
             <Route path="/admin-register" element={<Navigate to={`/${role}`} />} />
           </>
         )}
-        {/* 로그인된 사용자가 "/" 또는 "/home"에 접근하면 역할에 맞는 홈 페이지로 리디렉션 */}
         <Route path="/" element={<Navigate to={`/${role}`} />} />
         <Route path="/home" element={<Navigate to={`/${role}`} />} />
 
-        <Route element={<Layout />}>
+        <Route element={<Layout isQuizMode={isQuizMode} />}>  {/* isQuizMode 전달 */}
           <Route
             path="/student"
             element={
@@ -118,7 +119,10 @@ const AppContent: React.FC = () => {
           />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/notifications" element={<NotificationsPage />} />
-          <Route path="/my-quizzes" element={<MyQuizzesPage />} />
+          <Route 
+            path="/my-quizzes" 
+            element={<MyQuizzesPage setIsQuizMode={setIsQuizMode} />}  // isQuizMode를 설정하는 함수 전달
+          />
         </Route>
       </Routes>
 
@@ -130,21 +134,21 @@ const AppContent: React.FC = () => {
           anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
           sx={{ 
             marginBottom: {
-              xs: '15%', // 모바일 (핸드폰)에서는 하단에서 10% 위치
-              sm: '10%', // 태블릿에서는 하단에서 10% 위치
-              md: '7%', // 작은 데스크탑에서는 하단에서 7% 위치
-              lg: '5%', // 큰 데스크탑에서는 하단에서 5% 위치
+              xs: '15%',
+              sm: '10%',
+              md: '7%',
+              lg: '5%',
             },
             '.MuiSnackbarContent-root': { 
-              backgroundColor: '#323232', // 다크 테마 색상
-              color: '#ffffff', // 텍스트 색상
-              borderRadius: '8px', // 모서리 둥글게
-              padding: '8px 16px', // 패딩 추가
+              backgroundColor: '#323232',
+              color: '#ffffff',
+              borderRadius: '8px',
+              padding: '8px 16px',
               fontSize: {
-                xs: '1rem', // 모바일에서 적당한 크기
-                sm: '1rem', // 태블릿에서 적당한 크기
-                md: '1rem', // 데스크탑에서 적당한 크기
-                lg: '1.125rem', // 큰 데스크탑에서 약간 큰 크기
+                xs: '1rem',
+                sm: '1rem',
+                md: '1rem',
+                lg: '1.125rem',
               },
             },
           }}
@@ -167,7 +171,9 @@ const App: React.FC = () => {
   }, []);
 
   const token = getToken();
+  console.log(token);
   const isLoggedIn = token ? isTokenValid(token) : false;
+  console.log(isLoggedIn);
 
   return (
     <ThemeProvider theme={theme}>
@@ -179,7 +185,6 @@ const App: React.FC = () => {
           </ChatbotProvider>
         </NotificationProvider>
       ) : (
-        <ChatbotProvider>
           <Routes>
             <Route path="/" element={<HomePage />} />
             <Route path="/home" element={<HomePage />} />
@@ -190,7 +195,6 @@ const App: React.FC = () => {
             <Route path="/student-register" element={<StudentRegisterPage />} />
             <Route path="/admin-register" element={<AdminRegisterPage />} />
           </Routes>
-        </ChatbotProvider>
       )}
     </ThemeProvider>
   );

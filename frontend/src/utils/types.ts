@@ -25,7 +25,6 @@ export interface AdminTeacherData {
   name: string;
   email: string;
   school: string;
-  phone?: string;
 }
 
 export interface RatingData {

@@ -1,22 +1,51 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BottomNavigation, BottomNavigationAction, Badge } from '@mui/material';
 import { Home, Person, Notifications, Quiz } from '@mui/icons-material';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useChatbotContext } from '../context/ChatbotContext';
 import { useNotificationContext } from '../context/NotificationContext';
 
-const Navbar: React.FC<{ role: string }> = ({ role }) => {
+const Navbar: React.FC<{ role: string, isQuizMode: boolean }> = ({ role, isQuizMode }) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { isChatbotActive, setAlertOpen } = useChatbotContext();
   const { notifications } = useNotificationContext();
   const [value, setValue] = React.useState(0);
+
+  // 현재 경로에 따라 네비게이션 바의 선택된 상태를 설정
+  useEffect(() => {
+    switch (location.pathname) {
+      case '/student':
+      case '/teacher':
+      case '/admin':
+        setValue(0);
+        break;
+      case '/profile':
+        setValue(1);
+        break;
+      case '/notifications':
+        setValue(2);
+        break;
+      case '/my-quizzes':
+        setValue(3);
+        break;
+      default:
+        setValue(0);
+        break;
+    }
+  }, [location.pathname]);
 
   const handleChange = (event: React.ChangeEvent<{}>, newValue: number) => {
     if (isChatbotActive) {
       setAlertOpen(true);
       return;
     }
-  
+
+    if (isQuizMode) {  // 퀴즈 진행 중일 때 이동 제한
+      alert("퀴즈 진행 중에는 페이지를 이동할 수 없습니다. 퀴즈를 먼저 제출해주세요.");
+      return;
+    }
+
     setValue(newValue);
     switch (newValue) {
       case 0:
@@ -45,7 +74,7 @@ const Navbar: React.FC<{ role: string }> = ({ role }) => {
         break;
     }
   };
-  
+
   const getHomeLabel = () => {
     switch (role) {
       case 'student':

@@ -4,13 +4,13 @@ import { Container } from '@mui/material';
 import Navbar from './Navbar';
 import { getRole } from '../utils/auth';
 
-const Layout: React.FC = () => {
+const Layout: React.FC<{ isQuizMode: boolean }> = ({ isQuizMode }) => {
   const role = getRole() || '';
 
   return (
-    <Container component="main" maxWidth="lg"> {/* maxWidth를 설정해 반응형 적용 */}
+    <Container component="main" maxWidth="lg">
       <Outlet />
-      <Navbar role={role} />
+      <Navbar role={role} isQuizMode={isQuizMode} />
     </Container>
   );
 };

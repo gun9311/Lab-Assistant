@@ -16,9 +16,10 @@ const TeacherRegisterPage = () => {
   const [schools, setSchools] = useState<School[]>([]);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState(''); // 비밀번호 확인 필드 추가
   const [name, setName] = useState('');
   const [school, setSchool] = useState('');
-  const [phone, setPhone] = useState('');
+  const [authCode, setAuthCode] = useState(''); // 인증코드 필드 추가
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const navigate = useNavigate();
@@ -51,8 +52,13 @@ const TeacherRegisterPage = () => {
   }, [educationOffice]);
 
   const handleRegister = async () => {
+    if (password !== confirmPassword) {  // 비밀번호와 비밀번호 확인이 일치하는지 확인
+      setError('비밀번호가 일치하지 않습니다.');
+      return;
+    }
+
     try {
-      const res = await apiNoAuth.post('/auth/register/teacher', { email, password, name, school, phone });
+      const res = await apiNoAuth.post('/auth/register/teacher', { email, password, name, school, authCode });
       console.log('교사 등록 완료:', res.data);
       setSuccess(true);
       setTimeout(() => {
@@ -69,6 +75,26 @@ const TeacherRegisterPage = () => {
         <Typography variant="h4" gutterBottom>
           교사 회원가입
         </Typography>
+        <FormControl fullWidth variant="outlined" margin="normal">
+          <InputLabel>지역(선택 후 학교 검색)</InputLabel>
+          <Select
+            value={educationOffice}
+            onChange={(e) => setEducationOffice(e.target.value)}
+            label="교육청"
+          >
+            {educationOffices.map(office => (
+              <MenuItem key={office.code} value={office.code}>
+                {office.name}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+        <Autocomplete
+          options={schools}
+          fullWidth
+          renderInput={(params) => <TextField {...params} label="학교(검색)" variant="outlined" margin="normal" />}
+          onChange={(event, value: School | null) => setSchool(value?.label || '')}
+        />
         <TextField
           fullWidth
           variant="outlined"
@@ -90,37 +116,26 @@ const TeacherRegisterPage = () => {
           fullWidth
           variant="outlined"
           margin="normal"
-          label="이름"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-        />
-        <FormControl fullWidth variant="outlined" margin="normal">
-          <InputLabel>교육청</InputLabel>
-          <Select
-            value={educationOffice}
-            onChange={(e) => setEducationOffice(e.target.value)}
-            label="교육청"
-          >
-            {educationOffices.map(office => (
-              <MenuItem key={office.code} value={office.code}>
-                {office.name}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-        <Autocomplete
-          options={schools}
-          fullWidth
-          renderInput={(params) => <TextField {...params} label="학교" variant="outlined" margin="normal" />}
-          onChange={(event, value: School | null) => setSchool(value?.label || '')}
+          label="비밀번호 확인"  // 비밀번호 확인 필드
+          type="password"
+          value={confirmPassword}
+          onChange={(e) => setConfirmPassword(e.target.value)}
         />
         <TextField
           fullWidth
           variant="outlined"
           margin="normal"
-          label="전화번호"
-          value={phone}
-          onChange={(e) => setPhone(e.target.value)}
+          label="닉네임"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+        />
+        <TextField
+          fullWidth
+          variant="outlined"
+          margin="normal"
+          label="교사 인증코드"  // 인증코드 필드
+          value={authCode}
+          onChange={(e) => setAuthCode(e.target.value)}
         />
         <Button
           fullWidth
