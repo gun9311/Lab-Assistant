@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const { Schema } = mongoose;
+const axios = require('axios');
 require("dotenv").config();
 
 const studentSchema = new mongoose.Schema({
@@ -9,8 +10,6 @@ const studentSchema = new mongoose.Schema({
   grade: { type: Number, required: true },
   class: { type: String, required: true },
   school: { type: String, required: true },
-  email: { type: String },
-  phone: { type: String },
   role: { type: String, default: "student" },
   tokens: [{ token: { type: String, required: true } }],
 });
@@ -31,7 +30,7 @@ const resultSchema = new mongoose.Schema({
   questionId: { type: Schema.Types.ObjectId, ref: "Quiz", required: true },
   taskText: { type: String, required: true },
   correctAnswer: { type: String, required: true },
-  studentAnswer: { type: String, required: true },
+  studentAnswer: { type: String, required: false },
   similarity: { type: Number, required: true },
 });
 
@@ -103,12 +102,12 @@ const processMessage = async (message) => {
     return;
   }
 
-  const { selectedSemesters, selectedSubjects, selectedStudents, reportLines } = reportData;
+  const { selectedSemesters, selectedSubjects, selectedStudents, reportLines, teacherId } = reportData;
 
   try {
     console.time("Total Processing Time");
 
-    // 미리 학생 및 과목 데이터를 조회
+    // 학생 및 과목 데이터를 조회
     const students = await Student.find({ _id: { $in: selectedStudents } });
     const subjects = await Subject.find({
       name: { $in: selectedSubjects },
@@ -117,6 +116,7 @@ const processMessage = async (message) => {
     });
 
     const promises = [];
+    const studentGrade = students[0].grade; // 학생들의 학년은 동일하므로 첫 번째 학생의 학년을 사용
 
     for (const student of students) {
       for (const semester of selectedSemesters) {
@@ -170,6 +170,15 @@ const processMessage = async (message) => {
 
     await Promise.all(promises);
     console.timeEnd("Total Processing Time");
+
+    // 리포트 생성이 완료된 후 알림 전송
+    const reportDetails = { 
+      grade: studentGrade, // 학년 정보 추가
+      selectedSemesters, 
+      selectedSubjects, 
+      selectedStudents 
+    };
+    await sendNotificationToTeacher(teacherId, reportDetails);
   } catch (error) {
     console.error("Failed to generate report:", error);
   }

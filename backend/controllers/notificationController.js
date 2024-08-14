@@ -46,6 +46,59 @@ const sendQuizResultNotification = async (req, res) => {
   }
 };
 
+const sendReportGeneratedNotification = async (req, res) => {
+  const { teacherId, reportDetails } = req.body;
+  const { grade, selectedSemesters, selectedSubjects, selectedStudents } = reportDetails;
+
+  try {
+    // 학기, 과목, 학생 정보를 바탕으로 메시지 작성
+    const semesterText = selectedSemesters.join(", ");
+    const subjectText = selectedSubjects.length > 2
+      ? `${selectedSubjects.slice(0, 2).join(", ")} 외 ${selectedSubjects.length - 2}개 과목`
+      : selectedSubjects.join(", ");
+    const studentText = selectedStudents.length > 2
+      ? `${selectedStudents.length}명`
+      : `${selectedStudents.length}명의 학생`;
+
+    const message = `${grade}학년 ${semesterText} ${subjectText} 과목, ${studentText}에 대한 리포트 생성이 완료되었습니다.`;
+
+    // 알림 생성
+    const notification = new Notification({
+      recipientId: teacherId,
+      recipientType: 'Teacher', 
+      message: message,
+      type: 'report_generated',
+      data: reportDetails,
+    });
+
+    await notification.save();
+
+    // FCM을 통해 푸시 알림 전송
+    const teacher = await Teacher.findById(teacherId);
+    if (teacher && teacher.tokens.length > 0) {
+      const tokens = teacher.tokens.map(t => t.token);
+      
+      const fcmMessage = {
+        notification: {
+          title: '리포트 생성 알림',
+          body: message,
+        },
+        data: {
+          notificationId: notification._id.toString(),
+        },
+        tokens: tokens,
+      };
+      
+      await admin.messaging().sendMulticast(fcmMessage);
+    }
+
+    res.status(200).send({ message: 'Notification sent successfully' });
+  } catch (error) {
+    console.error('Failed to send notification to teacher:', error);
+    res.status(500).send({ message: 'Failed to send notification' });
+  }
+};
+
 // 사용자의 알림 목록 가져오기
 const getNotifications = async (req, res) => {
   try {
@@ -72,6 +125,7 @@ const markAsRead = async (req, res) => {
 
 module.exports = {
   sendQuizResultNotification,
+  sendReportGeneratedNotification,
   getNotifications,
   markAsRead,
 };

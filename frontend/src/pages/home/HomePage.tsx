@@ -31,26 +31,33 @@ const HomePage = () => {
       sx={{
         height: '100vh',
         display: 'flex',
-        alignItems: 'flex-end',  // 중앙과 하단 사이에 위치
+        alignItems: 'flex-end',
         justifyContent: 'center',
         backgroundImage: `url(${background})`,
-        backgroundSize: 'cover',
+        backgroundSize: {
+          xs: 'contain',  // 모바일에서는 이미지 크기를 contain으로 설정
+          sm: 'cover',    // 태블릿 이상에서는 cover로 설정
+        },
         backgroundPosition: 'center center',
         textAlign: 'center',
         paddingBottom: 4,
+        paddingTop: {
+          xs: 2,  // 모바일에서 상단 여백 추가
+          sm: 0,  // 태블릿 이상에서는 기본 값
+        },
         '@media (max-width: 600px)': {
           backgroundPosition: 'top center',
         },
         color: 'white',
         textShadow: '2px 2px 4px rgba(0, 0, 0, 0.7)',
-        animation: 'fadeInBackground 3s ease-in-out', // 배경 등장 애니메이션 추가
+        animation: 'fadeInBackground 2s ease-in-out',
       }}
     >
       <Box
         sx={{
           zIndex: 1,
           width: '100%',
-          animation: 'fadeIn 3s ease-in-out',  // 버튼 등장 애니메이션 추가
+          animation: 'fadeIn 2s ease-in-out',  // 버튼 등장 애니메이션 추가
           mb: 3,  // margin-bottom 값을 줄여서 살짝 위로 이동
         }}
       >

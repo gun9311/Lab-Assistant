@@ -17,11 +17,10 @@ const StudentRegisterPage = () => {
   const [studentId, setStudentId] = useState('');
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [grade, setGrade] = useState('');
   const [studentClass, setStudentClass] = useState('');
-  const [email, setEmail] = useState('');
   const [school, setSchool] = useState('');
-  const [phone, setPhone] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const navigate = useNavigate();
@@ -54,8 +53,13 @@ const StudentRegisterPage = () => {
   }, [educationOffice]);
 
   const handleRegister = async () => {
+    if (password !== confirmPassword) {
+      setError('비밀번호가 일치하지 않습니다.');
+      return;
+    }
+
     try {
-      const res = await apiNoAuth.post('/auth/register/student', { studentId, name, password, grade, class: studentClass, school, email, phone });
+      const res = await apiNoAuth.post('/auth/register/student', { studentId, name, password, grade, class: studentClass, school });
       console.log('학생 등록 완료:', res.data);
       setSuccess(true);
       setTimeout(() => {
@@ -73,7 +77,7 @@ const StudentRegisterPage = () => {
           학생 회원가입
         </Typography>
         <FormControl fullWidth variant="outlined" margin="normal">
-          <InputLabel>지역</InputLabel>
+          <InputLabel>지역(선택 후 학교 검색)</InputLabel>
           <Select
             value={educationOffice}
             onChange={(e) => setEducationOffice(e.target.value)}
@@ -89,33 +93,8 @@ const StudentRegisterPage = () => {
         <Autocomplete
           options={schools}
           fullWidth
-          renderInput={(params) => <TextField {...params} label="학교" variant="outlined" margin="normal" />}
+          renderInput={(params) => <TextField {...params} label="학교(검색)" variant="outlined" margin="normal" />}
           onChange={(event, value: School | null) => setSchool(value?.label || '')}
-        />
-        <TextField
-          fullWidth
-          variant="outlined"
-          margin="normal"
-          label="출석번호"
-          value={studentId}
-          onChange={(e) => setStudentId(e.target.value)}
-        />
-        <TextField
-          fullWidth
-          variant="outlined"
-          margin="normal"
-          label="이름"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-        />
-        <TextField
-          fullWidth
-          variant="outlined"
-          margin="normal"
-          label="비밀번호"
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
         />
         <FormControl fullWidth variant="outlined" margin="normal">
           <InputLabel>학년</InputLabel>
@@ -142,17 +121,35 @@ const StudentRegisterPage = () => {
           fullWidth
           variant="outlined"
           margin="normal"
-          label="이메일"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          label="출석번호"
+          value={studentId}
+          onChange={(e) => setStudentId(e.target.value)}
         />
         <TextField
           fullWidth
           variant="outlined"
           margin="normal"
-          label="전화번호"
-          value={phone}
-          onChange={(e) => setPhone(e.target.value)}
+          label="이름"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+        />
+        <TextField
+          fullWidth
+          variant="outlined"
+          margin="normal"
+          label="비밀번호"
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
+        <TextField
+          fullWidth
+          variant="outlined"
+          margin="normal"
+          label="비밀번호 확인"
+          type="password"
+          value={confirmPassword}
+          onChange={(e) => setConfirmPassword(e.target.value)}
         />
         <Button
           fullWidth

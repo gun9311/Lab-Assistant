@@ -8,10 +8,12 @@ const studentSchema = new mongoose.Schema({
   grade: { type: Number, required: true },
   class: { type: String, required: true }, // 반
   school: { type: String, required: true },
-  email: { type: String },
-  phone: { type: String },
   role: { type: String, default: 'student' },
   tokens: [{ token: { type: String, required: true } }], // FCM 토큰 저장
+  submittedQuizzes: [{
+    quizId: { type: mongoose.Schema.Types.ObjectId, ref: 'Quiz', required: true },
+    submittedAt: { type: Date, default: Date.now }
+  }]
 });
 
 // 복합 unique 인덱스 설정

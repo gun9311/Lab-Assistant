@@ -33,13 +33,11 @@ const getProfile = async (req, res) => {
 
 const updateProfile = async (req, res) => {
   const updates = Object.keys(req.body);
-  const allowedUpdates = req.user.role === 'teacher' ? ['name', 'school', 'phone', 'password'] : ['name', 'school', 'phone', 'password', 'grade', 'class'];
+  const allowedUpdates = req.user.role === 'teacher' ? ['name', 'school', 'password'] : ['name', 'school', 'password', 'grade', 'class'];
   const isValidOperation = updates.every(update => allowedUpdates.includes(update));
 
   if (!isValidOperation) {
-    const filteredUpdates = updates.filter(update => allowedUpdates.includes(update)); // 허용된 필드만 추출
-    console.log('Invalid updates:', updates); // 허용되지 않는 업데이트 로깅
-    console.log('Filtered updates:', filteredUpdates); // 필터링된 업데이트 로깅
+    console.warn('Invalid updates:', updates);
     return res.status(400).send({ error: 'Invalid updates!' });
   }
 

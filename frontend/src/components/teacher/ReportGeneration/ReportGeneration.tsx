@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Box, Tabs, Tab, Fade, Alert, FormControl, InputLabel, Select, MenuItem, SelectChangeEvent } from "@mui/material";
+import { Box, Tabs, Tab, Fade, Alert, FormControl, InputLabel, Select, MenuItem, SelectChangeEvent, Snackbar } from "@mui/material";
 import SemesterSelect from "./SemesterSelect";
 import SubjectSelect from "./SubjectSelect";
 import StudentSelect from "./StudentSelect";
@@ -36,10 +36,15 @@ const ReportGeneration: React.FC<ReportGenerationProps> = ({
   const [showReportComponent, setShowReportComponent] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [tabValue, setTabValue] = useState<number>(0);
+  const [snackbarOpen, setSnackbarOpen] = useState<boolean>(false);
+  const [snackbarMessage, setSnackbarMessage] = useState<string>("");
+  const [snackbarSeverity, setSnackbarSeverity] = useState<"success" | "error">("success");
 
   const handleReportGeneration = async () => {
     if (selectedSemesters.length === 0 || selectedSubjects.length === 0 || selectedStudents.length === 0) {
-      setErrorMessage("학기, 과목, 학생을 모두 선택해야 합니다.");
+      setSnackbarMessage("학기, 과목, 학생을 모두 선택해야 합니다.");
+      setSnackbarSeverity("error");
+      setSnackbarOpen(true);
       return;
     }
     try {
@@ -49,16 +54,23 @@ const ReportGeneration: React.FC<ReportGenerationProps> = ({
         selectedStudents,
         reportLines,
       });
+  
+      setSnackbarMessage("보고서 생성 요청이 성공적으로 접수되었습니다. 생성이 완료되면 알림을 받게 됩니다.");
+      setSnackbarSeverity("success");
+      setSnackbarOpen(true);
       setErrorMessage(null);
-      alert("보고서가 성공적으로 생성되었습니다.");
     } catch (error) {
-      setErrorMessage("보고서 생성 요청에 실패했습니다.");
+      setSnackbarMessage("보고서 생성 요청에 실패했습니다.");
+      setSnackbarSeverity("error");
+      setSnackbarOpen(true);
     }
   };
-
+  
   const handleReportQuery = async () => {
     if (selectedSemesters.length === 0 || selectedSubjects.length === 0 || selectedStudents.length === 0) {
-      setErrorMessage("학기, 과목, 학생을 모두 선택해야 합니다.");
+      setSnackbarMessage("학기, 과목, 학생을 모두 선택해야 합니다.");
+      setSnackbarSeverity("error");
+      setSnackbarOpen(true);
       return;
     }
     try {
@@ -69,9 +81,13 @@ const ReportGeneration: React.FC<ReportGenerationProps> = ({
       });
       setReportResults(response.data);
       setShowReportComponent(true);
-      setErrorMessage(null);
+      setSnackbarMessage("보고서 조회 요청이 성공적으로 완료되었습니다.");
+      setSnackbarSeverity("success");
+      setSnackbarOpen(true);
     } catch (error) {
-      setErrorMessage("보고서 조회 요청에 실패했습니다.");
+      setSnackbarMessage("보고서 조회 요청에 실패했습니다.");
+      setSnackbarSeverity("error");
+      setSnackbarOpen(true);
     }
   };
 
@@ -101,21 +117,21 @@ const ReportGeneration: React.FC<ReportGenerationProps> = ({
           <Tab label="평가 생성" />
           <Tab label="평가 조회" />
         </Tabs>
-
+  
         <SemesterSelect
           selectedSemesters={selectedSemesters}
           handleSemesterChange={(e: SelectChangeEvent<string[]>) => setSelectedSemesters(e.target.value as string[])}
           handleSelectAllSemesters={() => setSelectedSemesters(["1학기", "2학기"])}
           handleDeselectAllSemesters={() => setSelectedSemesters([])}
         />
-
+  
         <SubjectSelect
           selectedSubjects={selectedSubjects}
           handleSubjectChange={(e: SelectChangeEvent<string[]>) => setSelectedSubjects(e.target.value as string[])}
           handleSelectAllSubjects={() => setSelectedSubjects(["국어", "수학", "사회", "과학", "영어"])}
           handleDeselectAllSubjects={() => setSelectedSubjects([])}
         />
-
+  
         <StudentSelect
           students={students}
           selectedStudents={selectedStudents}
@@ -123,7 +139,7 @@ const ReportGeneration: React.FC<ReportGenerationProps> = ({
           handleSelectAllStudents={() => setSelectedStudents(students.map((s: Student) => s._id))}
           handleDeselectAllStudents={() => setSelectedStudents([])}
         />
-
+  
         {tabValue === 0 && (
           <FormControl fullWidth sx={{ marginBottom: 2 }}>
             <InputLabel>평가 라인 수(최대)</InputLabel>
@@ -136,15 +152,24 @@ const ReportGeneration: React.FC<ReportGenerationProps> = ({
             </Select>
           </FormControl>
         )}
-
-        {errorMessage && <Alert severity="error">{errorMessage}</Alert>}
-
+  
         <ActionButtons
           tabValue={tabValue}
           onBack={onBack}
           onGenerate={handleReportGeneration}
           onQuery={handleReportQuery}
         />
+  
+        <Snackbar
+          open={snackbarOpen}
+          autoHideDuration={6000}
+          onClose={() => setSnackbarOpen(false)}
+          anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+        >
+          <Alert onClose={() => setSnackbarOpen(false)} severity={snackbarSeverity} sx={{ width: '100%' }}>
+            {snackbarMessage}
+          </Alert>
+        </Snackbar>
       </Box>
     </Fade>
   );
