@@ -61,7 +61,7 @@ jobs:
                        --build-arg QUIZ_QUEUE_URL=${{ secrets.QUIZ_QUEUE_URL }} \
                        --build-arg AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }} \
                        --build-arg AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }} \
-                       --build-arg NOTIFICATION_API_URL=${{ secrets.NOTIFICATION_API_URL }} \
+                       --build-arg QUIZ_NOTIFICATION_API_URL=${{ secrets.QUIZ_NOTIFICATION_API_URL }} \
                        -t ${{ secrets.DOCKER_USERNAME }}/quizworker:latest .
       
       - name: Push Docker image to Docker Hub
