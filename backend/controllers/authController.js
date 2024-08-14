@@ -112,9 +112,16 @@ const refreshAccessToken = async (req, res) => {
 };
 
 const registerTeacher = async (req, res) => {
-  const { email, password, name, school, phone } = req.body;
+  const { email, password, name, school, authCode } = req.body;
+
+  const VALID_AUTH_CODE = '교사';  // 하드코딩된 인증코드
+
+  if (authCode !== VALID_AUTH_CODE) {
+    return res.status(400).send({ error: 'Invalid authentication code' });
+  }
+
   try {
-    const teacher = new Teacher({ email, password, name, school, phone });
+    const teacher = new Teacher({ email, password, name, school });
     await teacher.save();
     res.status(201).send(teacher);
   } catch (error) {
@@ -123,9 +130,9 @@ const registerTeacher = async (req, res) => {
 };
 
 const registerStudent = async (req, res) => {
-  const { studentId, name, password, grade, class: studentClass, school, email, phone } = req.body;
+  const { studentId, name, password, grade, class: studentClass, school } = req.body;
   try {
-    const student = new Student({ studentId, name, password, grade, class: studentClass, school, email, phone });
+    const student = new Student({ studentId, name, password, grade, class: studentClass, school });
     await student.save();
     res.status(201).send(student);
   } catch (error) {

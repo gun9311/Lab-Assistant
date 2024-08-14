@@ -6,7 +6,6 @@ const teacherSchema = new mongoose.Schema({
   password: { type: String, required: true },
   name: { type: String, required: true },
   school: { type: String, required: true },
-  phone: { type: String },
   role: { type: String, default: 'teacher' },
   tokens: [{ token: { type: String, required: true } }], // FCM 토큰 저장
 });

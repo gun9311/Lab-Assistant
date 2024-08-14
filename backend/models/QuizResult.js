@@ -5,7 +5,7 @@ const resultSchema = new mongoose.Schema({
   questionId: { type: Schema.Types.ObjectId, ref: 'Quiz', required: true }, // 퀴즈 문제 ID
   taskText: { type: String, required: true }, // 문제 텍스트
   correctAnswer: { type: String, required: true }, // 정답
-  studentAnswer: { type: String, required: true }, // 학생의 답변
+  studentAnswer: { type: String, required: false }, // 학생의 답변
   similarity: { type: Number, required: true } // 유사도 점수 (0 ~ 100)
 });
 

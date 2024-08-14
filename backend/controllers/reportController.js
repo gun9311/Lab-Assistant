@@ -15,7 +15,16 @@ const queueUrl = process.env.REPORT_QUEUE_URL;
 const generateReport = async (req, res) => {
   const { selectedSemesters, selectedSubjects, selectedStudents, reportLines } = req.body;
 
-  const reportData = { selectedSemesters, selectedSubjects, selectedStudents, reportLines };
+  // 현재 요청을 보낸 교사의 ID를 추가
+  const teacherId = req.user._id; // `req.user`에 인증 미들웨어에서 설정된 사용자 정보가 있다고 가정
+
+  const reportData = { 
+    selectedSemesters, 
+    selectedSubjects, 
+    selectedStudents, 
+    reportLines, 
+    teacherId // 교사 ID를 포함
+  };
 
   // SQS 큐에 데이터 전송
   const params = {
@@ -26,7 +35,9 @@ const generateReport = async (req, res) => {
   try {
     const command = new SendMessageCommand(params);
     await sqsClient.send(command);
-    res.status(200).send({ message: 'Report generation request submitted successfully' });
+    
+    // 성공적으로 큐에 추가되었음을 응답
+    res.status(200).send({ message: 'Report generation request submitted successfully. You will be notified upon completion.' });
   } catch (error) {
     console.error('Failed to send message to SQS:', error);
     res.status(500).send({ message: 'Failed to send message to SQS' });

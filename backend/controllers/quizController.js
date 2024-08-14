@@ -2,6 +2,7 @@ require('dotenv').config();
 const { SQSClient, SendMessageCommand } = require('@aws-sdk/client-sqs');
 const { fromEnv } = require('@aws-sdk/credential-providers');
 const Quiz = require('../models/Quiz');
+const Student = require('../models/Student');
 const Subject = require('../models/Subject'); // 경로를 필요에 따라 조정하세요
 
 // AWS SQS 설정
@@ -14,12 +15,28 @@ const queueUrl = process.env.QUIZ_QUEUE_URL;
 
 const getQuiz = async (req, res) => {
   const { grade, semester, subject, unit } = req.query;
+  const studentId = req.user._id; // 인증된 학생의 ID
 
   try {
+    // 퀴즈를 먼저 조회합니다.
     const quiz = await Quiz.findOne({ grade, semester, subject, unit });
     if (!quiz) {
       return res.status(404).send({ error: '퀴즈를 찾을 수 없습니다' });
     }
+
+    // 학생 정보 가져오기
+    const student = await Student.findById(studentId);
+
+    // 해당 학생이 이미 제출한 퀴즈인지 확인 (quizId로 확인)
+    const submittedQuiz = student.submittedQuizzes.find(
+      (submittedQuiz) => submittedQuiz.quizId.toString() === quiz._id.toString()
+    );
+
+    if (submittedQuiz) {
+      return res.status(400).send({ message: '이미 제출한 퀴즈입니다.' });
+    }
+
+    // 제출 기록이 없다면 퀴즈를 반환합니다.
     res.status(200).send(quiz);
   } catch (error) {
     console.error('퀴즈를 가져오는 중 오류 발생:', error);
@@ -29,6 +46,7 @@ const getQuiz = async (req, res) => {
 
 const submitQuiz = async (req, res) => {
   const quizData = req.body;
+  const studentId = req.user._id; // 인증된 학생의 ID
 
   // SQS 큐에 데이터 전송
   const params = {
@@ -39,7 +57,16 @@ const submitQuiz = async (req, res) => {
   try {
     const command = new SendMessageCommand(params);
     await sqsClient.send(command);
-    res.status(200).send({ message: 'Quiz submitted successfully' });
+
+    // 학생 데이터를 데이터베이스에서 가져옴
+    const student = await Student.findById(studentId);
+
+    // 제출 기록을 학생 데이터에 추가
+    student.submittedQuizzes.push({ quizId: quizData.quizId, submittedAt: new Date() });
+    await student.save();
+    
+    // 채점 완료 알림 메시지 추가
+    res.status(200).send({ message: '퀴즈가 성공적으로 제출되었습니다. 채점이 완료되면 알림이 발송됩니다.' });
   } catch (error) {
     console.error('Failed to send message to SQS:', error);
     res.status(500).send({ message: 'Failed to send message to SQS' });
