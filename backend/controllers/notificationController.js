@@ -1,5 +1,6 @@
 const Notification = require('../models/Notification');
 const Student = require('../models/Student');
+const Teacher = require('../models/Teacher');
 const admin = require('firebase-admin');
 
 // 알림 생성 및 푸시 알림 전송

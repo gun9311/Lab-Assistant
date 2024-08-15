@@ -86,6 +86,17 @@ const connectToDatabase = async () => {
   }
 };
 
+const sendNotificationToTeacher = async (teacherId, reportDetails) => {
+  try {
+    await axios.post(process.env.REPORT_NOTIFICATION_API_URL, {
+      teacherId,
+      reportDetails,
+    });
+  } catch (error) {
+    console.error('Failed to send notification to teacher:', error);
+  }
+};
+
 const processMessage = async (message) => {
   console.log("Received message:", message);
   if (!message || !message.body) {
