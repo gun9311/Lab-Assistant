@@ -2,7 +2,7 @@ import sys
 from sentence_transformers import SentenceTransformer, util
 
 def calculate_similarity(answer, correct_answer):
-    model = SentenceTransformer('all-MiniLM-L6-v2')
+    model = SentenceTransformer('jhgan/ko-sroberta-multitask')
     embeddings1 = model.encode(answer, convert_to_tensor=True)
     embeddings2 = model.encode(correct_answer, convert_to_tensor=True)
     cosine_scores = util.pytorch_cos_sim(embeddings1, embeddings2)

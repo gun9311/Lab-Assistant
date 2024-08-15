@@ -26,7 +26,7 @@ const resultSchema = new mongoose.Schema({
   questionId: { type: Schema.Types.ObjectId, ref: 'Quiz', required: true }, // 퀴즈 문제 ID
   taskText: { type: String, required: true }, // 문제 텍스트
   correctAnswer: { type: String, required: true }, // 정답
-  studentAnswer: { type: String, required: true }, // 학생의 답변
+  studentAnswer: { type: String, required: false }, // 학생의 답변
   similarity: { type: Number, required: true } // 유사도 점수 (0 ~ 100)
 });
 // 
@@ -61,14 +61,22 @@ const evaluateQuiz = async (quizData) => {
 
     const correctAnswer = correctTask.tasks[0].correctAnswer;
     const taskText = correctTask.tasks[0].taskText;
-    const similarity = await calculateSimilarity(task.studentAnswer, correctAnswer);
-    const roundedSimilarity = Math.round(similarity * 10000) / 100; // 소수점 셋째자리 반올림 후 100 곱함
+
+    let similarity = 0.0; // 기본값 0.0으로 초기화
+
+    if (task.studentAnswer.trim() !== "") {
+      similarity = await calculateSimilarity(task.studentAnswer, correctAnswer);
+      similarity = Math.round(similarity * 10000) / 100; // 소수점 셋째자리 반올림 후 100 곱함
+    } else {
+      console.log(`Question ID ${task.questionId} has no student answer, assigning similarity 0.`);
+    }
+
     results.push({
       questionId: task.questionId,
       taskText,
       correctAnswer,
       studentAnswer: task.studentAnswer,
-      similarity: roundedSimilarity
+      similarity
     });
   }
 
@@ -87,7 +95,7 @@ const evaluateQuiz = async (quizData) => {
 
   // 평가가 완료되었음을 백엔드 서버로 알림
   try {
-    await axios.post(process.env.NOTIFICATION_API_URL, {
+    await axios.post(process.env.QUIZ_NOTIFICATION_API_URL, {
       studentId: quizData.studentId,
       quizId: quizData.quizId, // 퀴즈의 ID를 보내서 어떤 퀴즈인지 식별 가능
       subject: quizData.subject,
