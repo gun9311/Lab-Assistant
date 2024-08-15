@@ -27,38 +27,51 @@ const HomePage = () => {
   return (
     <Container
       component="main"
-      maxWidth="sm"
       sx={{
-        height: '100vh',
+        minHeight: '100vh',
         display: 'flex',
         alignItems: 'flex-end',
         justifyContent: 'center',
         backgroundImage: `url(${background})`,
-        backgroundSize: {
-          xs: 'contain',  // 모바일에서는 이미지 크기를 contain으로 설정
-          sm: 'cover',    // 태블릿 이상에서는 cover로 설정
-        },
+        backgroundSize: 'cover',
         backgroundPosition: 'center center',
         textAlign: 'center',
         paddingBottom: 4,
         paddingTop: {
-          xs: 2,  // 모바일에서 상단 여백 추가
-          sm: 0,  // 태블릿 이상에서는 기본 값
+          xs: 2,
+          sm: 0,
+          md: 0, 
         },
         '@media (max-width: 600px)': {
-          backgroundPosition: 'top center',
+          backgroundSize: 'auto 100%', // 배경 이미지를 화면 높이에 맞추어 비율 유지
+          backgroundPosition: 'center center', // 좌우 중심으로 배경 위치 조정
+        },
+        '@media (min-width: 960px) and (max-width: 1199px)': {
+          padding: '16px',
+          maxWidth: '680px',
+        },
+        '@media (min-width: 1200px)': {
+          padding: '20px',
+          maxWidth: '750px',
         },
         color: 'white',
         textShadow: '2px 2px 4px rgba(0, 0, 0, 0.7)',
         animation: 'fadeInBackground 2s ease-in-out',
+        width: '100%',
       }}
     >
       <Box
         sx={{
           zIndex: 1,
           width: '100%',
-          animation: 'fadeIn 2s ease-in-out',  // 버튼 등장 애니메이션 추가
-          mb: 3,  // margin-bottom 값을 줄여서 살짝 위로 이동
+          maxWidth: {
+            xs: '100%',
+            sm: '580px',
+            md: '680px', 
+            lg: '750px',
+          },
+          animation: 'fadeIn 2s ease-in-out',
+          mb: 2,
         }}
       >
         <Stack spacing={2} sx={{ alignItems: 'center' }}>
@@ -75,8 +88,19 @@ const HomePage = () => {
               },
               transition: 'all 0.3s ease-in-out',
               boxShadow: '0px 5px 15px rgba(0,0,0,0.3)',
-              width: '70%',  // 로그인 버튼 길이 조정
-              margin: '0 auto',  // 중앙 정렬
+              width: '70%',
+              margin: '0 auto',
+              fontSize: {
+                xs: '1rem',
+                sm: '1.1rem',
+                md: '1rem',
+                lg: '1.1rem',
+              },
+              padding: {
+                xs: '8px 16px',
+                md: '10px 20px', 
+                lg: '10px 20px',
+              },
             }}
           >
             T-BOT 시작하기
@@ -86,9 +110,9 @@ const HomePage = () => {
             onClick={handleRegisterClickOpen}
             sx={{
               color: 'rgba(255, 255, 255, 0.8)',
-              textDecoration: 'underline',  // 밑줄 추가
-              textAlign: 'right',  // 오른쪽 정렬
-              marginRight: 2,  // 여백 추가
+              textDecoration: 'underline',
+              textAlign: 'right',
+              marginRight: 2,
               '&:hover': {
                 color: 'white',
               },
