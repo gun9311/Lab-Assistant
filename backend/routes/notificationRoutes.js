@@ -1,5 +1,5 @@
 const express = require('express');
-const { sendQuizResultNotification, sendReportGeneratedNotification, getNotifications, markAsRead } = require('../controllers/notificationController');
+const { sendQuizResultNotification, sendReportGeneratedNotification, getNotifications, markAsRead, markAllAsRead } = require('../controllers/notificationController');
 const router = express.Router();
 const auth = require('../middleware/auth');
 
@@ -13,5 +13,8 @@ router.get('/', auth(), getNotifications);
 
 // 특정 알림을 읽음으로 표시
 router.patch('/:id/read', auth(), markAsRead);
+
+// 모든 알림을 읽음으로 표시
+router.patch('/mark-all-read', auth(), markAllAsRead);
 
 module.exports = router;

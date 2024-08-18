@@ -51,8 +51,8 @@ const handleWebSocketConnection = async (ws, userId, subject) => {
     chatHistory.push({ user: userMessage, bot: botResponse });
     await redisClient.set(chatHistoryKey, JSON.stringify(chatHistory));
 
-    ws.send(JSON.stringify({ user: userMessage, bot: botResponse }));
-  });
+    ws.send(JSON.stringify({ bot: botResponse }));  // 질문을 제외하고 응답만 전송
+});
 
   ws.on('close', async () => {
     console.log('----------ws.close 호출됨--------------');
