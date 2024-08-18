@@ -3,6 +3,8 @@ import { Button, Typography, Box, Container, Dialog, DialogActions, DialogConten
 import { Link } from 'react-router-dom';
 import background from '../../assets/background.png';
 import adminIcon from '../../assets/admin-icon.png';
+import studentIcon from '../../assets/student-icon.png';
+import teacherIcon from '../../assets/teacher-icon.png';
 
 const HomePage = () => {
   const [loginOpen, setLoginOpen] = useState(false);
@@ -150,6 +152,7 @@ const HomePage = () => {
               variant="contained"
               color="primary"
               fullWidth
+              startIcon={<img src={teacherIcon} alt="교사" width="24" height="24" />}
             >
               교사 로그인
             </Button>
@@ -159,6 +162,7 @@ const HomePage = () => {
               variant="contained"
               color="primary"
               fullWidth
+              startIcon={<img src={studentIcon} alt="학생" width="24" height="24" />}
             >
               학생 로그인
             </Button>
@@ -185,6 +189,7 @@ const HomePage = () => {
               variant="outlined"
               color="primary"
               fullWidth
+              startIcon={<img src={teacherIcon} alt="교사" width="24" height="24" />}
             >
               교사 회원가입
             </Button>
@@ -194,6 +199,7 @@ const HomePage = () => {
               variant="outlined"
               color="primary"
               fullWidth
+              startIcon={<img src={studentIcon} alt="학생" width="24" height="24" />}
             >
               학생 회원가입
             </Button>
