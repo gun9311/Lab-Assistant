@@ -57,7 +57,7 @@ const SubjectSelector: React.FC<SubjectSelectorProps> = ({ onSelectionChange, sh
   }, [grade, semester, subject, unit, topic]);
 
   return (
-    <Paper elevation={3} sx={{ padding: 4, marginTop: 8 }}>
+    <Paper elevation={3} sx={{ padding: 4, marginTop: 4 }}>
       <Typography variant="h5" gutterBottom>
         과목 선택
       </Typography>

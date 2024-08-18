@@ -2,10 +2,11 @@ import React, { useEffect, useState } from 'react';
 import SubjectSelector from "../../../components/student/SubjectSelector";
 import { Container, Typography, Paper, Box, Button, Tabs, Tab, Snackbar, Alert } from '@mui/material';
 import QuizComponent from './QuizComponent';
-import api from '../../../utils/api';
 import QuizFilter from './QuizFilter';
 import QuizResults from './QuizResults';
 import { getUserId } from '../../../utils/auth';
+import api from '../../../utils/api';
+import { PlayCircleFilled, History } from '@mui/icons-material';
 
 interface Selection {
   grade: string;
@@ -102,9 +103,23 @@ const MyQuizzesPage: React.FC<MyQuizzesPageProps> = ({ setIsQuizMode }) => {
   };
 
   const handleQuizStart = async () => {
+    if (!selection.semester || !selection.subject || !selection.unit) {
+      alert("학기, 과목, 단원을 모두 선택해야 퀴즈를 시작할 수 있습니다.");
+      return;
+    }
+  
     try {
+      // 먼저 퀴즈가 이미 제출된 것인지 확인
       const response = await api.get('/quiz', { params: selection });
       if (response.data) {
+        const confirmStart = window.confirm(
+          "퀴즈를 시작하시겠습니까? 퀴즈가 시작되면 중단할 수 없으며, 제출 후에는 다시 풀 수 없습니다."
+        );
+  
+        if (!confirmStart) {
+          return; // 사용자가 퀴즈 시작을 취소한 경우
+        }
+  
         setCurrentQuiz(response.data);
         setError(null);
         setIsQuizMode(true); // 퀴즈 모드로 전환
@@ -163,73 +178,97 @@ const MyQuizzesPage: React.FC<MyQuizzesPageProps> = ({ setIsQuizMode }) => {
 
   return (
     <Container component="main" maxWidth="md" sx={{ mt: 8 }}>
-      <Paper elevation={3} sx={{ padding: 4 }}>
-        <Typography variant="h4" gutterBottom align="center">
-          Let's Quiz!
-        </Typography>
-        <Tabs
-          value={tabValue}
-          onChange={handleTabChange}
-          indicatorColor="primary"
-          textColor="primary"
-          centered
-        >
-          <Tab label="퀴즈 결과 조회" />
-          <Tab label="퀴즈 풀기" />
-        </Tabs>
-
-        <Snackbar
-          open={!!successMessage}
-          autoHideDuration={2000}
-          onClose={() => setSuccessMessage(null)}
-          anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
-        >
-          <Alert onClose={() => setSuccessMessage(null)} severity="success" sx={{ width: '100%' }}>
-            {successMessage}
-          </Alert>
-        </Snackbar>
-
-        <Snackbar
-          open={!!error}
-          autoHideDuration={6000}
-          onClose={() => setError(null)}
-          anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
-        >
-          <Alert onClose={() => setError(null)} severity="error" sx={{ width: '100%' }}>
-            {error}
-          </Alert>
-        </Snackbar>
-
-        {tabValue === 0 && (
+      <Paper elevation={3} sx={{ padding: 4, borderRadius: '16px', boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.1)' }}>
+        {!currentQuiz && (
           <>
-            <QuizFilter 
-              selection={selection}
-              handleSelectionChange={handleSelectionChange}
-            />
-            <QuizResults 
-              filteredResults={filteredResults}
-              selectedQuiz={selectedQuiz}
-              handleQuizResultClick={handleQuizResultClick}
-              handleCloseDetails={handleCloseDetails}
-            />
+            <Typography variant="h4" gutterBottom align="center" sx={{ fontWeight: 700, color: '#3f51b5' }}>
+              Let's Quiz!
+            </Typography>
+            <Tabs
+              value={tabValue}
+              onChange={handleTabChange}
+              indicatorColor="primary"
+              textColor="primary"
+              centered
+              sx={{ mb: 2 }}
+            >
+              <Tab icon={<History />} label="퀴즈 결과 조회" />
+              <Tab icon={<PlayCircleFilled />} label="퀴즈 풀기" />
+            </Tabs>
+
+            {/* Tabs와 필터 사이에 여백 추가 */}
+            <Box sx={{ mt: 3 }}></Box>
+
+            <Snackbar
+              open={!!successMessage}
+              autoHideDuration={2000}
+              onClose={() => setSuccessMessage(null)}
+              anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+            >
+              <Alert onClose={() => setSuccessMessage(null)} severity="success" sx={{ width: '100%' }}>
+                {successMessage}
+              </Alert>
+            </Snackbar>
+
+            <Snackbar
+              open={!!error}
+              autoHideDuration={6000}
+              onClose={() => setError(null)}
+              anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+            >
+              <Alert onClose={() => setError(null)} severity="error" sx={{ width: '100%' }}>
+                {error}
+              </Alert>
+            </Snackbar>
+
+            {tabValue === 0 && (
+              <>
+                <QuizFilter 
+                  selection={selection}
+                  handleSelectionChange={handleSelectionChange}
+                />
+                <QuizResults 
+                  filteredResults={filteredResults}
+                  selectedQuiz={selectedQuiz}
+                  handleQuizResultClick={handleQuizResultClick}
+                  handleCloseDetails={handleCloseDetails}
+                />
+              </>
+            )}
+
+            {tabValue === 1 && (
+              <>
+                <SubjectSelector 
+                  onSelectionChange={handleSelectionChange} 
+                  showTopic={false} 
+                />
+                <Box textAlign="center" sx={{ mt: 2 }}>
+                  <Button 
+                    variant="contained" 
+                    color="primary" 
+                    onClick={handleQuizStart}
+                    startIcon={<PlayCircleFilled />}
+                    sx={{
+                      fontWeight: 600,
+                      padding: '8px 24px',
+                      borderRadius: '24px',
+                      background: (!selection.semester || !selection.subject || !selection.unit) 
+                        ? 'linear-gradient(45deg, #cccccc 30%, #cccccc 90%)' // 회색으로 비활성화 상태 표현
+                        : 'linear-gradient(45deg, #FE6B8B 30%, #FF8E53 90%)',
+                    }}
+                    disabled={!selection.semester || !selection.subject || !selection.unit} // 조건에 따른 비활성화
+                  >
+                    퀴즈 시작
+                  </Button>
+                </Box>
+              </>
+            )}
           </>
         )}
 
-        {tabValue === 1 && (
-          <>
-            <SubjectSelector 
-              onSelectionChange={handleSelectionChange} 
-              showTopic={false} 
-            />
-            <Box textAlign="center" sx={{ mt: 2 }}>
-              <Button variant="contained" color="primary" onClick={handleQuizStart}>
-                퀴즈 시작
-              </Button>
-            </Box>
-            {currentQuiz && (
-              <QuizComponent quiz={currentQuiz} onSubmit={handleQuizSubmit} />
-            )}
-          </>
+        {/* 퀴즈 컴포넌트만 표시 */}
+        {currentQuiz && (
+          <QuizComponent quiz={currentQuiz} onSubmit={handleQuizSubmit} />
         )}
       </Paper>
     </Container>
