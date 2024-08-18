@@ -78,7 +78,7 @@ const Navbar: React.FC<{ role: string, isQuizMode: boolean }> = ({ role, isQuizM
   const getHomeLabel = () => {
     switch (role) {
       case 'student':
-        return '챗봇';
+        return 'T-BOT';
       case 'teacher':
         return '대시보드';
       case 'admin':
@@ -126,7 +126,7 @@ const Navbar: React.FC<{ role: string, isQuizMode: boolean }> = ({ role, isQuizM
       />
       {role === 'student' && (
         <BottomNavigationAction 
-          label="나의 퀴즈" 
+          label="퀴즈" 
           icon={<Quiz />} 
         />
       )}

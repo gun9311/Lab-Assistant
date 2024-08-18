@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import Chatbot from '../../components/student/Chatbot';
-import LogoutButton from '../../components/auth/LogoutButton';
-import SubjectSelector from '../../components/student/SubjectSelector';
+import React, { useState, useEffect, useRef } from 'react';
 import { Container, Typography, Button, Paper, Box, Snackbar, Alert } from '@mui/material';
+import { Assistant, PlayArrow, StopCircle, AccessTime } from '@mui/icons-material';
+import Chatbot from '../../components/student/Chatbot';
+import SubjectSelector from '../../components/student/SubjectSelector';
 import { useChatbotContext } from '../../context/ChatbotContext';
 
 const StudentHomePage: React.FC = () => {
@@ -76,26 +76,41 @@ const StudentHomePage: React.FC = () => {
   };
 
   return (
-    <Container component="main" maxWidth="md" sx={{ mt: 8 }}>
+    <Container 
+      component="main" 
+      maxWidth={isChatbotActive ? 'lg' : 'md'} 
+      sx={{ mt: 8, fontFamily: 'Roboto, sans-serif' }}
+    >
       <Paper elevation={3} sx={{ padding: 4 }}>
-        <Typography variant="h4" gutterBottom align="center">
-          챗봇
-        </Typography>
-        <SubjectSelector 
-          onSelectionChange={handleSelectionChange} 
-          showTopic={true} 
-          disabled={isChatbotActive} 
-        />
+        {!isChatbotActive && (
+          <Typography 
+            variant="h4" 
+            gutterBottom 
+            align="center" 
+            sx={{ fontFamily: 'Montserrat, sans-serif', display: 'flex', justifyContent: 'center', alignItems: 'center' }}
+          >
+            <Assistant sx={{ mr: 1 }} />
+            T-BOT
+          </Typography>
+        )}
+        {!isChatbotActive && (
+          <SubjectSelector 
+            onSelectionChange={handleSelectionChange} 
+            showTopic={true} 
+            disabled={isChatbotActive} 
+          />
+        )}
         {selection.unit && selection.topic && !isChatbotActive && (
           <Box textAlign="center" sx={{ mt: 2 }}>
-            <Button variant="contained" color="primary" onClick={handleChatbotStart}>
-              챗봇 생성하기
+            <Button variant="contained" color="primary" onClick={handleChatbotStart} startIcon={<PlayArrow />}>
+              학습 챗봇 시작하기
             </Button>
           </Box>
         )}
         {isChatbotActive && (
           <Box textAlign="center" sx={{ mt: 2 }}>
-            <Typography variant="h6" color="secondary">
+            <Typography variant="h6" color="third" sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+              <AccessTime sx={{ mr: 1 }} />
               남은 시간: {formatTime(remainingTime || 0)}
             </Typography>
           </Box>
@@ -108,6 +123,7 @@ const StudentHomePage: React.FC = () => {
             unit={selection.unit}
             topic={selection.topic}
             onChatbotEnd={handleChatbotEnd}
+            sx={{ height: '70vh' }} // 챗봇의 높이를 크게 설정하여 화면을 더 많이 차지하도록 함
           />
         )}
       </Paper>
@@ -118,7 +134,7 @@ const StudentHomePage: React.FC = () => {
         anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
       >
         <Alert onClose={() => setSessionEndedAlertOpen(false)} severity="warning" sx={{ width: '100%' }}>
-          챗봇 세션이 종료되었습니다!
+          세션이 종료되었습니다. 계속 학습하려면 새로 시작하세요.
         </Alert>
       </Snackbar>
     </Container>

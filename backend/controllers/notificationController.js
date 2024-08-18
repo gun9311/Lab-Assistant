@@ -124,9 +124,21 @@ const markAsRead = async (req, res) => {
   }
 };
 
+// 모든 알림을 읽음으로 표시
+const markAllAsRead = async (req, res) => {
+  try {
+    await Notification.updateMany({ recipientId: req.user._id, read: false }, { read: true });
+    res.status(200).send({ message: 'All notifications marked as read' });
+  } catch (error) {
+    console.error('Failed to mark all notifications as read:', error);
+    res.status(500).send({ message: 'Failed to mark all notifications as read' });
+  }
+};
+
 module.exports = {
   sendQuizResultNotification,
   sendReportGeneratedNotification,
   getNotifications,
   markAsRead,
+  markAllAsRead, // 추가
 };

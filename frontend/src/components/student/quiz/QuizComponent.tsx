@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { Box, Button, TextField, Typography, Paper } from "@mui/material";
+import { Box, Button, TextField, Typography, Paper, Divider } from "@mui/material";
+import { AccessTime, Send } from '@mui/icons-material';
 
 type Task = {
   _id: string;
@@ -81,26 +82,49 @@ const QuizComponent: React.FC<{ quiz: Quiz; onSubmit: (answers: { [key: string]:
   };
 
   return (
-    <Paper elevation={3} sx={{ padding: 4, mt: 2 }}>
-      <Typography variant="h5" gutterBottom>
-        {quiz.subject} - {quiz.unit}
-      </Typography>
-      <Typography variant="body2" color="textSecondary">
-        남은 시간: {Math.floor(timeLeft / 60)}분 {timeLeft % 60}초
-      </Typography>
-      {quiz.tasks.map((task) => (
-        <Box key={task._id} sx={{ mb: 2 }}>
-          <Typography variant="body1">{task.taskText}</Typography>
+    <Paper elevation={3} sx={{ padding: 4, mt: 2, borderRadius: '16px', boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.1)', backgroundColor: '#f9f9f9' }}>
+      <Box display="flex" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+        <Typography variant="h5" sx={{ fontWeight: 'bold', color: '#333' }}>
+          {quiz.subject} - {quiz.unit}
+        </Typography>
+        <Box display="flex" alignItems="center">
+          <AccessTime sx={{ color: '#6c757d', mr: 1 }} />
+          <Typography variant="body1" sx={{ color: '#6c757d', fontWeight: 'bold' }}>
+            남은 시간: {Math.floor(timeLeft / 60)}분 {timeLeft % 60}초
+          </Typography>
+        </Box>
+      </Box>
+
+      <Divider sx={{ mb: 3 }} />
+
+      {quiz.tasks.map((task, index) => (
+        <Box key={task._id} sx={{ mb: 4 }}>
+          <Typography variant="body1" sx={{ mb: 1, fontWeight: 'bold', color: '#555' }}>
+            {index + 1}. {task.taskText}
+          </Typography>
           <TextField
             fullWidth
             variant="outlined"
             value={answers[task._id] || ""}
             onChange={(e) => handleChange(task._id, e.target.value)}
+            sx={{ borderRadius: '8px', backgroundColor: '#fff', borderColor: '#ced4da' }}
           />
         </Box>
       ))}
-      <Box textAlign="center" sx={{ mt: 2 }}>
-        <Button variant="contained" color="primary" onClick={() => handleSubmit(false)}>
+
+      <Box textAlign="center" sx={{ mt: 3 }}>
+        <Button 
+          variant="contained" 
+          color="primary" 
+          onClick={() => handleSubmit(false)} 
+          startIcon={<Send />} 
+          sx={{
+            padding: '10px 20px',
+            borderRadius: '24px',
+            fontWeight: 'bold',
+            background: 'linear-gradient(45deg, #4CAF50 30%, #81C784 90%)',
+          }}
+        >
           퀴즈 제출
         </Button>
       </Box>

@@ -12,6 +12,7 @@ type NotificationContextType = {
   notifications: Notification[];
   addNotification: (notification: Notification) => void;
   markAsRead: (notificationId: string) => void;
+  markAllAsRead: () => void; // 새로운 메서드 추가
 };
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
@@ -31,7 +32,6 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
     const fetchNotifications = async () => {
       try {
         const { data } = await api.get('/notifications');
-        console.log(data);
         
         // 데이터 구조를 기대하는 형태로 변환
         const transformedNotifications = data.map((notif: any) => ({
@@ -67,8 +67,20 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({ childr
     }
   };
 
+  // 모든 알림을 읽음 처리하는 메서드 추가
+  const markAllAsRead = async () => {
+    try {
+      await api.patch('/notifications/mark-all-read'); // 서버에서 모든 알림을 읽음 처리하는 엔드포인트가 있다고 가정
+      setNotifications(prev =>
+        prev.map(notification => ({ ...notification, read: true }))
+      );
+    } catch (error) {
+      console.error('Failed to mark all notifications as read:', error);
+    }
+  };
+
   return (
-    <NotificationContext.Provider value={{ notifications, addNotification, markAsRead }}>
+    <NotificationContext.Provider value={{ notifications, addNotification, markAsRead, markAllAsRead }}>
       {children}
     </NotificationContext.Provider>
   );

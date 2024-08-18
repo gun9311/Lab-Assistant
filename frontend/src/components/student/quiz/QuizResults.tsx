@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Typography, Box, Button, Collapse, CircularProgress } from '@mui/material';
+import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, Typography, Box, IconButton, Collapse, CircularProgress, useMediaQuery, useTheme } from '@mui/material';
+import { Visibility, VisibilityOff } from '@mui/icons-material';
 import api from '../../../utils/api';
 
 interface QuizResult {
@@ -41,6 +42,11 @@ const QuizResults: React.FC<QuizResultsProps> = ({
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [noData, setNoData] = useState<boolean>(false);
+  const [expandedQuizId, setExpandedQuizId] = useState<string | null>(null);
+
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const isTablet = useMediaQuery(theme.breakpoints.between('sm', 'md'));
 
   useEffect(() => {
     const fetchQuizResults = async () => {
@@ -78,6 +84,10 @@ const QuizResults: React.FC<QuizResultsProps> = ({
     return <Typography>Error: {error}</Typography>;
   }
 
+  const toggleQuizDetails = (quizId: string) => {
+    setExpandedQuizId(prev => (prev === quizId ? null : quizId));
+  };
+
   return (
     <>
       {noData ? (
@@ -94,70 +104,73 @@ const QuizResults: React.FC<QuizResultsProps> = ({
             <TableHead>
               <TableRow>
                 <TableCell>날짜</TableCell>
-                <TableCell>학기</TableCell>
+                {!isMobile && <TableCell>학기</TableCell>}
                 <TableCell>과목</TableCell>
-                <TableCell>단원</TableCell>
+                {!isMobile && <TableCell>단원</TableCell>}
                 <TableCell>점수</TableCell>
+                <TableCell align="center">상세보기</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {filteredQuizResults.map(result => (
-                <TableRow key={result._id} onClick={() => handleQuizResultClick && handleQuizResultClick(result)}>
-                  <TableCell>{new Date(result.createdAt).toLocaleDateString()}</TableCell>
-                  <TableCell>{result.semester}</TableCell>
-                  <TableCell>{result.subject}</TableCell>
-                  <TableCell>{result.unit}</TableCell>
-                  <TableCell>{result.score}</TableCell>
-                </TableRow>
+                <React.Fragment key={result._id}>
+                  <TableRow sx={{ cursor: 'pointer' }}>
+                    <TableCell>{new Date(result.createdAt).toLocaleDateString()}</TableCell>
+                    {!isMobile && <TableCell>{result.semester}</TableCell>}
+                    <TableCell>{result.subject}</TableCell>
+                    {!isMobile && <TableCell>{result.unit}</TableCell>}
+                    <TableCell>{result.score}</TableCell>
+                    <TableCell align="center">
+                      <IconButton 
+                        onClick={() => toggleQuizDetails(result._id)}
+                        color="primary"
+                        aria-label="view details"
+                      >
+                        {expandedQuizId === result._id ? <VisibilityOff /> : <Visibility />}
+                      </IconButton>
+                    </TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell colSpan={isMobile ? 5 : 6} sx={{ padding: 0, borderBottom: 'none' }}>
+                      <Collapse in={expandedQuizId === result._id} timeout="auto" unmountOnExit>
+                        <Box sx={{ padding: 2 }}>
+                          <Typography variant="h6" gutterBottom>
+                            퀴즈 상세 내용
+                          </Typography>
+                          <Typography variant="body1">과목: {result.subject}</Typography>
+                          <Typography variant="body1">단원: {result.unit}</Typography>
+                          <Typography variant="body1">점수: {result.score}</Typography>
+                          <TableContainer component={Paper} sx={{ mt: 2 }}>
+                            <Table>
+                              <TableHead>
+                                <TableRow>
+                                  <TableCell>문제</TableCell>
+                                  <TableCell>내 답변</TableCell>
+                                  <TableCell>정답</TableCell>
+                                  <TableCell>유사도</TableCell>
+                                </TableRow>
+                              </TableHead>
+                              <TableBody>
+                                {result.results.map((detail, index) => (
+                                  <TableRow key={index}>
+                                    <TableCell>{detail.taskText || '문제를 찾을 수 없음'}</TableCell>
+                                    <TableCell>{detail.studentAnswer}</TableCell>
+                                    <TableCell>{detail.correctAnswer}</TableCell>
+                                    <TableCell>{detail.similarity}</TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </TableContainer>
+                        </Box>
+                      </Collapse>
+                    </TableCell>
+                  </TableRow>
+                </React.Fragment>
               ))}
             </TableBody>
           </Table>
         </TableContainer>
-      )}
-      {selectedQuiz && (
-        <Collapse in={Boolean(selectedQuiz)}>
-          <Paper elevation={3} sx={{ padding: 4, mt: 2 }}>
-            <Typography variant="h5" gutterBottom>
-              퀴즈 결과
-            </Typography>
-            <Typography variant="body1">
-              과목: {selectedQuiz.subject}
-            </Typography>
-            <Typography variant="body1">
-              단원: {selectedQuiz.unit}
-            </Typography>
-            <Typography variant="body1">
-              점수: {selectedQuiz.score}
-            </Typography>
-            <TableContainer component={Paper} sx={{ mt: 2 }}>
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>문제</TableCell>
-                    <TableCell>학생 답변</TableCell>
-                    <TableCell>정답</TableCell>
-                    <TableCell>유사도</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {selectedQuiz.results.map((result, index) => (
-                    <TableRow key={index}>
-                      <TableCell>{result.taskText || '문제를 찾을 수 없음'}</TableCell>
-                      <TableCell>{result.studentAnswer}</TableCell>
-                      <TableCell>{result.correctAnswer}</TableCell>
-                      <TableCell>{result.similarity}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-            <Box textAlign="center" sx={{ mt: 2 }}>
-              <Button variant="contained" color="primary" onClick={handleCloseDetails}>
-                닫기
-              </Button>
-            </Box>
-          </Paper>
-        </Collapse>
       )}
     </>
   );
