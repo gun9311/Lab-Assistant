@@ -1,3 +1,4 @@
+//chatbotController.js
 const { v4: uuidv4 } = require('uuid');
 const { getNLPResponse } = require('../services/nlpService');
 const ChatSummary = require('../models/ChatSummary');
@@ -42,16 +43,20 @@ const handleWebSocketConnection = async (ws, userId, subject) => {
 
   ws.on('message', async (message) => {
     const { grade, semester, subject, unit, topic, userMessage } = JSON.parse(message);
+
+    // 최근 대화 몇 개만 포함 (예: 마지막 3개의 대화)
+    const recentHistory = chatHistory.slice(-3);
+
     const botResponse = await getNLPResponse([
-      { role: 'system', content: `You are a tutor helping a student with ${subject}. The student is in ${grade} grade, ${semester} semester, studying the ${unit} unit on ${topic}.` },
-      ...chatHistory.map(chat => [{ role: 'user', content: chat.user }, { role: 'assistant', content: chat.bot }]).flat(),
-      { role: 'user', content: userMessage }
+        { role: 'system', content: `당신은 친절하고 인내심 있는 튜터입니다. 지금 ${grade}학년 학생이 ${subject} 과목을 이해하도록 돕고 있습니다. 학생은 현재 ${unit} 단원에서 ${topic}을(를) 공부하고 있습니다. 개념을 쉽게, 명확하게, 그리고 격려하는 방식으로 설명해 주세요.` },
+        ...recentHistory.map(chat => [{ role: 'user', content: chat.user }, { role: 'assistant', content: chat.bot }]).flat(),
+        { role: 'user', content: userMessage }
     ]);
 
     chatHistory.push({ user: userMessage, bot: botResponse });
     await redisClient.set(chatHistoryKey, JSON.stringify(chatHistory));
 
-    ws.send(JSON.stringify({ bot: botResponse }));  // 질문을 제외하고 응답만 전송
+    ws.send(JSON.stringify({ bot: botResponse }));
 });
 
   ws.on('close', async () => {
@@ -114,4 +119,4 @@ const saveChatSummaryInternal = async (userId, subject) => {
   }
 };
 
-module.exports = { handleWebSocketConnection };
+module.exports = { handleWebSocketConnection, handleDisconnection, saveChatSummaryInternal };

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Box, Button, TextField, Typography, Paper, IconButton, Avatar } from '@mui/material';
+import { Box, Button, TextField, Typography, Paper, IconButton, Avatar, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle } from '@mui/material';
 import { Mic, MicOff, Send, StopCircle } from '@mui/icons-material';
 import SmartToyIcon from '@mui/icons-material/SmartToy'; // 챗봇 아이콘
 import { SxProps } from '@mui/system'; // SxProps 타입 추가
@@ -11,15 +11,17 @@ type ChatbotProps = {
   unit: string;
   topic: string;
   onChatbotEnd: () => void;
+  onAlertOpen: () => void; // 알림 상태 제어 함수 추가
   sx?: SxProps; // sx 속성 추가
 };
 
-const Chatbot: React.FC<ChatbotProps> = ({ grade, semester, subject, unit, topic, onChatbotEnd, sx }) => {
+const Chatbot: React.FC<ChatbotProps> = ({ grade, semester, subject, unit, topic, onChatbotEnd, onAlertOpen, sx }) => {
   const [message, setMessage] = useState<string>("");
   const [chatHistory, setChatHistory] = useState<{ sender: string; content: string }[]>([]);
   const [isListening, setIsListening] = useState<boolean>(false);
   const [recognition, setRecognition] = useState<SpeechRecognition | null>(null);
   const [ws, setWs] = useState<WebSocket | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false); // Dialog 상태 추가
   const chatBoxRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -111,7 +113,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ grade, semester, subject, unit, topic
     try {
       setChatHistory([]);
       onChatbotEnd();
-      alert("Chat summary saved successfully");
+      onAlertOpen(); // 알림 상태를 true로 설정
     } catch (error: any) {
       console.error("Error saving chat summary:", error);
       onChatbotEnd();
@@ -131,6 +133,17 @@ const Chatbot: React.FC<ChatbotProps> = ({ grade, semester, subject, unit, topic
   const handleStopListening = () => {
     if (recognition && isListening) {
       recognition.stop();
+    }
+  };
+
+  const handleDialogOpen = () => {
+    setDialogOpen(true);
+  };
+
+  const handleDialogClose = (confirmed: boolean) => {
+    setDialogOpen(false);
+    if (confirmed) {
+      handleSaveChatSummary();
     }
   };
 
@@ -200,12 +213,33 @@ const Chatbot: React.FC<ChatbotProps> = ({ grade, semester, subject, unit, topic
             >
               전송
             </Button>
-            <Button variant="contained" color="secondary" startIcon={<StopCircle />} onClick={handleSaveChatSummary}>
+            <Button variant="contained" color="secondary" startIcon={<StopCircle />} onClick={handleDialogOpen}>
               대화 종료
             </Button>
           </Box>
         </Box>
       </Box>
+
+      {/* 대화 종료 확인 Dialog */}
+      <Dialog
+        open={dialogOpen}
+        onClose={() => handleDialogClose(false)}
+      >
+        <DialogTitle>대화 종료</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            정말로 대화를 종료하시겠습니까?
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => handleDialogClose(false)} color="primary">
+            취소
+          </Button>
+          <Button onClick={() => handleDialogClose(true)} color="secondary">
+            종료
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Paper>
   );
 };

@@ -16,10 +16,10 @@ const TeacherRegisterPage = () => {
   const [schools, setSchools] = useState<School[]>([]);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState(''); // 비밀번호 확인 필드 추가
+  const [confirmPassword, setConfirmPassword] = useState(''); 
   const [name, setName] = useState('');
   const [school, setSchool] = useState('');
-  const [authCode, setAuthCode] = useState(''); // 인증코드 필드 추가
+  const [authCode, setAuthCode] = useState(''); 
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const navigate = useNavigate();
@@ -51,8 +51,18 @@ const TeacherRegisterPage = () => {
     }
   }, [educationOffice]);
 
+  const validateEmail = (email: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
   const handleRegister = async () => {
-    if (password !== confirmPassword) {  // 비밀번호와 비밀번호 확인이 일치하는지 확인
+    if (!validateEmail(email)) {
+      setError('유효한 이메일 주소를 입력하세요.');
+      return;
+    }
+
+    if (password !== confirmPassword) {  
       setError('비밀번호가 일치하지 않습니다.');
       return;
     }
@@ -102,6 +112,8 @@ const TeacherRegisterPage = () => {
           label="이메일"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
+          error={!!error && error.includes('이메일')}
+          helperText={!!error && error.includes('이메일') ? error : ''}
         />
         <TextField
           fullWidth
@@ -116,7 +128,7 @@ const TeacherRegisterPage = () => {
           fullWidth
           variant="outlined"
           margin="normal"
-          label="비밀번호 확인"  // 비밀번호 확인 필드
+          label="비밀번호 확인"
           type="password"
           value={confirmPassword}
           onChange={(e) => setConfirmPassword(e.target.value)}
@@ -133,7 +145,7 @@ const TeacherRegisterPage = () => {
           fullWidth
           variant="outlined"
           margin="normal"
-          label="교사 인증코드"  // 인증코드 필드
+          label="교사 인증코드"
           value={authCode}
           onChange={(e) => setAuthCode(e.target.value)}
         />
