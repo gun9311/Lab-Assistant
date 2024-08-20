@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Container, TextField, Button, Typography, Paper, MenuItem, Select, InputLabel, FormControl, Snackbar, Alert } from '@mui/material';
+import { Container, TextField, Button, Typography, Paper, MenuItem, Select, InputLabel, FormControl, Snackbar, Alert, InputAdornment } from '@mui/material';
 import Autocomplete from '@mui/material/Autocomplete';
 import { educationOffices } from '../../educationOffices';
 import apiNoAuth from '../../utils/apiNoAuth';
@@ -116,14 +116,19 @@ const StudentRegisterPage = () => {
           label="반"
           value={studentClass}
           onChange={(e) => setStudentClass(e.target.value)}
+          InputProps={{
+            startAdornment: <InputAdornment position="start">반 </InputAdornment>,
+          }}
         />
         <TextField
           fullWidth
           variant="outlined"
           margin="normal"
           label="출석번호"
+          type="number"
           value={studentId}
           onChange={(e) => setStudentId(e.target.value)}
+          inputProps={{ inputMode: 'numeric', pattern: '[0-9]*' }}
         />
         <TextField
           fullWidth

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Container, Typography, Button, Paper, Box, Snackbar, Alert } from '@mui/material';
 import { Assistant, PlayArrow, StopCircle, AccessTime } from '@mui/icons-material';
 import Chatbot from '../../components/student/Chatbot';
@@ -6,7 +6,7 @@ import SubjectSelector from '../../components/student/SubjectSelector';
 import { useChatbotContext } from '../../context/ChatbotContext';
 
 const StudentHomePage: React.FC = () => {
-  const { isChatbotActive, setIsChatbotActive, setAlertOpen } = useChatbotContext();
+  const { isChatbotActive, setIsChatbotActive } = useChatbotContext();
   const [selection, setSelection] = useState({
     grade: '',
     semester: '',
@@ -16,6 +16,7 @@ const StudentHomePage: React.FC = () => {
   });
   const [remainingTime, setRemainingTime] = useState<number | null>(null);
   const [sessionEndedAlertOpen, setSessionEndedAlertOpen] = useState(false);
+  const [chatbotEndAlertOpen, setChatbotEndAlertOpen] = useState(false); // 새로운 알림 상태 추가
 
   const handleSelectionChange = (newSelection: typeof selection) => {
     setSelection(newSelection);
@@ -23,12 +24,16 @@ const StudentHomePage: React.FC = () => {
 
   const handleChatbotStart = () => {
     setIsChatbotActive(true);
-    setRemainingTime(3600); // 1시간 = 3600초
+    setRemainingTime(900); // 15분 = 900초
   };
 
   const handleChatbotEnd = () => {
     setIsChatbotActive(false);
     setRemainingTime(null);
+  };
+
+  const handleExtendTime = () => {
+    setRemainingTime(900); // 시간을 15분으로 연장
   };
 
   useEffect(() => {
@@ -59,7 +64,7 @@ const StudentHomePage: React.FC = () => {
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
       if (isChatbotActive) {
         event.preventDefault();
-        event.returnValue = '';
+        event.returnValue = '';  // 경고 메시지를 표시하는 역할
       }
     };
 
@@ -67,7 +72,7 @@ const StudentHomePage: React.FC = () => {
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
-  }, [isChatbotActive, setAlertOpen]);
+  }, [isChatbotActive]);
 
   const formatTime = (seconds: number) => {
     const minutes = Math.floor(seconds / 60);
@@ -109,10 +114,22 @@ const StudentHomePage: React.FC = () => {
         )}
         {isChatbotActive && (
           <Box textAlign="center" sx={{ mt: 2 }}>
-            <Typography variant="h6" color="third" sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+            <Typography 
+              variant="h6" 
+              color={remainingTime !== null && remainingTime < 60 ? "error" : "third"} 
+              sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}
+            >
               <AccessTime sx={{ mr: 1 }} />
               남은 시간: {formatTime(remainingTime || 0)}
             </Typography>
+            <Button 
+              variant="outlined" 
+              color="primary" 
+              onClick={handleExtendTime} 
+              sx={{ mt: 2 }}
+            >
+              시간 연장 (15분)
+            </Button>
           </Box>
         )}
         {isChatbotActive && (
@@ -123,6 +140,7 @@ const StudentHomePage: React.FC = () => {
             unit={selection.unit}
             topic={selection.topic}
             onChatbotEnd={handleChatbotEnd}
+            onAlertOpen={() => setChatbotEndAlertOpen(true)} // 알림 상태 제어 함수 전달
             sx={{ height: '70vh' }} // 챗봇의 높이를 크게 설정하여 화면을 더 많이 차지하도록 함
           />
         )}
@@ -135,6 +153,17 @@ const StudentHomePage: React.FC = () => {
       >
         <Alert onClose={() => setSessionEndedAlertOpen(false)} severity="warning" sx={{ width: '100%' }}>
           세션이 종료되었습니다. 계속 학습하려면 새로 시작하세요.
+        </Alert>
+      </Snackbar>
+
+      <Snackbar 
+        open={chatbotEndAlertOpen} 
+        autoHideDuration={2000} 
+        onClose={() => setChatbotEndAlertOpen(false)}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert onClose={() => setChatbotEndAlertOpen(false)} severity="success" sx={{ width: '100%' }}>
+          대화가 종료되었습니다!
         </Alert>
       </Snackbar>
     </Container>
