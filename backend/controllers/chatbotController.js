@@ -1,24 +1,26 @@
-//chatbotController.js
 const { v4: uuidv4 } = require('uuid');
 const { getNLPResponse } = require('../services/nlpService');
 const ChatSummary = require('../models/ChatSummary');
-const redisClient = require('../utils/redisClient'); // Redis 클라이언트 가져오기
-const winston = require('winston'); // winston 로깅 라이브러리 추가
+const redisClient = require('../utils/redisClient'); 
+const winston = require('winston'); 
 
 const logger = winston.createLogger({
   level: 'info',
-  format: winston.format.json(),
+  format: winston.format.combine(
+    winston.format.timestamp(),
+    winston.format.json()
+  ),
   transports: [
     new winston.transports.Console(),
-    new winston.transports.File({ filename: '/app/logs/websocket.log' }) // 로그 파일 설정
+    new winston.transports.File({ filename: '/app/logs/websocket.log' }) 
   ]
 });
 
-let clients = {}; // 실제 웹소켓 객체를 메모리에 저장
+let clients = {}; 
 
 const handleWebSocketConnection = async (ws, userId, subject) => {
   const chatHistoryKey = `chatHistories:${userId}`;
-  const clientId = uuidv4(); // 고유한 클라이언트 ID 생성
+  const clientId = uuidv4(); 
 
   let chatHistory = await redisClient.get(chatHistoryKey);
   if (!chatHistory) {
@@ -27,11 +29,9 @@ const handleWebSocketConnection = async (ws, userId, subject) => {
     chatHistory = JSON.parse(chatHistory);
   }
 
-  // 클라이언트 연결 저장
-  clients[clientId] = ws; // 각 클라이언트의 ws 객체를 고유하게 저장
-  logger.info(`Client connected: ${clientId} for user ${userId}, subject: ${subject}`);
+  clients[clientId] = ws; 
+  logger.info(`Client connected: ${clientId} for user ${userId}, subject: ${subject}. Total active connections: ${Object.keys(clients).length}`);
 
-  // 핑/퐁 메커니즘 설정
   let isAlive = true;
 
   ws.on('pong', () => {
@@ -49,12 +49,13 @@ const handleWebSocketConnection = async (ws, userId, subject) => {
         logger.info(`Ping sent to client ${clientId}`);
       }
     }
-  }, 60000); // 60초마다 핑 메시지 전송
+  }, 60000); 
 
   ws.on('message', async (message) => {
+    const startTime = process.hrtime();
+
     const { grade, semester, subject, unit, topic, userMessage } = JSON.parse(message);
 
-    // 최근 대화 몇 개만 포함 (예: 마지막 3개의 대화)
     const recentHistory = chatHistory.slice(-3);
 
     const botResponse = await getNLPResponse([
@@ -67,24 +68,27 @@ const handleWebSocketConnection = async (ws, userId, subject) => {
     await redisClient.set(chatHistoryKey, JSON.stringify(chatHistory));
 
     ws.send(JSON.stringify({ bot: botResponse }));
-});
+
+    const endTime = process.hrtime(startTime);
+    const elapsedTime = endTime[0] * 1000 + endTime[1] / 1e6; 
+    logger.info(`Message processed for client ${clientId}: ${elapsedTime.toFixed(2)}ms`);
+  });
 
   ws.on('close', async () => {
-    logger.info(`Client ${clientId} disconnected`);
-    clearInterval(pingInterval); // 핑/퐁 메커니즘 중지
+    logger.info(`Client ${clientId} disconnected. Total active connections: ${Object.keys(clients).length - 1}`);
+    clearInterval(pingInterval); 
     await handleDisconnection(userId, subject, clientId, ws);
   });
 };
 
 const handleDisconnection = async (userId, subject, clientId, ws) => {
-  await saveChatSummaryInternal(userId, subject); // 실제 subject 정보를 전달
-  // console.log('----------saveChatSummaryInternal 호출됨--------------');
+  await saveChatSummaryInternal(userId, subject);
 
-  delete clients[clientId]; // 메모리에서 웹소켓 객체 제거
-  logger.info(`Client ${clientId} removed from memory`);
+  delete clients[clientId];
+  logger.info(`Client ${clientId} removed from memory. Total active connections: ${Object.keys(clients).length}`);
 
   if (ws.readyState === ws.OPEN || ws.readyState === ws.CLOSING) {
-    ws.terminate(); // 연결 종료
+    ws.terminate();
   }
 };
 
@@ -94,7 +98,7 @@ const saveChatSummaryInternal = async (userId, subject) => {
   try {
     let chatHistory = await redisClient.get(chatHistoryKey);
     if (!chatHistory) {
-      console.error('No chat history found for this user');
+      logger.warn('No chat history found for this user');
       return;
     }
 
@@ -104,14 +108,12 @@ const saveChatSummaryInternal = async (userId, subject) => {
     let chatSummary = await ChatSummary.findOne({ student: userId, 'subjects.subject': subject });
 
     if (chatSummary) {
-      // 기존 subject에 summary 추가
       chatSummary.subjects.forEach(sub => {
         if (sub.subject === subject) {
           sub.summaries.push({ summary, createdAt: new Date() });
         }
       });
     } else {
-      // 새로운 subject 추가
       chatSummary = new ChatSummary({
         student: userId,
         subjects: [{ subject, summaries: [{ summary, createdAt: new Date() }] }]
@@ -119,13 +121,11 @@ const saveChatSummaryInternal = async (userId, subject) => {
     }
 
     await chatSummary.save();
-
-    // 대화 내역 삭제
     await redisClient.del(chatHistoryKey);
 
-    console.log('Chat summary saved successfully');
+    logger.info('Chat summary saved successfully');
   } catch (error) {
-    console.error('Failed to save chat summary:', error);
+    logger.error('Failed to save chat summary:', error);
   }
 };
 
