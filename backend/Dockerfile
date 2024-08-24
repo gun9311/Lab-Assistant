@@ -35,6 +35,9 @@ RUN yarn install
 
 COPY . .
 
+# 로그 디렉토리 생성
+RUN mkdir -p /app/logs
+
 EXPOSE 3000
 
 CMD ["node", "server.js"]
