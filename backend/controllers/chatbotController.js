@@ -3,6 +3,16 @@ const { v4: uuidv4 } = require('uuid');
 const { getNLPResponse } = require('../services/nlpService');
 const ChatSummary = require('../models/ChatSummary');
 const redisClient = require('../utils/redisClient'); // Redis 클라이언트 가져오기
+const winston = require('winston'); // winston 로깅 라이브러리 추가
+
+const logger = winston.createLogger({
+  level: 'info',
+  format: winston.format.json(),
+  transports: [
+    new winston.transports.Console(),
+    new winston.transports.File({ filename: '/app/logs/websocket.log' }) // 로그 파일 설정
+  ]
+});
 
 let clients = {}; // 실제 웹소켓 객체를 메모리에 저장
 
@@ -19,7 +29,7 @@ const handleWebSocketConnection = async (ws, userId, subject) => {
 
   // 클라이언트 연결 저장
   clients[clientId] = ws; // 각 클라이언트의 ws 객체를 고유하게 저장
-  console.log('클라이언트 연결 저장 clients : ' + clients);
+  logger.info(`Client connected: ${clientId} for user ${userId}, subject: ${subject}`);
 
   // 핑/퐁 메커니즘 설정
   let isAlive = true;
@@ -31,12 +41,12 @@ const handleWebSocketConnection = async (ws, userId, subject) => {
   const pingInterval = setInterval(async () => {
     if (ws.readyState === ws.OPEN) {
       if (!isAlive) {
-        console.log('----------!isAlive--------------');
+        logger.warn(`Client ${clientId} did not respond to ping, terminating connection`);
         await handleDisconnection(userId, subject, clientId, ws);
       } else {
         isAlive = false;
         ws.ping();
-        console.log('----------ws.ping 호출됨--------------');
+        logger.info(`Ping sent to client ${clientId}`);
       }
     }
   }, 60000); // 60초마다 핑 메시지 전송
@@ -60,7 +70,7 @@ const handleWebSocketConnection = async (ws, userId, subject) => {
 });
 
   ws.on('close', async () => {
-    console.log('----------ws.close 호출됨--------------');
+    logger.info(`Client ${clientId} disconnected`);
     clearInterval(pingInterval); // 핑/퐁 메커니즘 중지
     await handleDisconnection(userId, subject, clientId, ws);
   });
@@ -71,7 +81,7 @@ const handleDisconnection = async (userId, subject, clientId, ws) => {
   // console.log('----------saveChatSummaryInternal 호출됨--------------');
 
   delete clients[clientId]; // 메모리에서 웹소켓 객체 제거
-  console.log('객체 제거 clients : ' + clients);
+  logger.info(`Client ${clientId} removed from memory`);
 
   if (ws.readyState === ws.OPEN || ws.readyState === ws.CLOSING) {
     ws.terminate(); // 연결 종료

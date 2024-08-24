@@ -20,10 +20,20 @@ const ChatSummary = require('./models/ChatSummary');
 const cron = require('node-cron');
 const redisClient = require('./utils/redisClient'); // Redis 클라이언트 가져오기
 const cors = require('cors')
-const auth = require('./middleware/auth'); // auth 미들웨어 임포트
+const winston = require('winston'); // winston 로깅 라이브러리 추가
 
 require('dotenv').config();
 require('./services/fcmService');
+
+// 로거 설정
+const logger = winston.createLogger({
+  level: 'info',  // 로그 레벨 설정: info 레벨 이상의 로그만 기록
+  format: winston.format.json(),  // 로그 형식을 JSON으로 설정
+  transports: [
+    new winston.transports.Console(),  // 콘솔에 로그 출력
+    new winston.transports.File({ filename: '/app/logs/server.log' }) // 로그 파일 설정
+  ]
+});
 
 mongoose.connect(process.env.MONGODB_URL)
   .then(() => console.log('MongoDB connected'))
@@ -52,7 +62,7 @@ app.use('/api/report', reportRoutes);
 app.use('/api/notifications', notificationRoutes); // 새로운 라우트 추가
 
 const server = app.listen(process.env.PORT || 5000, () => {
-  console.log(`Server running on port ${process.env.PORT || 5000}`);
+  logger.info(`Server running on port ${process.env.PORT || 5000}`); // 서버 시작 로그
 });
 
 const wss = new WebSocketServer({ server });
@@ -63,31 +73,34 @@ wss.on('connection', (ws, req) => {
   const subject = urlParams.get('subject');
   if (!token || !subject) {
     ws.close();
+    logger.warn('WebSocket connection closed due to missing token or subject');
     return;
   }
 
   jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
     if (err) {
       ws.close();
+      logger.error('WebSocket connection closed due to JWT verification error:', err);
       return;
     }
 
     ws.user = user;
+    logger.info(`WebSocket connection established for user: ${user._id}`);
     handleWebSocketConnection(ws, user._id, subject);
   });
 });
 
 // 매일 자정에 removeOldSummaries 실행
 cron.schedule('0 0 * * *', async () => {
-  console.log('Running removeOldSummaries at midnight');
+  logger.info('Running removeOldSummaries at midnight');
   try {
     const days = 3; // 삭제할 요약의 기준 기간 (3일 이전)
     const chatSummaries = await ChatSummary.find();
     for (const chatSummary of chatSummaries) {
       await chatSummary.removeOldSummaries(days);
     }
-    console.log('Old summaries removed successfully');
+    logger.info('Old summaries removed successfully');
   } catch (error) {
-    console.error('Error removing old summaries:', error);
+    logger.error('Error removing old summaries:', error);
   }
 });
