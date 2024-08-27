@@ -55,7 +55,7 @@ const ChatSummaryList: React.FC<ChatSummaryListProps> = ({ studentId, selectedSe
     };
 
     fetchChatSummaries();
-  }, [studentId]);
+  }, [studentId, selectedSemester, selectedSubject]);
 
   const handleFilterChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setOnlyStudentQuestions(event.target.checked);
@@ -72,6 +72,12 @@ const ChatSummaryList: React.FC<ChatSummaryListProps> = ({ studentId, selectedSe
 
   const extractStudentQuestions = (text: string) => {
     return text.split('\n').filter(line => line.startsWith('You:')).join('\n');
+  };
+
+  const formatSummaryText = (text: string) => {
+    return text
+      .replace(/^You:/gm, '학생:')  // 각 줄의 시작 부분에 있는 "You:"를 "학생:"으로 변환
+      .replace(/^Bot:/gm, '챗봇:');  // 각 줄의 시작 부분에 있는 "Bot:"을 "챗봇:"으로 변환
   };
 
   if (loading) {
@@ -113,7 +119,7 @@ const ChatSummaryList: React.FC<ChatSummaryListProps> = ({ studentId, selectedSe
               {summary.summaries.map((item, idx) => (
                 <ListItem key={idx} sx={{ backgroundColor: '#f5f5f5', borderRadius: 1, mb: 1 }}>
                   <ListItemText
-                    primary={onlyStudentQuestions ? extractStudentQuestions(item.summary) : item.summary}
+                    primary={onlyStudentQuestions ? formatSummaryText(extractStudentQuestions(item.summary)) : formatSummaryText(item.summary)}
                     secondary={new Date(item.createdAt).toLocaleString()}
                     primaryTypographyProps={{ style: { whiteSpace: 'pre-line' } }}
                   />

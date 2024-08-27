@@ -145,7 +145,7 @@ const TeacherHomePage: React.FC = () => {
               }}
             >
               <AssessmentIcon sx={{ mr: 1, verticalAlign: "middle" }} />
-              평가 생성 및 일괄 조회
+              평어 생성 및 일괄 조회
             </Button>
           )}
         </Box>

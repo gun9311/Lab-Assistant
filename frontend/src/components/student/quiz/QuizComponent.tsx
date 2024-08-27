@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { Box, Button, TextField, Typography, Paper, Divider } from "@mui/material";
+import React, { useState, useEffect, useRef } from "react";
+import { Box, Button, TextField, Typography, Paper, Divider, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle } from "@mui/material";
 import { AccessTime, Send } from '@mui/icons-material';
 
 type Task = {
@@ -16,10 +16,20 @@ type Quiz = {
   tasks: Task[];
 };
 
-const QuizComponent: React.FC<{ quiz: Quiz; onSubmit: (answers: { [key: string]: string }) => void }> = ({ quiz, onSubmit }) => {
+const QuizComponent: React.FC<{ 
+  quiz: Quiz; 
+  onSubmit: (answers: { [key: string]: string }) => void;
+  onAutoSubmit: () => void;
+}> = ({ quiz, onSubmit, onAutoSubmit }) => {
   const [answers, setAnswers] = useState<{ [key: string]: string }>({});
+  const answersRef = useRef(answers);
   const [timeLeft, setTimeLeft] = useState<number>(1800); // 30분 = 1800초
-  const [isSubmitting, setIsSubmitting] = useState(false); // 제출 상태를 추적합니다
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [confirmDialogOpen, setConfirmDialogOpen] = useState<boolean>(false);
+
+  useEffect(() => {
+    answersRef.current = answers; // answers 상태가 변경될 때마다 ref를 업데이트
+  }, [answers]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -45,7 +55,6 @@ const QuizComponent: React.FC<{ quiz: Quiz; onSubmit: (answers: { [key: string]:
 
     const handleUnload = () => {
       if (!isSubmitting) {
-        // 사용자가 새로고침을 누른 경우 제출 동작 수행
         handleSubmit(true);
       }
     };
@@ -65,20 +74,17 @@ const QuizComponent: React.FC<{ quiz: Quiz; onSubmit: (answers: { [key: string]:
 
   const handleSubmit = (isAutoSubmit = false) => {
     if (!isAutoSubmit) {
-      const confirmSubmit = window.confirm(
-        "퀴즈를 제출하시겠습니까? 제출 후에는 다시 풀 수 없으며, 수정이 불가합니다."
-      );
-
-      if (!confirmSubmit) {
-        return; // 사용자가 제출을 취소한 경우
-      }
+      setConfirmDialogOpen(true);
+      return;
     } else {
-      alert("제한 시간이 종료되었거나, 페이지 이탈로 인해 퀴즈가 자동 제출되었습니다.");
+      onAutoSubmit(); // 부모 컴포넌트에서 자동 제출 로직을 처리하도록 호출
+      performSubmit(); // 자동 제출 처리
     }
+  };
 
-    // 실질적인 제출 동작
-    setIsSubmitting(true); // 제출 상태를 업데이트합니다
-    onSubmit(answers);
+  const performSubmit = () => {
+    setIsSubmitting(true);
+    onSubmit(answersRef.current); // 항상 최신의 answers 상태를 사용하여 제출
   };
 
   return (
@@ -128,6 +134,27 @@ const QuizComponent: React.FC<{ quiz: Quiz; onSubmit: (answers: { [key: string]:
           퀴즈 제출
         </Button>
       </Box>
+
+      {/* 퀴즈 제출 확인 Dialog */}
+      <Dialog
+        open={confirmDialogOpen}
+        onClose={() => setConfirmDialogOpen(false)}
+      >
+        <DialogTitle>퀴즈 제출</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            퀴즈를 제출하시겠습니까? 제출 후에는 다시 풀 수 없으며, 수정이 불가합니다.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmDialogOpen(false)} color="primary">
+            취소
+          </Button>
+          <Button onClick={performSubmit} color="secondary">
+            제출
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Paper>
   );
 };

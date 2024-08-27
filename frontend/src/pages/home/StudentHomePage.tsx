@@ -128,7 +128,7 @@ const StudentHomePage: React.FC = () => {
               onClick={handleExtendTime} 
               sx={{ mt: 2 }}
             >
-              시간 연장 (15분)
+              시간 연장
             </Button>
           </Box>
         )}

@@ -117,7 +117,7 @@ const StudentRegisterPage = () => {
           value={studentClass}
           onChange={(e) => setStudentClass(e.target.value)}
           InputProps={{
-            startAdornment: <InputAdornment position="start">반 </InputAdornment>,
+            endAdornment: studentClass ? <InputAdornment position="end">반</InputAdornment> : null, // 입력 값이 있을 때만 endAdornment를 보여줍니다.
           }}
         />
         <TextField

@@ -56,7 +56,7 @@ const StudentReport: React.FC<StudentReportProps> = ({ studentId, selectedSemest
   if (reports.length === 0) {
     return (
       <Paper elevation={3} sx={{ padding: 2, marginTop: 2 }}>
-        <Typography variant="h6" gutterBottom>평가</Typography>
+        <Typography variant="h6" gutterBottom>평어</Typography>
         <Typography variant="body1">조회된 보고서가 없습니다. 보고서를 생성하세요.</Typography>
       </Paper>
     );
