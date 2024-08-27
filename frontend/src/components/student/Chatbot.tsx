@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Box, Button, TextField, Typography, Paper, IconButton, Avatar, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle } from '@mui/material';
+import { Box, Button, TextField, Typography, Paper, IconButton, Avatar, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Snackbar, Alert } from '@mui/material';
 import { Mic, MicOff, Send, StopCircle } from '@mui/icons-material';
 import SmartToyIcon from '@mui/icons-material/SmartToy'; // 챗봇 아이콘
 import { SxProps } from '@mui/system'; // SxProps 타입 추가
@@ -23,6 +23,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ grade, semester, subject, unit, topic
   const [ws, setWs] = useState<WebSocket | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false); // Dialog 상태 추가
   const chatBoxRef = useRef<HTMLDivElement>(null);
+  const [alertOpen, setAlertOpen] = useState(false); // 경고 메시지 상태 추가
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -91,6 +92,12 @@ const Chatbot: React.FC<ChatbotProps> = ({ grade, semester, subject, unit, topic
   }, [chatHistory]);
 
   const handleSendMessage = async () => {
+    if (!message.trim()) {
+      // 메시지가 비어있거나 공백으로만 이루어져 있을 경우 전송하지 않음
+      setAlertOpen(true);
+      return;
+    }
+
     if (ws && ws.readyState === WebSocket.OPEN) {
       setChatHistory(prevChatHistory => [...prevChatHistory, { sender: '사용자', content: message }]);
       ws.send(JSON.stringify({
@@ -240,6 +247,17 @@ const Chatbot: React.FC<ChatbotProps> = ({ grade, semester, subject, unit, topic
           </Button>
         </DialogActions>
       </Dialog>
+      {/* 빈 메시지 경고 Snackbar */}
+      <Snackbar
+        open={alertOpen}
+        autoHideDuration={2000}
+        onClose={() => setAlertOpen(false)}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert onClose={() => setAlertOpen(false)} severity="warning" sx={{ width: '100%' }}>
+          메시지를 입력해주세요.
+        </Alert>
+      </Snackbar>
     </Paper>
   );
 };

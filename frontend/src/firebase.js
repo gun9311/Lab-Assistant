@@ -69,6 +69,7 @@ export const requestPermissionAndGetToken = async (setTokenFound) => {
 export const onMessageListener = () =>
   new Promise((resolve) => {
     onMessage(messaging, (payload) => {
+      console.log("Foreground message received: ", payload); // 디버깅용 로그 추가
       resolve(payload);
     });
   });

@@ -1,5 +1,5 @@
-import React, { useEffect } from 'react';
-import { BottomNavigation, BottomNavigationAction, Badge } from '@mui/material';
+import React, { useEffect, useState } from 'react';
+import { BottomNavigation, BottomNavigationAction, Badge, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Button } from '@mui/material';
 import { Home, Person, Notifications, Quiz } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useChatbotContext } from '../context/ChatbotContext';
@@ -10,7 +10,8 @@ const Navbar: React.FC<{ role: string, isQuizMode: boolean }> = ({ role, isQuizM
   const location = useLocation();
   const { isChatbotActive, setAlertOpen } = useChatbotContext();
   const { notifications } = useNotificationContext();
-  const [value, setValue] = React.useState(0);
+  const [value, setValue] = useState(0);
+  const [openDialog, setOpenDialog] = useState(false);
 
   // 현재 경로에 따라 네비게이션 바의 선택된 상태를 설정
   useEffect(() => {
@@ -42,7 +43,7 @@ const Navbar: React.FC<{ role: string, isQuizMode: boolean }> = ({ role, isQuizM
     }
 
     if (isQuizMode) {  // 퀴즈 진행 중일 때 이동 제한
-      alert("퀴즈 진행 중에는 페이지를 이동할 수 없습니다. 퀴즈를 먼저 제출해주세요.");
+      setOpenDialog(true);  // 다이얼로그 열기
       return;
     }
 
@@ -91,46 +92,66 @@ const Navbar: React.FC<{ role: string, isQuizMode: boolean }> = ({ role, isQuizM
   const unreadNotificationsCount = notifications.filter(notification => !notification.read).length;
 
   return (
-    <BottomNavigation
-      value={value}
-      onChange={handleChange}
-      showLabels
-      sx={{
-        position: 'fixed',
-        bottom: 0,
-        width: '100%',
-        zIndex: 1000,
-        '@media (min-width: 1200px)': {
-          position: 'relative',
-          bottom: 'auto',
-          marginTop: 'auto',
+    <>
+      <BottomNavigation
+        value={value}
+        onChange={handleChange}
+        showLabels
+        sx={{
+          position: 'fixed',
+          bottom: 0,
           width: '100%',
-        },
-      }}
-    >
-      <BottomNavigationAction 
-        label={getHomeLabel()} 
-        icon={<Home />} 
-      />
-      <BottomNavigationAction 
-        label="프로필" 
-        icon={<Person />} 
-      />
-      <BottomNavigationAction 
-        label="알림" 
-        icon={
-          <Badge badgeContent={unreadNotificationsCount} color="secondary">
-            <Notifications />
-          </Badge>
-        } 
-      />
-      {role === 'student' && (
+          zIndex: 1000,
+          '@media (min-width: 1200px)': {
+            position: 'relative',
+            bottom: 'auto',
+            marginTop: 'auto',
+            width: '100%',
+          },
+        }}
+      >
         <BottomNavigationAction 
-          label="퀴즈" 
-          icon={<Quiz />} 
+          label={getHomeLabel()} 
+          icon={<Home />} 
         />
-      )}
-    </BottomNavigation>
+        <BottomNavigationAction 
+          label="프로필" 
+          icon={<Person />} 
+        />
+        <BottomNavigationAction 
+          label="알림" 
+          icon={
+            <Badge badgeContent={unreadNotificationsCount} color="secondary">
+              <Notifications />
+            </Badge>
+          } 
+        />
+        {role === 'student' && (
+          <BottomNavigationAction 
+            label="퀴즈" 
+            icon={<Quiz />} 
+          />
+        )}
+      </BottomNavigation>
+
+      {/* 다이얼로그 컴포넌트 추가 */}
+      <Dialog
+        open={openDialog}
+        onClose={() => setOpenDialog(false)}
+      >
+        <DialogTitle>퀴즈 진행 중</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            퀴즈 진행 중에는 페이지를 이동할 수 없습니다. 퀴즈를 먼저 제출해주세요.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenDialog(false)} color="primary">
+            확인
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </>
   );
 };
 

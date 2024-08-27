@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { setToken, setRefreshToken, setRole, setUserId, setSchoolName, setGradeStatus } from '../../utils/auth';
-import { Container, TextField, Button, Typography, Paper, MenuItem, Select, InputLabel, FormControl } from '@mui/material';
+import { Container, TextField, Button, Typography, Paper, MenuItem, Select, InputLabel, FormControl, InputAdornment } from '@mui/material';
 import Autocomplete from '@mui/material/Autocomplete';
 import { educationOffices } from '../../educationOffices';
 import apiNoAuth from '../../utils/apiNoAuth';
@@ -129,6 +129,9 @@ const StudentLoginPage = () => {
           label="반"
           value={classNumber}
           onChange={(e) => setClassNumber(e.target.value)}
+          InputProps={{
+            endAdornment: classNumber ? <InputAdornment position="end">반</InputAdornment> : null,
+          }} // 입력 값이 있을 때만 "반"이 붙도록 수정
         />
         <TextField
           fullWidth
@@ -137,6 +140,8 @@ const StudentLoginPage = () => {
           label="출석번호"
           value={studentId}
           onChange={(e) => setStudentId(e.target.value)}
+          type="number" // 숫자만 입력할 수 있도록 제한
+          inputProps={{ inputMode: 'numeric', pattern: '[0-9]*' }} // 추가적인 숫자 입력 제한
         />
         <TextField
           fullWidth

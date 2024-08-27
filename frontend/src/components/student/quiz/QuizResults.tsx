@@ -107,7 +107,7 @@ const QuizResults: React.FC<QuizResultsProps> = ({
                 {!isMobile && <TableCell>학기</TableCell>}
                 <TableCell>과목</TableCell>
                 {!isMobile && <TableCell>단원</TableCell>}
-                <TableCell>점수</TableCell>
+                <TableCell>총점</TableCell>
                 <TableCell align="center">상세보기</TableCell>
               </TableRow>
             </TableHead>
@@ -147,7 +147,7 @@ const QuizResults: React.FC<QuizResultsProps> = ({
                                   <TableCell>문제</TableCell>
                                   <TableCell>내 답변</TableCell>
                                   <TableCell>정답</TableCell>
-                                  <TableCell>유사도</TableCell>
+                                  <TableCell>점수</TableCell>
                                 </TableRow>
                               </TableHead>
                               <TableBody>

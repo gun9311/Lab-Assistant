@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import SubjectSelector from "../../../components/student/SubjectSelector";
-import { Container, Typography, Paper, Box, Button, Tabs, Tab, Snackbar, Alert } from '@mui/material';
+import { Container, Typography, Paper, Box, Button, Tabs, Tab, Snackbar, Alert, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions } from '@mui/material';
 import QuizComponent from './QuizComponent';
 import QuizFilter from './QuizFilter';
 import QuizResults from './QuizResults';
@@ -55,11 +55,14 @@ const MyQuizzesPage: React.FC<MyQuizzesPageProps> = ({ setIsQuizMode }) => {
   const [filteredResults, setFilteredResults] = useState<QuizResult[]>([]);
   const [selectedQuiz, setSelectedQuiz] = useState<QuizResult | null>(null);
   const [currentQuiz, setCurrentQuiz] = useState<Quiz | null>(null);
+  const [pendingQuiz, setPendingQuiz] = useState<Quiz | null>(null); // Pending 상태의 퀴즈
   const [selection, setSelection] = useState<Selection>({ grade: '', semester: '', subject: '', unit: '', topic: '' });
   const [error, setError] = useState<string | null>(null);
   const [isQuizModeLocal, setIsQuizModeLocal] = useState<boolean>(false);
   const [tabValue, setTabValue] = useState<number>(0);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [confirmDialogOpen, setConfirmDialogOpen] = useState<boolean>(false);
+  const [snackbarOpen, setSnackbarOpen] = useState<boolean>(false);
 
   const fetchQuizResults = async () => {
     try {
@@ -102,39 +105,37 @@ const MyQuizzesPage: React.FC<MyQuizzesPageProps> = ({ setIsQuizMode }) => {
     setSelectedQuiz(null);
   };
 
-  const handleQuizStart = async () => {
+  const handleQuizRequest = async () => {
     if (!selection.semester || !selection.subject || !selection.unit) {
       alert("학기, 과목, 단원을 모두 선택해야 퀴즈를 시작할 수 있습니다.");
       return;
     }
-  
+
     try {
-      // 먼저 퀴즈가 이미 제출된 것인지 확인
       const response = await api.get('/quiz', { params: selection });
       if (response.data) {
-        const confirmStart = window.confirm(
-          "퀴즈를 시작하시겠습니까? 퀴즈가 시작되면 중단할 수 없으며, 제출 후에는 다시 풀 수 없습니다."
-        );
-  
-        if (!confirmStart) {
-          return; // 사용자가 퀴즈 시작을 취소한 경우
-        }
-  
-        setCurrentQuiz(response.data);
+        setPendingQuiz(response.data); // 퀴즈가 로드되면 pending 상태로 설정
         setError(null);
-        setIsQuizMode(true); // 퀴즈 모드로 전환
-        setIsQuizModeLocal(true);
-      } else {
-        setError('퀴즈를 불러올 수 없습니다.');
-      }
+        setConfirmDialogOpen(true); // 퀴즈가 정상적으로 로드되면 확인창 띄우기
+      } 
     } catch (error: any) {
-      if (error.response?.status === 400) {
+      if (error.response?.status === 404) {
+        setError('퀴즈를 찾을 수 없습니다.');
+      } else if (error.response?.status === 400) {
         setError('이미 제출한 퀴즈입니다. 다시 풀 수 없습니다.');
       } else {
         console.error('Failed to start quiz:', error);
         setError(error.response?.data?.message || '퀴즈를 시작하는 데 실패했습니다.');
       }
     }
+  };
+
+  const handleQuizStart = () => {
+    setCurrentQuiz(pendingQuiz); // "시작" 버튼을 누르면 currentQuiz를 설정
+    setPendingQuiz(null); // pending 상태 초기화
+    setIsQuizMode(true);
+    setIsQuizModeLocal(true);
+    setConfirmDialogOpen(false); // 퀴즈 시작 시 대화 상자 닫기
   };
 
   const handleQuizSubmit = async (answers: { [key: string]: string }) => {
@@ -150,7 +151,7 @@ const MyQuizzesPage: React.FC<MyQuizzesPageProps> = ({ setIsQuizMode }) => {
           studentAnswer: answers[task._id] !== undefined ? answers[task._id] : "", // 빈 문자열 또는 답변을 포함
         })),
       };
-  
+
       try {
         const response = await api.post("/quiz/submit", quizData);
         setCurrentQuiz(null);
@@ -158,7 +159,7 @@ const MyQuizzesPage: React.FC<MyQuizzesPageProps> = ({ setIsQuizMode }) => {
         setIsQuizModeLocal(false);
         fetchQuizResults();
         setTabValue(1); // 퀴즈 결과 조회 탭으로 전환
-  
+
         // 성공 메시지를 설정
         setSuccessMessage(response.data.message);
       } catch (error: any) {
@@ -166,6 +167,12 @@ const MyQuizzesPage: React.FC<MyQuizzesPageProps> = ({ setIsQuizMode }) => {
         setError(error.response?.data?.message || "퀴즈 제출에 실패했습니다.");
       }
     }
+  };
+
+  const handleQuizAutoSubmit = () => {
+    // 자동 제출 시 호출되는 핸들러
+    setSnackbarOpen(true); // Snackbar 열기
+    setTimeout(() => setSnackbarOpen(false), 6000); // Snackbar 6초 후 닫기
   };
 
   const handleTabChange = (event: React.ChangeEvent<{}>, newValue: number) => {
@@ -221,6 +228,17 @@ const MyQuizzesPage: React.FC<MyQuizzesPageProps> = ({ setIsQuizMode }) => {
               </Alert>
             </Snackbar>
 
+            <Snackbar
+              open={snackbarOpen}
+              autoHideDuration={6000}
+              onClose={() => setSnackbarOpen(false)}
+              anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+            >
+              <Alert onClose={() => setSnackbarOpen(false)} severity="warning" sx={{ width: '100%' }}>
+                제한 시간이 종료되었거나, 페이지 이탈로 인해 퀴즈가 자동 제출되었습니다.
+              </Alert>
+            </Snackbar>
+
             {tabValue === 0 && (
               <>
                 <QuizFilter 
@@ -246,7 +264,7 @@ const MyQuizzesPage: React.FC<MyQuizzesPageProps> = ({ setIsQuizMode }) => {
                   <Button 
                     variant="contained" 
                     color="primary" 
-                    onClick={handleQuizStart}
+                    onClick={handleQuizRequest} // 퀴즈 요청 함수로 변경
                     startIcon={<PlayCircleFilled />}
                     sx={{
                       fontWeight: 600,
@@ -268,8 +286,29 @@ const MyQuizzesPage: React.FC<MyQuizzesPageProps> = ({ setIsQuizMode }) => {
 
         {/* 퀴즈 컴포넌트만 표시 */}
         {currentQuiz && (
-          <QuizComponent quiz={currentQuiz} onSubmit={handleQuizSubmit} />
+          <QuizComponent quiz={currentQuiz} onSubmit={handleQuizSubmit} onAutoSubmit={handleQuizAutoSubmit} />
         )}
+
+        {/* 퀴즈 시작 확인 Dialog */}
+        <Dialog
+          open={confirmDialogOpen}
+          onClose={() => setConfirmDialogOpen(false)}
+        >
+          <DialogTitle>퀴즈 시작</DialogTitle>
+          <DialogContent>
+            <DialogContentText>
+              퀴즈를 시작하시겠습니까? 퀴즈가 시작되면 중단할 수 없으며, 제출 후에는 다시 풀 수 없습니다.
+            </DialogContentText>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setConfirmDialogOpen(false)} color="primary">
+              취소
+            </Button>
+            <Button onClick={handleQuizStart} color="secondary">
+              시작
+            </Button>
+          </DialogActions>
+        </Dialog>
       </Paper>
     </Container>
   );
