@@ -21,10 +21,10 @@ const sendQuizResultNotification = async (req, res) => {
 
     // FCM을 통해 푸시 알림 전송
     const student = await Student.findById(studentId);
-    console.log(student);
+    // console.log(student);
     if (student && student.tokens.length > 0) {
       const tokens = student.tokens.map(t => t.token); // 모든 토큰을 배열로 추출
-      console.log(tokens);
+      // console.log(tokens);
       
       const message = {
         notification: {
@@ -37,7 +37,16 @@ const sendQuizResultNotification = async (req, res) => {
         tokens: tokens, // 토큰 배열을 설정
       };
       
-      await admin.messaging().sendMulticast(message);
+      // FCM 메시지 전송
+      const response = await admin.messaging().sendMulticast(message);
+      console.log('FCM response:', response);
+
+      if (response.failureCount > 0) {
+        const failedTokens = response.responses
+          .map((resp, idx) => resp.error ? tokens[idx] : null)
+          .filter(token => token !== null);
+        console.log('Failed tokens:', failedTokens);
+      }
     }
 
     res.status(200).send({ message: 'Notification sent successfully' });
