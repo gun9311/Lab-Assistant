@@ -8,6 +8,7 @@ type SemesterSelectProps = {
   handleSemesterChange: (event: SelectChangeEvent<string[]>) => void;
   handleSelectAllSemesters: () => void;
   handleDeselectAllSemesters: () => void;
+  sx?: object; // sx 속성을 추가하여 스타일 조정 가능하게 함
 };
 
 const SemesterSelect: React.FC<SemesterSelectProps> = ({
@@ -15,6 +16,7 @@ const SemesterSelect: React.FC<SemesterSelectProps> = ({
   handleSemesterChange,
   handleSelectAllSemesters,
   handleDeselectAllSemesters,
+  sx, // 추가된 부분: sx를 props로 받음
 }) => {
   return (
     <>
@@ -22,7 +24,7 @@ const SemesterSelect: React.FC<SemesterSelectProps> = ({
         <Button onClick={handleSelectAllSemesters} startIcon={<SemesterIcon />}>학기 전체 선택</Button>
         <Button onClick={handleDeselectAllSemesters}>학기 전체 해제</Button>
       </Box>
-      <FormControl fullWidth sx={{ marginBottom: 2 }}>
+      <FormControl fullWidth sx={{ ...sx, marginBottom: 2 }}>
         <InputLabel>학기 선택</InputLabel>
         <Select
           multiple
