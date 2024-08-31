@@ -22,16 +22,48 @@ const getSubjects = async (req, res) => {
   }
 };
 
-// 단원 조회
 const getUnits = async (req, res) => {
-  const { grade, semester, subject } = req.query;
+  const { grade, semester, subject, subjects, semesters } = req.query;
+
   try {
-    const subjectDoc = await Subject.findOne({ grade, semester, name: subject });
-    if (!subjectDoc) {
-      return res.status(404).send({ error: 'Subject not found' });
+    if (subjects && semesters) {
+      // 복수 과목 및 학기 처리
+      const subjectNames = subjects.split(',');
+      const semestersList = semesters.split(',');
+
+      const subjectsData = await Subject.find({
+        name: { $in: subjectNames },
+        grade: parseInt(grade),
+        semester: { $in: semestersList },
+      });
+
+      // 과목별 단원 데이터를 구성
+      const unitsBySubject = subjectsData.reduce((acc, subject) => {
+        acc[subject.name] = subject.units.map(unit => unit.name);
+        return acc;
+      }, {});
+
+      res.status(200).send({ units: unitsBySubject });
+    } else if (subject && semester) {
+      // 단일 과목 및 학기 처리
+      const subjectData = await Subject.findOne({
+        name: subject,
+        grade: parseInt(grade),
+        semester,
+      });
+
+      if (!subjectData) {
+        return res.status(404).send({ error: 'Subject not found' });
+      }
+
+      // 단원 목록만 반환 (기존 동작 유지)
+      const units = subjectData.units.map(unit => unit.name);
+      res.status(200).send({ units });
+    } else {
+      return res.status(400).send({ error: 'Invalid parameters' });
     }
-    res.status(200).send({ units: subjectDoc.units });
   } catch (error) {
+    console.error('Failed to fetch units:', error);
     res.status(500).send({ error: 'Failed to fetch units' });
   }
 };

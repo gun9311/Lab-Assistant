@@ -6,24 +6,25 @@ const StudentReport = require('../models/StudentReport');
 // AWS SQS 설정
 const sqsClient = new SQSClient({
   region: process.env.SQS_REGION,
-  credentials: fromEnv(),  // 환경 변수에서 자격 증명 가져오기
+  credentials: fromEnv(),
 });
 
 const queueUrl = process.env.REPORT_QUEUE_URL;
 
 // 보고서 생성 요청 핸들러
 const generateReport = async (req, res) => {
-  const { selectedSemesters, selectedSubjects, selectedStudents, reportLines } = req.body;
+  const { selectedSemesters, selectedSubjects, selectedStudents, reportLines, selectedUnits, generationMethod } = req.body;
 
-  // 현재 요청을 보낸 교사의 ID를 추가
-  const teacherId = req.user._id; // `req.user`에 인증 미들웨어에서 설정된 사용자 정보가 있다고 가정
+  const teacherId = req.user._id;
 
   const reportData = { 
     selectedSemesters, 
     selectedSubjects, 
     selectedStudents, 
     reportLines, 
-    teacherId // 교사 ID를 포함
+    selectedUnits, // **수정된 부분**: 과목별 단원 정보를 포함
+    generationMethod,
+    teacherId 
   };
 
   // SQS 큐에 데이터 전송
@@ -36,7 +37,6 @@ const generateReport = async (req, res) => {
     const command = new SendMessageCommand(params);
     await sqsClient.send(command);
     
-    // 성공적으로 큐에 추가되었음을 응답
     res.status(200).send({ message: 'Report generation request submitted successfully. You will be notified upon completion.' });
   } catch (error) {
     console.error('Failed to send message to SQS:', error);
@@ -56,7 +56,7 @@ const queryReport = async (req, res) => {
     };
 
     const reports = await StudentReport.find(query)
-      .populate('studentId', 'studentId name') // 학생의 출석번호와 이름을 포함하여 조인
+      .populate('studentId', 'studentId name')
       .sort({ 'studentId.studentId': 1 });
 
     res.status(200).send(reports);
