@@ -105,10 +105,10 @@ const StudentList: React.FC<StudentListProps> = ({
           >
             <MenuItem value="All">전체</MenuItem>
             <MenuItem value="국어">국어</MenuItem>
-            <MenuItem value="영어">영어</MenuItem>
             <MenuItem value="수학">수학</MenuItem>
-            <MenuItem value="과학">과학</MenuItem>
             <MenuItem value="사회">사회</MenuItem>
+            <MenuItem value="과학">과학</MenuItem>
+            <MenuItem value="영어">영어</MenuItem>
             {/* 필요에 따라 과목을 더 추가 */}
           </Select>
         </FormControl>
@@ -141,7 +141,7 @@ const StudentList: React.FC<StudentListProps> = ({
                 sx={{ backgroundColor: expandedSections[student._id] === 'report' ? theme.palette.action.selected : 'transparent' }}
               >
                 {expandedSections[student._id] === 'report' ? <ExpandLessIcon /> : <ExpandMoreIcon />} 
-                <Typography variant="body2" sx={{ ml: 1, fontSize: '1rem' }}>평가</Typography>
+                <Typography variant="body2" sx={{ ml: 1, fontSize: '1rem' }}>평어</Typography>
               </IconButton>
             </ListItem>
             <Collapse in={expandedSections[student._id] === 'chat'}>

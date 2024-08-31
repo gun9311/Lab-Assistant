@@ -21,13 +21,13 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({ tabValue, onBack, onGener
       {tabValue === 0 && (
         <Button variant="contained" color="primary" onClick={onGenerate}>
           <SaveIcon sx={{ mr: 1 }} />
-          평가 생성
+          평어 생성
         </Button>
       )}
       {tabValue === 1 && (
         <Button variant="contained" color="secondary" onClick={onQuery}>
           <SearchIcon sx={{ mr: 1 }} />
-          평가 조회
+          평어 조회
         </Button>
       )}
     </Box>

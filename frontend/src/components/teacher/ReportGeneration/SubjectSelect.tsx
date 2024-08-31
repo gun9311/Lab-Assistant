@@ -1,12 +1,14 @@
 import React from "react";
 import { FormControl, InputLabel, Select, MenuItem, Checkbox, ListItemText, Box, Button } from "@mui/material";
 import SubjectIcon from '@mui/icons-material/MenuBook';
+import { SelectChangeEvent } from '@mui/material/Select';
 
 type SubjectSelectProps = {
   selectedSubjects: string[];
-  handleSubjectChange: (event: any) => void;
+  handleSubjectChange: (event: SelectChangeEvent<string[]>) => void;
   handleSelectAllSubjects: () => void;
   handleDeselectAllSubjects: () => void;
+  sx?: object; // sx 속성을 추가하여 스타일 조정 가능하게 함
 };
 
 const SubjectSelect: React.FC<SubjectSelectProps> = ({
@@ -14,6 +16,7 @@ const SubjectSelect: React.FC<SubjectSelectProps> = ({
   handleSubjectChange,
   handleSelectAllSubjects,
   handleDeselectAllSubjects,
+  sx, // 추가된 부분: sx를 props로 받음
 }) => {
   return (
     <>
@@ -21,7 +24,7 @@ const SubjectSelect: React.FC<SubjectSelectProps> = ({
         <Button onClick={handleSelectAllSubjects} startIcon={<SubjectIcon />}>과목 전체 선택</Button>
         <Button onClick={handleDeselectAllSubjects}>과목 전체 해제</Button>
       </Box>
-      <FormControl fullWidth sx={{ marginBottom: 2 }}>
+      <FormControl fullWidth sx={{ ...sx, marginBottom: 2 }}>
         <InputLabel>과목 선택</InputLabel>
         <Select
           multiple

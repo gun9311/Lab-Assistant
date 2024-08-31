@@ -32,16 +32,19 @@ const SubjectSelector: React.FC<SubjectSelectorProps> = ({ onSelectionChange, sh
           const res = await api.get('/subjects/units', {
             params: { grade, semester, subject },
           });
-          const fetchedUnits = res.data.units.map((unit: { name: string }) => unit.name);
+          // Fetch된 단원 데이터를 처리하고 설정
+          const fetchedUnits = res.data.units;
           fetchedUnits.sort((a: string, b: string) => {
             const numA = parseInt(a.match(/\d+/)?.[0] || '0', 10);
             const numB = parseInt(b.match(/\d+/)?.[0] || '0', 10);
             return numA - numB;
           });
-          setUnits(fetchedUnits);
+          setUnits(fetchedUnits);  // 단원 목록 설정
         } catch (error) {
           console.error('Failed to fetch units:', error);
         }
+      } else {
+        setUnits([]); // 과목 또는 학기가 선택되지 않은 경우 단원 목록 초기화
       }
     };
 

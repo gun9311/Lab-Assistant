@@ -8,6 +8,7 @@ type StudentSelectProps = {
   handleStudentChange: (studentId: number) => void;
   handleSelectAllStudents: () => void;
   handleDeselectAllStudents: () => void;
+  sx?: object; // sx 속성을 추가하여 스타일 조정 가능하게 함
 };
 
 const StudentSelect: React.FC<StudentSelectProps> = ({
@@ -16,6 +17,7 @@ const StudentSelect: React.FC<StudentSelectProps> = ({
   handleStudentChange,
   handleSelectAllStudents,
   handleDeselectAllStudents,
+  sx, // 추가된 부분: sx를 props로 받음
 }) => {
   return (
     <>
@@ -31,6 +33,7 @@ const StudentSelect: React.FC<StudentSelectProps> = ({
       </Box>
       <Paper
         sx={{
+          ...sx, // 추가된 부분: 전달된 sx 스타일을 적용
           maxHeight: 200,
           overflow: "auto",
           padding: 2,
