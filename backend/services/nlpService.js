@@ -35,7 +35,7 @@ const getNLPResponse = async function* (messages) {
           // 타이핑 효과를 위해 각 청크를 일정 간격으로 전송
           for (const bufferedChunk of buffer) {
             yield bufferedChunk;
-            await new Promise(resolve => setTimeout(resolve, 100));  // 100ms 간격으로 청크 전송
+            await new Promise(resolve => setTimeout(resolve, 60));  // 100ms 간격으로 청크 전송
           }
           buffer = [];  // 버퍼 초기화
           accumulatedText = "";  // 누적된 텍스트 초기화
@@ -47,7 +47,7 @@ const getNLPResponse = async function* (messages) {
         // 스트리밍이 종료된 후, 남아 있는 불완전한 청크들을 일정 간격으로 전송
         for (const bufferedChunk of buffer) {
           yield bufferedChunk;
-          await new Promise(resolve => setTimeout(resolve, 50));  // 100ms 간격으로 청크 전송
+          await new Promise(resolve => setTimeout(resolve, 60));  // 100ms 간격으로 청크 전송
         }
         break; // 스트리밍 종료
       }
