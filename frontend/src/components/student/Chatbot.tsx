@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Box, Button, TextField, Typography, Paper, IconButton, Avatar, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Snackbar, Alert } from '@mui/material';
 import { Mic, MicOff, Send, StopCircle } from '@mui/icons-material';
-import SmartToyIcon from '@mui/icons-material/SmartToy'; // 챗봇 아이콘
-import { SxProps } from '@mui/system'; // SxProps 타입 추가
+import SmartToyIcon from '@mui/icons-material/SmartToy';
+import { SxProps } from '@mui/system';
 
 type ChatbotProps = {
   grade: string;
@@ -11,8 +11,8 @@ type ChatbotProps = {
   unit: string;
   topic: string;
   onChatbotEnd: () => void;
-  onAlertOpen: () => void; // 알림 상태 제어 함수 추가
-  sx?: SxProps; // sx 속성 추가
+  onAlertOpen: () => void;
+  sx?: SxProps;
 };
 
 const Chatbot: React.FC<ChatbotProps> = ({ grade, semester, subject, unit, topic, onChatbotEnd, onAlertOpen, sx }) => {
@@ -21,9 +21,9 @@ const Chatbot: React.FC<ChatbotProps> = ({ grade, semester, subject, unit, topic
   const [isListening, setIsListening] = useState<boolean>(false);
   const [recognition, setRecognition] = useState<SpeechRecognition | null>(null);
   const [ws, setWs] = useState<WebSocket | null>(null);
-  const [dialogOpen, setDialogOpen] = useState(false); // Dialog 상태 추가
+  const [dialogOpen, setDialogOpen] = useState(false);
   const chatBoxRef = useRef<HTMLDivElement>(null);
-  const [alertOpen, setAlertOpen] = useState(false); // 경고 메시지 상태 추가
+  const [alertOpen, setAlertOpen] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -41,8 +41,33 @@ const Chatbot: React.FC<ChatbotProps> = ({ grade, semester, subject, unit, topic
     };
 
     newWs.onmessage = (event) => {
-      const { bot } = JSON.parse(event.data);
-      setChatHistory(prevChatHistory => [...prevChatHistory, { sender: '챗봇', content: bot }]);
+      try {
+        const { bot, isFinal } = JSON.parse(event.data);
+
+        if (isFinal) {
+          // 스트리밍이 끝났음을 알리면서 마지막 메시지를 확정
+          setChatHistory(prevChatHistory => [
+            ...prevChatHistory.slice(0, -1),
+            { sender: '챗봇', content: prevChatHistory[prevChatHistory.length - 1].content }
+          ]);
+        } else {
+          setChatHistory(prevChatHistory => {
+            if (prevChatHistory[prevChatHistory.length - 1]?.sender === '챗봇') {
+              return [
+                ...prevChatHistory.slice(0, -1),
+                { sender: '챗봇', content: prevChatHistory[prevChatHistory.length - 1].content + bot }
+              ];
+            } else {
+              return [
+                ...prevChatHistory,
+                { sender: '챗봇', content: bot }
+              ];
+            }
+          });
+        }
+      } catch (error) {
+        console.error('Error parsing WebSocket message:', error);
+      }
     };
 
     newWs.onerror = (error) => {
@@ -93,13 +118,16 @@ const Chatbot: React.FC<ChatbotProps> = ({ grade, semester, subject, unit, topic
 
   const handleSendMessage = async () => {
     if (!message.trim()) {
-      // 메시지가 비어있거나 공백으로만 이루어져 있을 경우 전송하지 않음
       setAlertOpen(true);
       return;
     }
 
     if (ws && ws.readyState === WebSocket.OPEN) {
-      setChatHistory(prevChatHistory => [...prevChatHistory, { sender: '사용자', content: message }]);
+      setChatHistory(prevChatHistory => [
+        ...prevChatHistory,
+        { sender: '사용자', content: message }
+      ]);
+
       ws.send(JSON.stringify({
         grade,
         semester,
@@ -120,7 +148,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ grade, semester, subject, unit, topic
     try {
       setChatHistory([]);
       onChatbotEnd();
-      onAlertOpen(); // 알림 상태를 true로 설정
+      onAlertOpen();
     } catch (error: any) {
       console.error("Error saving chat summary:", error);
       onChatbotEnd();
@@ -166,7 +194,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ grade, semester, subject, unit, topic
               flexDirection: chat.sender === '사용자' ? 'row-reverse' : 'row', 
               alignItems: 'center', 
               mb: 3, 
-              mr: chat.sender === '사용자' ? 2 : 0 // 사용자 말풍선에 오른쪽 여백 추가
+              mr: chat.sender === '사용자' ? 2 : 0
             }}
           >
             {chat.sender === '챗봇' && (
@@ -247,6 +275,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ grade, semester, subject, unit, topic
           </Button>
         </DialogActions>
       </Dialog>
+
       {/* 빈 메시지 경고 Snackbar */}
       <Snackbar
         open={alertOpen}
