@@ -24,6 +24,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ grade, semester, subject, unit, topic
   const [dialogOpen, setDialogOpen] = useState(false);
   const chatBoxRef = useRef<HTMLDivElement>(null);
   const [alertOpen, setAlertOpen] = useState(false);
+  const [isResponding, setIsResponding] = useState<boolean>(false); // 새로운 상태 추가
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -50,6 +51,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ grade, semester, subject, unit, topic
             ...prevChatHistory.slice(0, -1),
             { sender: '챗봇', content: prevChatHistory[prevChatHistory.length - 1].content }
           ]);
+          setIsResponding(false); // 응답 완료 시 전송 가능 상태로 변경
         } else {
           setChatHistory(prevChatHistory => {
             if (prevChatHistory[prevChatHistory.length - 1]?.sender === '챗봇') {
@@ -122,7 +124,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ grade, semester, subject, unit, topic
       return;
     }
 
-    if (ws && ws.readyState === WebSocket.OPEN) {
+    if (ws && ws.readyState === WebSocket.OPEN && !isResponding) { // isResponding 체크 추가
       setChatHistory(prevChatHistory => [
         ...prevChatHistory,
         { sender: '사용자', content: message }
@@ -137,6 +139,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ grade, semester, subject, unit, topic
         userMessage: message
       }));
       setMessage("");
+      setIsResponding(true); // 메시지 전송 시 응답 대기 상태로 변경
 
       if (recognition) {
         recognition.stop();
@@ -228,10 +231,11 @@ const Chatbot: React.FC<ChatbotProps> = ({ grade, semester, subject, unit, topic
           onChange={(e) => setMessage(e.target.value)}
           placeholder="궁금한 점을 입력해보세요!"
           sx={{ mb: 1 }}
+          disabled={isResponding} // 응답 중일 때 입력창 비활성화
         />
         <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
           <Box>
-            <IconButton onClick={handleStartListening} disabled={isListening} color="primary">
+            <IconButton onClick={handleStartListening} disabled={isListening || isResponding} color="primary">
               <Mic />
             </IconButton>
             <IconButton onClick={handleStopListening} disabled={!isListening} color="secondary">
@@ -245,6 +249,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ grade, semester, subject, unit, topic
               endIcon={<Send />}
               onClick={handleSendMessage}
               sx={{ mr: 1 }}
+              disabled={isResponding} // 응답 중일 때 전송 버튼 비활성화
             >
               전송
             </Button>
