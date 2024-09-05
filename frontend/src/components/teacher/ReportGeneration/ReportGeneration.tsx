@@ -101,6 +101,7 @@ const ReportGeneration: React.FC<ReportGenerationProps> = ({
     }
     try {
       const payload: any = {
+        grade,
         selectedSemesters,
         selectedSubjects,
         selectedStudents,

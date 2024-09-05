@@ -114,6 +114,7 @@ const processMessage = async (message) => {
   }
 
   const {
+    grade,
     selectedSemesters,
     selectedSubjects,
     selectedStudents,
