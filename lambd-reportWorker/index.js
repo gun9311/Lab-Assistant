@@ -258,10 +258,10 @@ const processMessage = async (message) => {
     console.log('Report generated successfully.');
 
     await sendNotificationToTeacher(teacherId, {
+      grade,
       selectedSemesters,
       selectedSubjects,
       selectedStudents,
-      selectedUnits,
     });
   } catch (error) {
     console.error("Failed to generate report:", error);
