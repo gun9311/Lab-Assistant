@@ -61,16 +61,23 @@ const sendReportGeneratedNotification = async (req, res) => {
   const { grade, selectedSemesters, selectedSubjects, selectedStudents } = reportDetails;
 
   try {
-    // 학기, 과목, 학생 정보를 바탕으로 메시지 작성
-    const semesterText = selectedSemesters.join(", ");
-    const subjectText = selectedSubjects.length > 2
-      ? `${selectedSubjects.slice(0, 2).join(", ")} 외 ${selectedSubjects.length - 2}개 과목`
-      : selectedSubjects.join(", ");
-    const studentText = selectedStudents.length > 2
-      ? `${selectedStudents.length}명`
-      : `${selectedStudents.length}명의 학생`;
+    // 학기 정보 처리
+    const semesterText = selectedSemesters.length > 1 
+      ? `${selectedSemesters.slice(0, -1).join(", ")} 및 ${selectedSemesters.slice(-1)}`
+      : selectedSemesters[0];
 
-    const message = `${grade}학년 ${semesterText} ${subjectText} 과목, ${studentText}에 대한 리포트 생성이 완료되었습니다.`;
+    // 과목 정보 처리
+    const subjectText = selectedSubjects.length > 2
+      ? `${selectedSubjects.slice(0, 2).join(", ")} 등 ${selectedSubjects.length}개 과목`
+      : selectedSubjects.join(", ");
+    
+    // 학생 정보 처리
+    const studentText = selectedStudents.length > 2
+      ? `${selectedStudents.length}명의 학생`
+      : `${selectedStudents.join(", ")} 학생`;
+
+    // 최종 메시지 생성
+    const message = `${grade}학년 ${semesterText} ${subjectText} 평어가 생성되었습니다. ${studentText}의 평어를 확인해 주세요.`;
 
     // 알림 생성
     const notification = new Notification({
@@ -100,6 +107,14 @@ const sendReportGeneratedNotification = async (req, res) => {
       };
       
       await admin.messaging().sendMulticast(fcmMessage);
+      console.log('FCM response:', response);
+
+      if (response.failureCount > 0) {
+        const failedTokens = response.responses
+          .map((resp, idx) => resp.error ? tokens[idx] : null)
+          .filter(token => token !== null);
+        console.log('Failed tokens:', failedTokens);
+      }
     }
 
     res.status(200).send({ message: 'Notification sent successfully' });
