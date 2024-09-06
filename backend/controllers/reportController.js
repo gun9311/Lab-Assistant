@@ -13,17 +13,18 @@ const queueUrl = process.env.REPORT_QUEUE_URL;
 
 // 보고서 생성 요청 핸들러
 const generateReport = async (req, res) => {
-  const { selectedSemesters, selectedSubjects, selectedStudents, reportLines, selectedUnits, generationMethod } = req.body;
+  const { grade, selectedSemesters, selectedSubjects, selectedStudents, reportLines, generationMethod, selectedUnits } = req.body;
 
   const teacherId = req.user._id;
 
   const reportData = { 
+    grade,
     selectedSemesters, 
     selectedSubjects, 
     selectedStudents, 
     reportLines, 
-    selectedUnits, // **수정된 부분**: 과목별 단원 정보를 포함
     generationMethod,
+    selectedUnits, // **수정된 부분**: 과목별 단원 정보를 포함
     teacherId 
   };
 

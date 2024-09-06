@@ -68,13 +68,20 @@ const sendReportGeneratedNotification = async (req, res) => {
 
     // 과목 정보 처리
     const subjectText = selectedSubjects.length > 2
-      ? `${selectedSubjects.slice(0, 2).join(", ")} 등 ${selectedSubjects.length}개 과목`
-      : selectedSubjects.join(", ");
-    
-    // 학생 정보 처리
-    const studentText = selectedStudents.length > 2
-      ? `${selectedStudents.length}명의 학생`
-      : `${selectedStudents.join(", ")} 학생`;
+      ? `${selectedSubjects.slice(0, 2).join(", ")} 등 ${selectedSubjects.length}개 과목에 대한`
+      : `${selectedSubjects.join(", ")} 과목에 대한`;
+
+    // 학생 이름 조회 (필요한 학생 이름만 제한적으로 조회)
+    const studentNames = await Student.find({ _id: { $in: selectedStudents } })
+      .select('name')
+      .limit(2) // 최대 2명의 이름만 조회
+      .then(students => students.map(student => student.name));
+
+    // 학생 정보 처리 (2명 이하일 경우에는 이름을 모두 표시, 초과하면 외 몇 명의 학생 추가 표시)
+    const remainingCount = selectedStudents.length - studentNames.length;
+    const studentText = remainingCount > 0
+      ? `${studentNames.join(", ")} 외 ${remainingCount}명의 학생`
+      : studentNames.join(", ");
 
     // 최종 메시지 생성
     const message = `${grade}학년 ${semesterText} ${subjectText} 평어가 생성되었습니다. ${studentText}의 평어를 확인해 주세요.`;
@@ -97,7 +104,7 @@ const sendReportGeneratedNotification = async (req, res) => {
       
       const fcmMessage = {
         notification: {
-          title: '리포트 생성 알림',
+          title: '평어 생성 알림',
           body: message,
         },
         data: {
@@ -105,8 +112,8 @@ const sendReportGeneratedNotification = async (req, res) => {
         },
         tokens: tokens,
       };
-      
-      await admin.messaging().sendMulticast(fcmMessage);
+      console.log('FCM message:', fcmMessage);
+      const response = await admin.messaging().sendMulticast(fcmMessage);
       console.log('FCM response:', response);
 
       if (response.failureCount > 0) {
