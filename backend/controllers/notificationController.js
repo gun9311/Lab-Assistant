@@ -21,10 +21,8 @@ const sendQuizResultNotification = async (req, res) => {
 
     // FCM을 통해 푸시 알림 전송
     const student = await Student.findById(studentId);
-    // console.log(student);
     if (student && student.tokens.length > 0) {
       const tokens = student.tokens.map(t => t.token); // 모든 토큰을 배열로 추출
-      // console.log(tokens);
       
       const message = {
         notification: {
