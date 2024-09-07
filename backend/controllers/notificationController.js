@@ -36,6 +36,7 @@ const sendQuizResultNotification = async (req, res) => {
       };
       
       // FCM 메시지 전송
+      console.log(message);
       const response = await admin.messaging().sendMulticast(message);
       console.log('FCM response:', response);
 
