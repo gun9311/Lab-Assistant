@@ -15,6 +15,7 @@ const quizSchema = new mongoose.Schema({
 
 // 복합 유일 인덱스 설정
 quizSchema.index({ grade: 1, semester: 1, subject: 1, unit: 1 }, { unique: true });
+quizSchema.index({ 'tasks._id': 1 }); // 서브 도큐먼트에 인덱스 추가
 
 const Quiz = mongoose.model('Quiz', quizSchema);
 

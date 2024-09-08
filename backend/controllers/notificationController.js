@@ -4,6 +4,70 @@ const Teacher = require('../models/Teacher');
 const admin = require('firebase-admin');
 
 // 알림 생성 및 푸시 알림 전송
+const sendPushNotification = async (message, tokens, attempt = 1, maxAttempts = 3) => {
+  try {
+    const response = await admin.messaging().sendMulticast(message);
+    console.log('FCM response:', response);
+
+    if (response.failureCount > 0) {
+      const failedTokens = response.responses
+        .map((resp, idx) => (resp.error ? { token: tokens[idx], error: resp.error } : null))
+        .filter(item => item !== null);
+
+      console.log('Failed tokens with errors:', failedTokens);
+
+      const invalidTokens = failedTokens
+        .filter(item => 
+          item.error.code === 'messaging/invalid-registration-token' || 
+          item.error.code === 'messaging/unregistered'
+        )
+        .map(item => item.token);
+
+      if (invalidTokens.length > 0) {
+        console.log('Invalid tokens detected and will be removed:', invalidTokens);
+        // 무효 토큰 삭제 로직 추가
+        await handleInvalidTokens(invalidTokens, Student); // 무효 토큰을 처리하는 함수 호출
+      }
+
+      const retryableTokens = failedTokens
+        .filter(item => 
+          item.error.code !== 'messaging/invalid-registration-token' && 
+          item.error.code !== 'messaging/unregistered'
+        )
+        .map(item => item.token);
+
+      if (retryableTokens.length > 0 && attempt < maxAttempts) {
+        const backoffTime = Math.pow(2, attempt) * 1000; // 지수적 백오프
+        console.log(`Retrying in ${backoffTime / 1000} seconds... Attempt ${attempt + 1}`);
+        setTimeout(() => sendPushNotification(message, retryableTokens, attempt + 1, maxAttempts), backoffTime);
+      } else if (retryableTokens.length > 0) {
+        console.log('Max retry attempts reached for some tokens. No further action will be taken.');
+      }
+    }
+  } catch (error) {
+    console.error('Failed to send push notification:', error);
+    if (attempt < maxAttempts) {
+      const backoffTime = Math.pow(2, attempt) * 1000; // 지수적 백오프
+      console.log(`Retrying in ${backoffTime / 1000} seconds due to error... Attempt ${attempt + 1}`);
+      setTimeout(() => sendPushNotification(message, tokens, attempt + 1, maxAttempts), backoffTime);
+    } else {
+      console.log('Max retry attempts reached after error.');
+    }
+  }
+};
+
+const handleInvalidTokens = async (failedTokens, Model) => {
+  try {
+    for (const token of failedTokens) {
+      // 해당 토큰을 가진 유저를 찾고 토큰 삭제
+      await Model.updateOne({ 'tokens.token': token }, { $pull: { tokens: { token } } });
+      console.log(`Invalid FCM token removed: ${token}`);
+    }
+  } catch (error) {
+    console.error('Failed to remove invalid tokens:', error);
+  }
+};
+
 const sendQuizResultNotification = async (req, res) => {
   const { studentId, quizId, subject, semester, unit } = req.body;
 
@@ -34,18 +98,9 @@ const sendQuizResultNotification = async (req, res) => {
         },
         tokens: tokens, // 토큰 배열을 설정
       };
-      
-      // FCM 메시지 전송
-      console.log(message);
-      const response = await admin.messaging().sendMulticast(message);
-      console.log('FCM response:', response);
 
-      if (response.failureCount > 0) {
-        const failedTokens = response.responses
-          .map((resp, idx) => resp.error ? tokens[idx] : null)
-          .filter(token => token !== null);
-        console.log('Failed tokens:', failedTokens);
-      }
+      // 재시도 로직 적용
+      await sendPushNotification(message, tokens);
     }
 
     res.status(200).send({ message: 'Notification sent successfully' });
@@ -70,13 +125,13 @@ const sendReportGeneratedNotification = async (req, res) => {
       ? `${selectedSubjects.slice(0, 2).join(", ")} 등 ${selectedSubjects.length}개 과목에 대한`
       : `${selectedSubjects.join(", ")} 과목에 대한`;
 
-    // 학생 이름 조회 (필요한 학생 이름만 제한적으로 조회)
+    // 학생 이름 조회
     const studentNames = await Student.find({ _id: { $in: selectedStudents } })
       .select('name')
       .limit(2) // 최대 2명의 이름만 조회
       .then(students => students.map(student => student.name));
 
-    // 학생 정보 처리 (2명 이하일 경우에는 이름을 모두 표시, 초과하면 외 몇 명의 학생 추가 표시)
+    // 학생 정보 처리
     const remainingCount = selectedStudents.length - studentNames.length;
     const studentText = remainingCount > 0
       ? `${studentNames.join(", ")} 외 ${remainingCount}명의 학생`
@@ -111,16 +166,9 @@ const sendReportGeneratedNotification = async (req, res) => {
         },
         tokens: tokens,
       };
-      console.log('FCM message:', fcmMessage);
-      const response = await admin.messaging().sendMulticast(fcmMessage);
-      console.log('FCM response:', response);
 
-      if (response.failureCount > 0) {
-        const failedTokens = response.responses
-          .map((resp, idx) => resp.error ? tokens[idx] : null)
-          .filter(token => token !== null);
-        console.log('Failed tokens:', failedTokens);
-      }
+      // 재시도 로직 적용
+      await sendPushNotification(fcmMessage, tokens);
     }
 
     res.status(200).send({ message: 'Notification sent successfully' });
