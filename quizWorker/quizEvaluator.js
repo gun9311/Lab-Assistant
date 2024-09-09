@@ -148,6 +148,7 @@ const calculateMaxSimilarity = async (studentAnswer, correctAnswers) => {
 };
 
 // 비동기적으로 파이썬 프로세스를 호출하여 유사도 계산
+// 비동기적으로 파이썬 프로세스를 호출하여 유사도 계산
 const calculateSimilarity = (studentAnswer, correctAnswer) => {
   return new Promise((resolve, reject) => {
     const pythonPath = process.env.NODE_ENV === "production"
@@ -158,27 +159,43 @@ const calculateSimilarity = (studentAnswer, correctAnswer) => {
       ? "/app/similarity.py"
       : "C:\\Users\\Master\\Desktop\\Lab-Assistant\\quizWorker\\similarity.py";
 
-    // 동기적으로 프로세스를 실행
+    // 비동기적으로 프로세스를 실행
     const pythonProcess = spawn(pythonPath, [scriptPath, studentAnswer, correctAnswer]);
 
-    // pythonProcess.stdout과 pythonProcess.stderr에서 직접 결과를 읽음
-    const output = pythonProcess.stdout.toString();
-    const errorOutput = pythonProcess.stderr.toString();
+    let output = "";
+    let errorOutput = "";
 
-    // 프로세스 종료 코드 확인
-    if (pythonProcess.error || pythonProcess.status !== 0) {
-      console.error(`Python process failed with error: ${errorOutput}`);
-      return reject(new Error(`Python process failed with error: ${errorOutput}`));
-    }
+    // stdout에서 데이터가 들어올 때마다 output에 추가
+    pythonProcess.stdout.on("data", (data) => {
+      output += data.toString();
+    });
 
-    // 유사도 값을 파싱
-    const similarity = parseFloat(output.trim());
-    if (isNaN(similarity)) {
-      console.log("유사도 NaN");
-      return resolve(0.0); // 유효하지 않은 값이면 0.0 반환
-    }
+    // stderr에서 에러가 발생하면 errorOutput에 추가
+    pythonProcess.stderr.on("data", (data) => {
+      errorOutput += data.toString();
+    });
 
-    resolve(similarity); // 유효한 유사도 값 반환
+    // 프로세스가 완료되면 close 이벤트로 처리
+    pythonProcess.on("close", (code) => {
+      if (code !== 0 || errorOutput) {
+        console.error(`Python process failed with code ${code} and error: ${errorOutput}`);
+        return reject(new Error(`Python process failed with error: ${errorOutput}`));
+      }
+
+      const similarity = parseFloat(output.trim());
+      if (isNaN(similarity)) {
+        console.log("유사도 NaN");
+        return resolve(0.0); // 유효하지 않은 값이면 0.0 반환
+      }
+
+      resolve(similarity); // 유효한 유사도 값 반환
+    });
+
+    // 프로세스 실행 중에 에러가 발생할 경우
+    pythonProcess.on("error", (error) => {
+      console.error(`Python process encountered an error: ${error}`);
+      reject(error);
+    });
   });
 };
 
