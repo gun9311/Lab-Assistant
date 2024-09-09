@@ -36,7 +36,7 @@ export interface RatingData {
 
 export interface TaskData {
   taskText: string;
-  correctAnswer: string;
+  correctAnswers: string[]; // 여러 개의 정답을 받을 수 있는 배열
 }
 
 export interface QuizData {

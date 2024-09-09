@@ -6,8 +6,8 @@ require("dotenv").config();
 
 // 스키마 정의 및 인덱스 최적화
 const taskSchema = new mongoose.Schema({
-  taskText: { type: String, required: true }, 
-  correctAnswer: { type: String, required: true }, 
+  taskText: { type: String, required: true },
+  correctAnswers: [{ type: String, required: true }] // 각 문제에 대해 하나 이상의 정답을 요구함
 });
 
 const quizSchema = new mongoose.Schema({
@@ -15,7 +15,7 @@ const quizSchema = new mongoose.Schema({
   semester: { type: String, required: true },
   subject: { type: String, required: true },
   unit: { type: String, required: true },
-  tasks: [taskSchema], 
+  tasks: [taskSchema],
 });
 
 // 인덱스 최적화
@@ -25,9 +25,9 @@ quizSchema.index({ 'tasks._id': 1 }); // 서브 도큐먼트에 인덱스 추가
 const Quiz = mongoose.model("Quiz", quizSchema);
 
 const resultSchema = new mongoose.Schema({
-  questionId: { type: Schema.Types.ObjectId, ref: "Quiz", required: true }, 
+  questionId: { type: Schema.Types.ObjectId, ref: "Quiz", required: true },
   taskText: { type: String, required: true },
-  correctAnswer: { type: String, required: true },
+  correctAnswer: { type: String, required: true }, // 대표 정답만 저장
   studentAnswer: { type: String, required: false },
   similarity: { type: Number, required: true },
 });
@@ -66,28 +66,41 @@ const evaluateQuiz = async (quizData) => {
     }
 
     const matchedTask = correctTask.tasks.find(t => t._id.equals(task.questionId));
-    const correctAnswer = matchedTask.correctAnswer;
+    const correctAnswers = matchedTask.correctAnswers; // 여러 정답 배열
     const taskText = matchedTask.taskText;
 
-    // 3. 비동기 처리 최적화: 파이썬 프로세스를 spawn으로 비동기 처리
     let similarity = 0.0;
+    let bestAnswer = "";
+
     if (task.studentAnswer.trim() !== "") {
-      similarity = await calculateSimilarity(task.studentAnswer, correctAnswer);
-      similarity = Math.round(similarity * 10000) / 100;
+      const { maxSimilarity, bestMatch } = await calculateMaxSimilarity(task.studentAnswer, correctAnswers);
+      similarity = Math.round(maxSimilarity * 10000) / 100;
+      bestAnswer = bestMatch || ""; // bestMatch가 없으면 빈 문자열로 처리
     } else {
       console.log(`Question ID ${task.questionId} has no student answer, assigning similarity 0.`);
+    }
+
+    // bestAnswer가 없을 때 기본값 할당
+    if (!bestAnswer) {
+      console.warn(`No best answer found for question ID ${task.questionId}. Defaulting to first correct answer.`);
+      if (correctAnswers.length > 0) {
+        bestAnswer = correctAnswers[0];
+      } else {
+        console.error(`No correct answers available for question ID ${task.questionId}.`);
+        bestAnswer = "N/A"; // 기본값으로 처리
+      }
     }
 
     return {
       questionId: task.questionId,
       taskText,
-      correctAnswer,
+      correctAnswer: bestAnswer, // 가장 높은 유사도를 가진 대표 정답만 저장
       studentAnswer: task.studentAnswer,
       similarity,
     };
   }));
 
-  // 4. 결과 처리 최적화: 배치로 MongoDB에 저장
+  // 결과 처리
   const averageScore = Math.round(
     (results.reduce((sum, result) => sum + result.similarity, 0) / results.length) * 100
   ) / 100;
@@ -103,7 +116,6 @@ const evaluateQuiz = async (quizData) => {
 
   await saveQuizResult(quizResultData);
 
-  // 완료 후 백엔드 서버에 알림
   try {
     await axios.post(process.env.QUIZ_NOTIFICATION_API_URL, {
       studentId: quizData.studentId,
@@ -121,6 +133,20 @@ const evaluateQuiz = async (quizData) => {
   };
 };
 
+// 유사도 계산 함수 (최대 유사도 및 해당 정답 반환)
+const calculateMaxSimilarity = async (studentAnswer, correctAnswers) => {
+  const similarities = await Promise.all(
+    correctAnswers.map(correctAnswer => calculateSimilarity(studentAnswer, correctAnswer))
+  );
+
+  // 가장 높은 유사도를 가진 정답을 찾음
+  const maxSimilarity = Math.max(...similarities);
+  const bestMatchIndex = similarities.indexOf(maxSimilarity);
+  const bestMatch = correctAnswers[bestMatchIndex];
+
+  return { maxSimilarity, bestMatch }; // 유사도와 해당 정답을 함께 반환
+};
+
 // 비동기적으로 파이썬 프로세스를 호출하여 유사도 계산
 const calculateSimilarity = (studentAnswer, correctAnswer) => {
   return new Promise((resolve, reject) => {
@@ -132,31 +158,27 @@ const calculateSimilarity = (studentAnswer, correctAnswer) => {
       ? "/app/similarity.py"
       : "C:\\Users\\Master\\Desktop\\Lab-Assistant\\quizWorker\\similarity.py";
 
+    // 동기적으로 프로세스를 실행
     const pythonProcess = spawn(pythonPath, [scriptPath, studentAnswer, correctAnswer]);
 
-    let output = "";
-    let errorOutput = "";
+    // pythonProcess.stdout과 pythonProcess.stderr에서 직접 결과를 읽음
+    const output = pythonProcess.stdout.toString();
+    const errorOutput = pythonProcess.stderr.toString();
 
-    pythonProcess.stdout.on("data", (data) => {
-      output += data.toString();
-    });
+    // 프로세스 종료 코드 확인
+    if (pythonProcess.error || pythonProcess.status !== 0) {
+      console.error(`Python process failed with error: ${errorOutput}`);
+      return reject(new Error(`Python process failed with error: ${errorOutput}`));
+    }
 
-    pythonProcess.stderr.on("data", (data) => {
-      errorOutput += data.toString();
-    });
+    // 유사도 값을 파싱
+    const similarity = parseFloat(output.trim());
+    if (isNaN(similarity)) {
+      console.log("유사도 NaN");
+      return resolve(0.0); // 유효하지 않은 값이면 0.0 반환
+    }
 
-    pythonProcess.on("close", (code) => {
-      if (code !== 0 || errorOutput) {
-        console.error(`Python process failed with code ${code}: ${errorOutput}`);
-        return reject(new Error(`Python process failed with code ${code}: ${errorOutput}`));
-      }
-      const similarity = parseFloat(output.trim());
-      if (isNaN(similarity)) {
-        console.log("유사도 NaN");
-        return resolve(0.0); // 유효하지 않은 값이면 0.0 반환
-      }
-      resolve(similarity);
-    });
+    resolve(similarity); // 유효한 유사도 값 반환
   });
 };
 
