@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 
 const taskSchema = new mongoose.Schema({
   taskText: { type: String, required: true }, // 문제 텍스트
-  correctAnswer: { type: String, required: true } // 정답
+  correctAnswers: [{ type: String, required: true }] // 여러 개의 정답을 배열로 설정
 });
 
 const quizSchema = new mongoose.Schema({

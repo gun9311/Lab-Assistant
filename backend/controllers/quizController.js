@@ -104,7 +104,10 @@ const addQuiz = async (req, res) => {
         semester: subject.semester,
         subject: subject.name,
         unit: unitName,
-        tasks
+        tasks: tasks.map(task => ({
+          taskText: task.taskText,
+          correctAnswers: task.correctAnswers // correctAnswer를 배열로 받음
+        }))
       };
 
       const newQuiz = new Quiz(quizData);
