@@ -15,7 +15,7 @@ interface QuizResult {
     taskText: string;
     studentAnswer: string;
     correctAnswer: string;
-    similarity: number;
+    similarity: number; // 문제당 개별 점수
   }[];
 }
 
@@ -27,6 +27,7 @@ interface QuizResultsProps {
   selectedSubject?: string;
   handleQuizResultClick?: (quizResult: QuizResult) => void;
   handleCloseDetails?: () => void;
+  isStudentView?: boolean; // 학생이 자신의 결과를 보는지 여부를 구분하기 위한 prop 추가
 }
 
 const QuizResults: React.FC<QuizResultsProps> = ({
@@ -36,7 +37,8 @@ const QuizResults: React.FC<QuizResultsProps> = ({
   selectedSemester,
   selectedSubject,
   handleQuizResultClick,
-  handleCloseDetails
+  handleCloseDetails,
+  isStudentView = false  // 기본값은 false로 설정
 }) => {
   const [quizResults, setQuizResults] = useState<QuizResult[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
@@ -46,7 +48,17 @@ const QuizResults: React.FC<QuizResultsProps> = ({
 
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
-  const isTablet = useMediaQuery(theme.breakpoints.between('sm', 'md'));
+
+  // 학생일 경우 점수를 평가 문구 및 이모티콘으로 변환하는 함수
+  const getEvaluation = (score: number) => {
+    if (score >= 80) {
+      return { text: '훌륭해요', emoji: '🏆' };
+    } else if (score >= 60) {
+      return { text: '잘했어요', emoji: '👍' };
+    } else {
+      return { text: '노력해요', emoji: '💪' };
+    }
+  };
 
   useEffect(() => {
     const fetchQuizResults = async () => {
@@ -119,7 +131,14 @@ const QuizResults: React.FC<QuizResultsProps> = ({
                     {!isMobile && <TableCell>{result.semester}</TableCell>}
                     <TableCell>{result.subject}</TableCell>
                     {!isMobile && <TableCell>{result.unit}</TableCell>}
-                    <TableCell>{result.score}</TableCell>
+                    
+                    {/* 학생이 자신의 결과를 볼 때는 이모티콘과 문구로 표시 */}
+                    <TableCell>
+                      {isStudentView
+                        ? `${getEvaluation(result.score).text} ${getEvaluation(result.score).emoji}`
+                        : result.score} {/* 교사는 점수를 그대로 숫자로 표시 */}
+                    </TableCell>
+
                     <TableCell align="center">
                       <IconButton 
                         onClick={() => toggleQuizDetails(result._id)}
@@ -139,7 +158,7 @@ const QuizResults: React.FC<QuizResultsProps> = ({
                           </Typography>
                           <Typography variant="body1">과목: {result.subject}</Typography>
                           <Typography variant="body1">단원: {result.unit}</Typography>
-                          <Typography variant="body1">점수: {result.score}</Typography>
+                          <Typography variant="body1">총점: {isStudentView ? `${getEvaluation(result.score).text} ${getEvaluation(result.score).emoji}` : result.score}</Typography>
                           <TableContainer component={Paper} sx={{ mt: 2 }}>
                             <Table>
                               <TableHead>
@@ -156,7 +175,12 @@ const QuizResults: React.FC<QuizResultsProps> = ({
                                     <TableCell>{detail.taskText || '문제를 찾을 수 없음'}</TableCell>
                                     <TableCell>{detail.studentAnswer}</TableCell>
                                     <TableCell>{detail.correctAnswer}</TableCell>
-                                    <TableCell>{detail.similarity}</TableCell>
+                                    {/* 문제당 점수를 이모티콘과 문구로 표시 */}
+                                    <TableCell>
+                                      {isStudentView
+                                        ? `${getEvaluation(detail.similarity).text} ${getEvaluation(detail.similarity).emoji}`
+                                        : detail.similarity} {/* 교사는 점수를 숫자로 표시 */}
+                                    </TableCell>
                                   </TableRow>
                                 ))}
                               </TableBody>
