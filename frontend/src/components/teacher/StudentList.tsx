@@ -165,6 +165,7 @@ const StudentList: React.FC<StudentListProps> = ({
                     selectedQuiz={selectedQuiz}
                     handleQuizResultClick={handleQuizResultClick}
                     handleCloseDetails={handleCloseDetails}
+                    isStudentView={false}  // 교사가 조회하는 경우에는 false로 설정
                   />
                 </Box>
               )}

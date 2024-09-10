@@ -250,6 +250,7 @@ const MyQuizzesPage: React.FC<MyQuizzesPageProps> = ({ setIsQuizMode }) => {
                   selectedQuiz={selectedQuiz}
                   handleQuizResultClick={handleQuizResultClick}
                   handleCloseDetails={handleCloseDetails}
+                  isStudentView={true}  // 학생이 자신의 결과를 확인할 때 true로 설정
                 />
               </>
             )}
