@@ -43,10 +43,9 @@ const processMessage = async (message) => {
 const pollMessages = async () => {
   const params = {
     QueueUrl: queueUrl,
-    MaxNumberOfMessages: 10,
+    MaxNumberOfMessages: 2,  // 한 번에 가져오는 메시지 수를 2개로 조정
     WaitTimeSeconds: 20,
     VisibilityTimeout: 100, // 메시지 가시성 타임아웃 설정
-    // VisibilityTimeout: 10, // 메시지 가시성 타임아웃 설정
   };
 
   try {
@@ -63,4 +62,3 @@ const pollMessages = async () => {
 
 // 지속적으로 메시지를 폴링하여 처리
 setInterval(pollMessages, 10000); // 10초 간격으로 폴링
-// setInterval(pollMessages, 1000); // 10초 간격으로 폴링
