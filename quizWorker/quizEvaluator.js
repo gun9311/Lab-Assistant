@@ -4,10 +4,22 @@ const { Schema } = mongoose;
 const axios = require("axios");
 require("dotenv").config();
 
+// Python 경로 설정
+const pythonPath = process.env.NODE_ENV === "production"
+  ? "/app/venv/bin/python3"  // 프로덕션 환경에서의 Python 경로
+  : "C:\\Users\\Master\\Desktop\\Lab-Assistant\\worker\\env\\Scripts\\python.exe";  // 개발 환경에서의 Python 경로
+
+const scriptPath = process.env.NODE_ENV === "production"
+  ? "/app/similarity.py"  // 프로덕션 환경에서의 스크립트 경로
+  : "C:\\Users\\Master\\Desktop\\Lab-Assistant\\quizWorker\\similarity.py";  // 개발 환경에서의 스크립트 경로
+
+// Python 프로세스를 한 번만 실행하여 유지
+const pythonProcess = spawn(pythonPath, [scriptPath]);
+
 // 스키마 정의 및 인덱스 최적화
 const taskSchema = new mongoose.Schema({
   taskText: { type: String, required: true },
-  correctAnswers: [{ type: String, required: true }] // 각 문제에 대해 하나 이상의 정답을 요구함
+  correctAnswers: [{ type: String, required: true }]  // 각 문제에 대해 하나 이상의 정답을 요구함
 });
 
 const quizSchema = new mongoose.Schema({
@@ -18,16 +30,16 @@ const quizSchema = new mongoose.Schema({
   tasks: [taskSchema],
 });
 
-// 인덱스 최적화
+// 인덱스 설정
 quizSchema.index({ grade: 1, semester: 1, subject: 1, unit: 1 }, { unique: true });
-quizSchema.index({ 'tasks._id': 1 }); // 서브 도큐먼트에 인덱스 추가
+quizSchema.index({ 'tasks._id': 1 });
 
 const Quiz = mongoose.model("Quiz", quizSchema);
 
 const resultSchema = new mongoose.Schema({
   questionId: { type: Schema.Types.ObjectId, ref: "Quiz", required: true },
   taskText: { type: String, required: true },
-  correctAnswer: { type: String, required: true }, // 대표 정답만 저장
+  correctAnswer: { type: String, required: true },  // 대표 정답만 저장
   studentAnswer: { type: String, required: false },
   similarity: { type: Number, required: true },
 });
@@ -42,7 +54,6 @@ const quizResultSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now },
 });
 
-// 복합 인덱스 설정
 quizResultSchema.index({ studentId: 1, subject: 1, semester: 1, unit: 1 });
 
 const QuizResult = mongoose.model("QuizResult", quizResultSchema);
@@ -66,7 +77,7 @@ const evaluateQuiz = async (quizData) => {
     }
 
     const matchedTask = correctTask.tasks.find(t => t._id.equals(task.questionId));
-    const correctAnswers = matchedTask.correctAnswers; // 여러 정답 배열
+    const correctAnswers = matchedTask.correctAnswers;  // 여러 정답 배열
     const taskText = matchedTask.taskText;
 
     let similarity = 0.0;
@@ -75,26 +86,25 @@ const evaluateQuiz = async (quizData) => {
     if (task.studentAnswer.trim() !== "") {
       const { maxSimilarity, bestMatch } = await calculateMaxSimilarity(task.studentAnswer, correctAnswers);
       similarity = Math.round(maxSimilarity * 10000) / 100;
-      bestAnswer = bestMatch || ""; // bestMatch가 없으면 빈 문자열로 처리
+      bestAnswer = bestMatch || "";  // bestMatch가 없으면 빈 문자열로 처리
     } else {
       console.log(`Question ID ${task.questionId} has no student answer, assigning similarity 0.`);
     }
 
-    // bestAnswer가 없을 때 기본값 할당
     if (!bestAnswer) {
       console.warn(`No best answer found for question ID ${task.questionId}. Defaulting to first correct answer.`);
       if (correctAnswers.length > 0) {
         bestAnswer = correctAnswers[0];
       } else {
         console.error(`No correct answers available for question ID ${task.questionId}.`);
-        bestAnswer = "N/A"; // 기본값으로 처리
+        bestAnswer = "N/A";  // 기본값으로 처리
       }
     }
 
     return {
       questionId: task.questionId,
       taskText,
-      correctAnswer: bestAnswer, // 가장 높은 유사도를 가진 대표 정답만 저장
+      correctAnswer: bestAnswer,
       studentAnswer: task.studentAnswer,
       similarity,
     };
@@ -139,67 +149,34 @@ const calculateMaxSimilarity = async (studentAnswer, correctAnswers) => {
     correctAnswers.map(correctAnswer => calculateSimilarity(studentAnswer, correctAnswer))
   );
 
-  // 가장 높은 유사도를 가진 정답을 찾음
   const maxSimilarity = Math.max(...similarities);
   const bestMatchIndex = similarities.indexOf(maxSimilarity);
   const bestMatch = correctAnswers[bestMatchIndex];
 
-  return { maxSimilarity, bestMatch }; // 유사도와 해당 정답을 함께 반환
+  return { maxSimilarity, bestMatch };
 };
 
-// 비동기적으로 파이썬 프로세스를 호출하여 유사도 계산
-// 비동기적으로 파이썬 프로세스를 호출하여 유사도 계산
+// Python 프로세스에 유사도 계산 요청
 const calculateSimilarity = (studentAnswer, correctAnswer) => {
   return new Promise((resolve, reject) => {
-    const pythonPath = process.env.NODE_ENV === "production"
-      ? "/app/venv/bin/python3"
-      : "C:\\Users\\Master\\Desktop\\Lab-Assistant\\worker\\env\\Scripts\\python.exe";
+    pythonProcess.stdin.write(`${studentAnswer}|${correctAnswer}\n`);
 
-    const scriptPath = process.env.NODE_ENV === "production"
-      ? "/app/similarity.py"
-      : "C:\\Users\\Master\\Desktop\\Lab-Assistant\\quizWorker\\similarity.py";
-
-    // 비동기적으로 프로세스를 실행
-    const pythonProcess = spawn(pythonPath, [scriptPath, studentAnswer, correctAnswer]);
-
-    let output = "";
-    let errorOutput = "";
-
-    // stdout에서 데이터가 들어올 때마다 output에 추가
-    pythonProcess.stdout.on("data", (data) => {
-      output += data.toString();
-    });
-
-    // stderr에서 에러가 발생하면 errorOutput에 추가
-    pythonProcess.stderr.on("data", (data) => {
-      errorOutput += data.toString();
-    });
-
-    // 프로세스가 완료되면 close 이벤트로 처리
-    pythonProcess.on("close", (code) => {
-      if (code !== 0 || errorOutput) {
-        console.error(`Python process failed with code ${code} and error: ${errorOutput}`);
-        return reject(new Error(`Python process failed with error: ${errorOutput}`));
-      }
-
-      const similarity = parseFloat(output.trim());
+    pythonProcess.stdout.once("data", (data) => {
+      const similarity = parseFloat(data.toString().trim());
       if (isNaN(similarity)) {
-        console.log("유사도 NaN");
-        return resolve(0.0); // 유효하지 않은 값이면 0.0 반환
+        resolve(0.0);  // 유사도가 유효하지 않으면 0.0 반환
+      } else {
+        resolve(similarity);  // 유사도 반환
       }
-
-      resolve(similarity); // 유효한 유사도 값 반환
     });
 
-    // 프로세스 실행 중에 에러가 발생할 경우
-    pythonProcess.on("error", (error) => {
-      console.error(`Python process encountered an error: ${error}`);
-      reject(error);
+    pythonProcess.stderr.once("data", (data) => {
+      reject(new Error(`Python error: ${data.toString()}`));
     });
   });
 };
 
-// 결과를 배치로 저장
+// 결과를 저장하는 함수
 const saveQuizResult = async (quizData) => {
   const { studentId, subject, semester, unit, results, score } = quizData;
   try {
