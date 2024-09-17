@@ -38,7 +38,7 @@ const QuizResults: React.FC<QuizResultsProps> = ({
   selectedSubject,
   handleQuizResultClick,
   handleCloseDetails,
-  isStudentView = false  // 기본값은 false로 설정
+  isStudentView = false,  // 기본값은 false로 설정
 }) => {
   const [quizResults, setQuizResults] = useState<QuizResult[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
@@ -57,6 +57,17 @@ const QuizResults: React.FC<QuizResultsProps> = ({
       return { text: '잘했어요', emoji: '👍' };
     } else {
       return { text: '노력해요', emoji: '💪' };
+    }
+  };
+
+  // 교사일 경우 단원별 총평을 상/중/하로 변환하는 함수
+  const getTeacherUnitEvaluation = (score: number) => {
+    if (score >= 80) {
+      return '상 🟢';
+    } else if (score >= 60) {
+      return '중 🟡';
+    } else {
+      return '하 🔴';
     }
   };
 
@@ -119,7 +130,7 @@ const QuizResults: React.FC<QuizResultsProps> = ({
                 {!isMobile && <TableCell>학기</TableCell>}
                 <TableCell>과목</TableCell>
                 {!isMobile && <TableCell>단원</TableCell>}
-                <TableCell>총점</TableCell>
+                <TableCell>총평</TableCell>
                 <TableCell align="center">상세보기</TableCell>
               </TableRow>
             </TableHead>
@@ -136,7 +147,7 @@ const QuizResults: React.FC<QuizResultsProps> = ({
                     <TableCell>
                       {isStudentView
                         ? `${getEvaluation(result.score).text} ${getEvaluation(result.score).emoji}`
-                        : result.score} {/* 교사는 점수를 그대로 숫자로 표시 */}
+                        : getTeacherUnitEvaluation(result.score)} {/* 교사는 점수를 "상/중/하"로 표시 */}
                     </TableCell>
 
                     <TableCell align="center">
@@ -158,29 +169,26 @@ const QuizResults: React.FC<QuizResultsProps> = ({
                           </Typography>
                           <Typography variant="body1">과목: {result.subject}</Typography>
                           <Typography variant="body1">단원: {result.unit}</Typography>
-                          <Typography variant="body1">총점: {isStudentView ? `${getEvaluation(result.score).text} ${getEvaluation(result.score).emoji}` : result.score}</Typography>
+                          <Typography variant="body1">총평: {isStudentView ? `${getEvaluation(result.score).text} ${getEvaluation(result.score).emoji}` : getTeacherUnitEvaluation(result.score)}</Typography>
+                          
+                          {/* 학생에게는 문제별 점수만 숨기고, 문제와 답변은 그대로 보여줍니다. */}
                           <TableContainer component={Paper} sx={{ mt: 2 }}>
                             <Table>
                               <TableHead>
                                 <TableRow>
                                   <TableCell>문제</TableCell>
+                                  <TableCell>예시답안</TableCell>
                                   <TableCell>내 답변</TableCell>
-                                  <TableCell>정답</TableCell>
-                                  <TableCell>점수</TableCell>
+                                  {!isStudentView && <TableCell>점수</TableCell>} {/* 교사만 문제별 점수 표시 */}
                                 </TableRow>
                               </TableHead>
                               <TableBody>
                                 {result.results.map((detail, index) => (
                                   <TableRow key={index}>
                                     <TableCell>{detail.taskText || '문제를 찾을 수 없음'}</TableCell>
-                                    <TableCell>{detail.studentAnswer}</TableCell>
                                     <TableCell>{detail.correctAnswer}</TableCell>
-                                    {/* 문제당 점수를 이모티콘과 문구로 표시 */}
-                                    <TableCell>
-                                      {isStudentView
-                                        ? `${getEvaluation(detail.similarity).text} ${getEvaluation(detail.similarity).emoji}`
-                                        : detail.similarity} {/* 교사는 점수를 숫자로 표시 */}
-                                    </TableCell>
+                                    <TableCell>{detail.studentAnswer}</TableCell>
+                                    {!isStudentView && <TableCell>{detail.similarity}</TableCell>} {/* 교사에게만 점수 표시 */}
                                   </TableRow>
                                 ))}
                               </TableBody>
