@@ -63,11 +63,11 @@ const QuizResults: React.FC<QuizResultsProps> = ({
   // 교사일 경우 단원별 총평을 상/중/하로 변환하는 함수
   const getTeacherUnitEvaluation = (score: number) => {
     if (score >= 80) {
-      return '상';
+      return '상 🟢';
     } else if (score >= 60) {
-      return '중';
+      return '중 🟡';
     } else {
-      return '하';
+      return '하 🔴';
     }
   };
 
