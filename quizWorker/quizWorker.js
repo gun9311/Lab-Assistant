@@ -22,7 +22,7 @@ const queueUrl = process.env.QUIZ_QUEUE_URL;
 
 const processMessage = async (message) => {
   const quizData = JSON.parse(message.Body);
-  console.log('Received quiz data:', quizData); // 로그 추가
+  // console.log('Received quiz data:', quizData); // 로그 추가
   try {
     const result = await evaluateQuiz(quizData);
     console.log('Evaluation result:', result); // 로그 추가
