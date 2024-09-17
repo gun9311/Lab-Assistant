@@ -16,30 +16,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
 
-      # - name: Set up Node.js
-        # uses: actions/setup-node@v2
-        # with:
-          # node-version: '20'
-
-      # - name: Install Node.js dependencies
-      #   run: |
-      #     cd quizWorker
-      #     yarn install
-
-      # - name: Set up Python
-      #   uses: actions/setup-python@v2
-      #   with:
-      #     python-version: '3.x'
-
-      # - name: Install Python dependencies
-      #   run: |
-      #     cd quizWorker
-      #     python3 -m venv venv
-      #     source venv/bin/activate
-      #     pip install -r requirements.txt
-
-      #- name: Run tests
-      #  run: yarn test
       - name: Set up SSH agent
         uses: webfactory/ssh-agent@v0.5.3
         with:
@@ -49,11 +25,8 @@ jobs:
         run: |
           ssh-keyscan -H ${{ secrets.WORKER_IP }} >> ~/.ssh/known_hosts
 
-      # - name: Test SSH connection
-      #   run: |
-      #     ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.WORKER_IP }} echo "SSH connection test successful"
-
-      - name: Build Docker image
+      # Node.js 이미지 빌드 및 푸시
+      - name: Build and Push Node.js Docker Image
         run: |
           cd quizWorker
           docker build --build-arg MONGODB_URL=${{ secrets.MONGODB_URL }} \
@@ -62,35 +35,25 @@ jobs:
                        --build-arg AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }} \
                        --build-arg AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }} \
                        --build-arg QUIZ_NOTIFICATION_API_URL=${{ secrets.QUIZ_NOTIFICATION_API_URL }} \
-                       -t ${{ secrets.DOCKER_USERNAME }}/quizworker:latest .
-      
-      - name: Push Docker image to Docker Hub
-        env:
-          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
-          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
-        run: |
+                       -t ${{ secrets.DOCKER_USERNAME }}/quizworker-node:latest .
           echo $DOCKER_PASSWORD | docker login -u $DOCKER_USERNAME --password-stdin
-          docker push ${{ secrets.DOCKER_USERNAME }}/quizworker:latest
+          docker push ${{ secrets.DOCKER_USERNAME }}/quizworker-node:latest
+
+      # Flask 서버 이미지 빌드 및 푸시
+      - name: Build and Push Flask Docker Image
+        run: |
+          cd quizWorker
+          docker build -f Dockerfile-flask -t ${{ secrets.DOCKER_USERNAME }}/quizworker-flask:latest .
+          echo $DOCKER_PASSWORD | docker login -u $DOCKER_USERNAME --password-stdin
+          docker push ${{ secrets.DOCKER_USERNAME }}/quizworker-flask:latest
 
       - name: Deploy to Server
         if: github.ref == 'refs/heads/main'
         run: |
           ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.WORKER_IP }} << 'EOF'
-            docker pull ${{ secrets.DOCKER_USERNAME }}/quizworker:latest
-            docker stop quizworker-container || true
-            docker rm quizworker-container || true
-            docker run -d --name quizworker-container -p 3000:3000 ${{ secrets.DOCKER_USERNAME }}/quizworker:latest
+            docker pull ${{ secrets.DOCKER_USERNAME }}/quizworker-node:latest
+            docker pull ${{ secrets.DOCKER_USERNAME }}/quizworker-flask:latest
+            docker-compose down || true
+            docker-compose up -d
             docker image prune -a -f
           EOF
-          
-      # - name: Deploy to EC2
-      #   uses: appleboy/ssh-action@v0.1.4
-      #   with:
-      #     host: ${{ secrets.WORKER_IP }}
-      #     username: ${{ secrets.SSH_USER }}
-      #     key: ${{ secrets.WORKER_SSH_PRIVATE_KEY }}
-      #     script: |
-      #       docker pull ${{ secrets.DOCKER_USERNAME }}/quizworker:latest
-      #       docker stop quizworker-container || true
-      #       docker rm quizworker-container || true
-      #       docker run -d --name quizworker-container -p 3000:3000 ${{ secrets.DOCKER_USERNAME }}/quizworker:latest
