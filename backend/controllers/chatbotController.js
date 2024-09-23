@@ -53,36 +53,44 @@ const handleWebSocketConnection = async (ws, userId, subject) => {
 
   ws.on('message', async (message) => {
     const startTime = process.hrtime();
-  
+
     try {
       const { grade, semester, subject, unit, topic, userMessage } = JSON.parse(message);
       const recentHistory = chatHistory.slice(-3);
-  
+
       const messages = [
         { role: 'system', content: `당신은 친절하고 인내심 있는 튜터입니다. 지금 ${grade}학년 학생이 ${subject} 과목을 이해하도록 돕고 있습니다. 학생은 현재 ${unit} 단원에서 ${topic}을(를) 공부하고 있습니다. 개념을 쉽게, 명확하게, 그리고 격려하는 방식으로 설명해 주세요.` },
         ...recentHistory.map(chat => [{ role: 'user', content: chat.user }, { role: 'assistant', content: chat.bot }]).flat(),
         { role: 'user', content: userMessage }
       ];
-  
+
       if (!messages.every(m => m.content)) {
         console.error('Invalid messages format:', messages);
         ws.send(JSON.stringify({ error: 'Invalid message format' }));
         return;
       }
-  
+
+      // NLP 서비스로 메시지를 보내서 응답 스트리밍 처리
       const streamResponse = getNLPResponse(messages);
-  
+
+      let botResponseContent = '';  // 스트리밍 응답을 저장할 변수
+
       for await (const botResponse of streamResponse) {
         ws.send(JSON.stringify({ bot: botResponse, isFinal: false }));
+        botResponseContent += botResponse;  // 전체 응답 저장
       }
-  
-      ws.send(JSON.stringify({ bot: null, isFinal: true })); // 빈 문자열 대신 null을 사용
+
+      ws.send(JSON.stringify({ bot: null, isFinal: true }));  // 마지막 응답
+
+      // Redis에 유저 메시지와 봇의 응답 저장
+      chatHistory.push({ user: userMessage, bot: botResponseContent });
+      await redisClient.set(chatHistoryKey, JSON.stringify(chatHistory));  // Redis에 대화 기록 저장
 
     } catch (error) {
       console.error('Error handling message:', error);
       ws.send(JSON.stringify({ error: 'Failed to process message' }));
     }
-  
+
     const endTime = process.hrtime(startTime);
     const elapsedTime = endTime[0] * 1000 + endTime[1] / 1e6;
     logger.info(`Message processed for client ${clientId}: ${elapsedTime.toFixed(2)}ms`);
@@ -90,8 +98,14 @@ const handleWebSocketConnection = async (ws, userId, subject) => {
 
   ws.on('close', async () => {
     logger.info(`Client ${clientId} disconnected. Total active connections: ${Object.keys(clients).length - 1}`);
-    clearInterval(pingInterval);
+    clearInterval(pingInterval);  // pingInterval 정리
     await handleDisconnection(userId, subject, clientId, ws);
+  });
+
+  ws.on('error', async (error) => {
+    logger.error(`Error occurred on client ${clientId}: ${error}`);
+    clearInterval(pingInterval);  // pingInterval 정리
+    await handleDisconnection(userId, subject, clientId, ws);  // 비정상 종료 처리
   });
 };
 
@@ -102,7 +116,8 @@ const handleDisconnection = async (userId, subject, clientId, ws) => {
   logger.info(`Client ${clientId} removed from memory. Total active connections: ${Object.keys(clients).length}`);
 
   if (ws.readyState === ws.OPEN || ws.readyState === ws.CLOSING) {
-    ws.terminate();
+    ws.terminate();  // WebSocket 연결 상태가 열려있거나 닫히는 중일 때만 terminate 호출
+    logger.info(`WebSocket connection for client ${clientId} terminated.`);
   }
 };
 
@@ -122,11 +137,14 @@ const saveChatSummaryInternal = async (userId, subject) => {
     let chatSummary = await ChatSummary.findOne({ student: userId, 'subjects.subject': subject });
 
     if (chatSummary) {
-      chatSummary.subjects.forEach(sub => {
-        if (sub.subject === subject) {
-          sub.summaries.push({ summary, createdAt: new Date() });
-        }
-      });
+      // 성능 개선: subjects 배열에서 해당 과목을 찾을 때 find 사용
+      let subjectData = chatSummary.subjects.find(sub => sub.subject === subject);
+
+      if (subjectData) {
+        subjectData.summaries.push({ summary, createdAt: new Date() });
+      } else {
+        chatSummary.subjects.push({ subject, summaries: [{ summary, createdAt: new Date() }] });
+      }
     } else {
       chatSummary = new ChatSummary({
         student: userId,
@@ -135,7 +153,7 @@ const saveChatSummaryInternal = async (userId, subject) => {
     }
 
     await chatSummary.save();
-    await redisClient.del(chatHistoryKey);
+    await redisClient.del(chatHistoryKey);  // Redis에서 기록 삭제
 
     logger.info('Chat summary saved successfully');
   } catch (error) {
