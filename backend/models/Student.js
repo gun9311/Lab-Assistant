@@ -9,7 +9,7 @@ const studentSchema = new mongoose.Schema({
   class: { type: String, required: true }, // 반
   school: { type: String, required: true },
   role: { type: String, default: 'student' },
-  tokens: [{ token: { type: String, required: true } }], // FCM 토큰 저장
+  tokens: [{ token: { type: String, required: false } }], // FCM 토큰 저장
   submittedQuizzes: [{
     quizId: { type: mongoose.Schema.Types.ObjectId, ref: 'Quiz', required: true },
     submittedAt: { type: Date, default: Date.now }
