@@ -25,6 +25,7 @@ jobs:
           cd frontend
           echo "REACT_APP_API_URL=${{ secrets.REACT_APP_API_URL }}" >> .env
           echo "REACT_APP_WEBSOCKET_URL=${{ secrets.REACT_APP_WEBSOCKET_URL }}" >> .env
+          yarn clean
           yarn install
           yarn build
 
