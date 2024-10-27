@@ -45,9 +45,6 @@ const ReportComponent: React.FC<ReportComponentProps> = ({ reports, onBack }) =>
 
   return (
     <Box sx={{ padding: 2 }}>
-      {/* <Typography variant="h4" gutterBottom align="center">
-        평어
-      </Typography> */}
       {Object.keys(groupedReports).map((semester) => (
         <Box key={semester} sx={{ marginBottom: 4 }}>
           <Typography variant="h5" gutterBottom>
