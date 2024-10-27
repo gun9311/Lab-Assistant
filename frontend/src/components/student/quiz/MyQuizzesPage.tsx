@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import SubjectSelector from "../../../components/student/SubjectSelector";
-import { Container, Typography, Paper, Box, Button, Tabs, Tab, Snackbar, Alert, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions } from '@mui/material';
+import { Container, Typography, Paper, Box, Button, Tabs, Tab, Snackbar, Alert, TextField, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions } from '@mui/material';
+import { PlayCircleFilled, History } from '@mui/icons-material';
 import QuizComponent from './QuizComponent';
 import QuizFilter from './QuizFilter';
 import QuizResults from './QuizResults';
 import { getUserId } from '../../../utils/auth';
 import api from '../../../utils/api';
-import { PlayCircleFilled, History } from '@mui/icons-material';
+import { useNavigate } from 'react-router-dom'; // 페이지 이동을 위한 useNavigate 사용
 
 interface Selection {
   grade: string;
@@ -55,7 +55,7 @@ const MyQuizzesPage: React.FC<MyQuizzesPageProps> = ({ setIsQuizMode }) => {
   const [filteredResults, setFilteredResults] = useState<QuizResult[]>([]);
   const [selectedQuiz, setSelectedQuiz] = useState<QuizResult | null>(null);
   const [currentQuiz, setCurrentQuiz] = useState<Quiz | null>(null);
-  const [pendingQuiz, setPendingQuiz] = useState<Quiz | null>(null); // Pending 상태의 퀴즈
+  const [pendingQuiz, setPendingQuiz] = useState<Quiz | null>(null);
   const [selection, setSelection] = useState<Selection>({ grade: '', semester: '', subject: '', unit: '', topic: '' });
   const [error, setError] = useState<string | null>(null);
   const [isQuizModeLocal, setIsQuizModeLocal] = useState<boolean>(false);
@@ -63,6 +63,8 @@ const MyQuizzesPage: React.FC<MyQuizzesPageProps> = ({ setIsQuizMode }) => {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [confirmDialogOpen, setConfirmDialogOpen] = useState<boolean>(false);
   const [snackbarOpen, setSnackbarOpen] = useState<boolean>(false);
+  const [pin, setPin] = useState<string>(''); // PIN 입력 상태 추가
+  const navigate = useNavigate(); // 페이지 이동을 위한 useNavigate 훅
 
   const fetchQuizResults = async () => {
     try {
@@ -106,73 +108,22 @@ const MyQuizzesPage: React.FC<MyQuizzesPageProps> = ({ setIsQuizMode }) => {
   };
 
   const handleQuizRequest = async () => {
-    if (!selection.semester || !selection.subject || !selection.unit) {
-      alert("학기, 과목, 단원을 모두 선택해야 퀴즈를 시작할 수 있습니다.");
-      return;
-    }
-
     try {
-      const response = await api.get('/quiz', { params: selection });
+      const response = await api.post('/kahoot-quiz/join-session', { pin }); // PIN으로 세션 참여 요청
       if (response.data) {
-        setPendingQuiz(response.data); // 퀴즈가 로드되면 pending 상태로 설정
-        setError(null);
-        setConfirmDialogOpen(true); // 퀴즈가 정상적으로 로드되면 확인창 띄우기
-      } 
+        const { sessionId } = response.data; // 서버로부터 sessionId를 받음
+        // 세션이 정상적으로 시작되면 퀴즈 참여 페이지로 이동
+        navigate(`/quiz-session`, { state: { pin, sessionId } });
+      }
     } catch (error: any) {
       if (error.response?.status === 404) {
-        setError('퀴즈를 찾을 수 없습니다.');
-      } else if (error.response?.status === 400) {
-        setError('이미 제출한 퀴즈입니다. 다시 풀 수 없습니다.');
+        setError('세션을 찾을 수 없습니다.');
       } else {
-        console.error('Failed to start quiz:', error);
-        setError(error.response?.data?.message || '퀴즈를 시작하는 데 실패했습니다.');
+        console.error('Failed to join quiz:', error);
+        setError(error.response?.data?.message || '퀴즈 세션에 참여하는 데 실패했습니다.');
       }
+      setSnackbarOpen(true);
     }
-  };
-
-  const handleQuizStart = () => {
-    setCurrentQuiz(pendingQuiz); // "시작" 버튼을 누르면 currentQuiz를 설정
-    setPendingQuiz(null); // pending 상태 초기화
-    setIsQuizMode(true);
-    setIsQuizModeLocal(true);
-    setConfirmDialogOpen(false); // 퀴즈 시작 시 대화 상자 닫기
-  };
-
-  const handleQuizSubmit = async (answers: { [key: string]: string }) => {
-    if (currentQuiz) {
-      const quizData = {
-        quizId: currentQuiz._id,
-        studentId: getUserId(),
-        subject: currentQuiz.subject,
-        semester: currentQuiz.semester,
-        unit: currentQuiz.unit,
-        answers: currentQuiz.tasks.map((task) => ({
-          questionId: task._id,
-          studentAnswer: answers[task._id] !== undefined ? answers[task._id] : "", // 빈 문자열 또는 답변을 포함
-        })),
-      };
-
-      try {
-        const response = await api.post("/quiz/submit", quizData);
-        setCurrentQuiz(null);
-        setIsQuizMode(false); // 퀴즈 모드 종료
-        setIsQuizModeLocal(false);
-        fetchQuizResults();
-        setTabValue(1); // 퀴즈 결과 조회 탭으로 전환
-
-        // 성공 메시지를 설정
-        setSuccessMessage(response.data.message);
-      } catch (error: any) {
-        console.error("Failed to submit quiz:", error);
-        setError(error.response?.data?.message || "퀴즈 제출에 실패했습니다.");
-      }
-    }
-  };
-
-  const handleQuizAutoSubmit = () => {
-    // 자동 제출 시 호출되는 핸들러
-    setSnackbarOpen(true); // Snackbar 열기
-    setTimeout(() => setSnackbarOpen(false), 6000); // Snackbar 6초 후 닫기
   };
 
   const handleTabChange = (event: React.ChangeEvent<{}>, newValue: number) => {
@@ -199,11 +150,10 @@ const MyQuizzesPage: React.FC<MyQuizzesPageProps> = ({ setIsQuizMode }) => {
               centered
               sx={{ mb: 2 }}
             >
-              <Tab icon={<History />} label="퀴즈 결과 조회" />
-              <Tab icon={<PlayCircleFilled />} label="퀴즈 풀기" />
+              <Tab icon={<History />} label="퀴즈 결과" />
+              <Tab icon={<PlayCircleFilled />} label="퀴즈 참여" />
             </Tabs>
 
-            {/* Tabs와 필터 사이에 여백 추가 */}
             <Box sx={{ mt: 3 }}></Box>
 
             <Snackbar
@@ -235,7 +185,7 @@ const MyQuizzesPage: React.FC<MyQuizzesPageProps> = ({ setIsQuizMode }) => {
               anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
             >
               <Alert onClose={() => setSnackbarOpen(false)} severity="warning" sx={{ width: '100%' }}>
-                제한 시간이 종료되었거나, 페이지 이탈로 인해 퀴즈가 자동 제출되었습니다.
+                세션을 찾을 수 없거나 오류가 발생했습니다.
               </Alert>
             </Snackbar>
 
@@ -255,27 +205,32 @@ const MyQuizzesPage: React.FC<MyQuizzesPageProps> = ({ setIsQuizMode }) => {
               </>
             )}
 
+            {/* 퀴즈 풀기 탭에서 PIN 입력 기능 추가 */}
             {tabValue === 1 && (
               <>
-                <SubjectSelector 
-                  onSelectionChange={handleSelectionChange} 
-                  showTopic={false} 
-                />
-                <Box textAlign="center" sx={{ mt: 2 }}>
-                  <Button 
-                    variant="contained" 
-                    color="primary" 
-                    onClick={handleQuizRequest} // 퀴즈 요청 함수로 변경
+                <Box sx={{ mt: 3, textAlign: 'center' }}>
+                  <TextField
+                    label="PIN 입력"
+                    variant="outlined"
+                    value={pin}
+                    onChange={(e) => setPin(e.target.value)}
+                    fullWidth
+                    sx={{ mb: 2 }}
+                  />
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    onClick={handleQuizRequest} // 퀴즈 세션 참여 요청
                     startIcon={<PlayCircleFilled />}
                     sx={{
                       fontWeight: 600,
                       padding: '8px 24px',
                       borderRadius: '24px',
-                      background: (!selection.semester || !selection.subject || !selection.unit) 
-                        ? 'linear-gradient(45deg, #cccccc 30%, #cccccc 90%)' // 회색으로 비활성화 상태 표현
+                      background: !pin 
+                        ? 'linear-gradient(45deg, #cccccc 30%, #cccccc 90%)' // 비활성화 상태 표현
                         : 'linear-gradient(45deg, #FE6B8B 30%, #FF8E53 90%)',
                     }}
-                    disabled={!selection.semester || !selection.subject || !selection.unit} // 조건에 따른 비활성화
+                    disabled={!pin} // PIN 입력이 없으면 버튼 비활성화
                   >
                     퀴즈 시작
                   </Button>
@@ -287,7 +242,7 @@ const MyQuizzesPage: React.FC<MyQuizzesPageProps> = ({ setIsQuizMode }) => {
 
         {/* 퀴즈 컴포넌트만 표시 */}
         {currentQuiz && (
-          <QuizComponent quiz={currentQuiz} onSubmit={handleQuizSubmit} onAutoSubmit={handleQuizAutoSubmit} />
+          <QuizComponent quiz={currentQuiz} onSubmit={() => {}} onAutoSubmit={() => {}} />
         )}
 
         {/* 퀴즈 시작 확인 Dialog */}
@@ -305,7 +260,7 @@ const MyQuizzesPage: React.FC<MyQuizzesPageProps> = ({ setIsQuizMode }) => {
             <Button onClick={() => setConfirmDialogOpen(false)} color="primary">
               취소
             </Button>
-            <Button onClick={handleQuizStart} color="secondary">
+            <Button onClick={() => {}} color="secondary">
               시작
             </Button>
           </DialogActions>

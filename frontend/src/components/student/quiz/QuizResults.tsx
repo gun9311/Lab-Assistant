@@ -51,9 +51,9 @@ const QuizResults: React.FC<QuizResultsProps> = ({
 
   // 학생일 경우 점수를 평가 문구 및 이모티콘으로 변환하는 함수
   const getEvaluation = (score: number) => {
-    if (score >= 80) {
+    if (score >= 75) {
       return { text: '훌륭해요', emoji: '🏆' };
-    } else if (score >= 60) {
+    } else if (score >= 55) {
       return { text: '잘했어요', emoji: '👍' };
     } else {
       return { text: '노력해요', emoji: '💪' };
@@ -62,9 +62,9 @@ const QuizResults: React.FC<QuizResultsProps> = ({
 
   // 교사일 경우 단원별 총평을 상/중/하로 변환하는 함수
   const getTeacherUnitEvaluation = (score: number) => {
-    if (score >= 80) {
+    if (score >= 75) {
       return '상 🟢';
-    } else if (score >= 60) {
+    } else if (score >= 55) {
       return '중 🟡';
     } else {
       return '하 🔴';

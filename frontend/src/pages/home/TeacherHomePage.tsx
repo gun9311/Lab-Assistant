@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import StudentList from "../../components/teacher/StudentList";
-import ReportGeneration from "../../components/teacher/ReportGeneration/ReportGeneration";
+import ReportGeneration from "../../components/teacher/reportGeneration/ReportGeneration";
 import { getSchoolName } from "../../utils/auth";
 import api from "../../utils/api";
 import {
