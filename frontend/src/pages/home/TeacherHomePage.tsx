@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import StudentList from "../../components/teacher/StudentList";
-import ReportGeneration from "../../components/teacher/reportGeneration/ReportGeneration";
 import { getSchoolName } from "../../utils/auth";
 import api from "../../utils/api";
 import {
@@ -20,6 +19,7 @@ import SchoolIcon from "@mui/icons-material/School";
 import GradeIcon from "@mui/icons-material/Grade";
 import ClassIcon from "@mui/icons-material/Class";
 import AssessmentIcon from "@mui/icons-material/Assessment";
+import ReportGeneration from "../../components/teacher/reportGeneration/ReportGeneration";
 
 type Student = {
   _id: number;
