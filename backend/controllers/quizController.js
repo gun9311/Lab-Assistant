@@ -3,7 +3,7 @@ const { SQSClient, SendMessageCommand } = require('@aws-sdk/client-sqs');
 const { fromEnv } = require('@aws-sdk/credential-providers');
 const Quiz = require('../models/Quiz');
 const Student = require('../models/Student');
-const Subject = require('../models/Subject'); // 경로를 필요에 따라 조정하세요
+const Subject = require('../models/Subject');
 
 // AWS SQS 설정
 const sqsClient = new SQSClient({
