@@ -1,7 +1,16 @@
 import React, { useState, useEffect } from "react";
-import { Dialog, DialogActions, DialogContent, DialogTitle, Button, TextField, Typography, Box } from "@mui/material";
+import {
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  Button,
+  TextField,
+  Typography,
+  Box,
+} from "@mui/material";
 
-type Props = {
+type ImageUploadDialogProps = {
   open: boolean;
   onClose: () => void;
   onImageChange: (file: File | null) => void;
@@ -10,11 +19,17 @@ type Props = {
   imageFile: File | null;
 };
 
-export const ImageUploadDialog: React.FC<Props> = ({ open, onClose, onImageChange, onImageUrlChange, imageUrl, imageFile }) => {
+export const ImageUploadDialog: React.FC<ImageUploadDialogProps> = ({
+  open,
+  onClose,
+  onImageChange,
+  onImageUrlChange,
+  imageUrl,
+  imageFile,
+}) => {
   const [tempImageUrl, setTempImageUrl] = useState(imageUrl);
   const [tempImageFile, setTempImageFile] = useState<File | null>(imageFile);
 
-  // 다이얼로그가 열릴 때마다 상태 초기화
   useEffect(() => {
     if (open) {
       setTempImageUrl(imageUrl);
@@ -29,10 +44,8 @@ export const ImageUploadDialog: React.FC<Props> = ({ open, onClose, onImageChang
 
   const handleConfirm = () => {
     if (tempImageFile) {
-      // 파일이 선택된 경우
       onImageChange(tempImageFile);
     } else if (tempImageUrl) {
-      // URL이 입력된 경우
       onImageUrlChange(tempImageUrl);
     }
     onClose();
@@ -42,12 +55,11 @@ export const ImageUploadDialog: React.FC<Props> = ({ open, onClose, onImageChang
     <Dialog open={open} onClose={onClose}>
       <DialogTitle>이미지 첨부</DialogTitle>
       <DialogContent>
-        {/* 파일 업로드 버튼 */}
         <Button
           variant="contained"
           component="label"
           fullWidth
-          disabled={!!tempImageUrl} // URL이 입력되면 비활성화
+          disabled={!!tempImageUrl}
         >
           파일 업로드
           <input
@@ -59,17 +71,15 @@ export const ImageUploadDialog: React.FC<Props> = ({ open, onClose, onImageChang
           />
         </Button>
 
-        {/* URL 입력 필드 */}
         <TextField
           label="이미지 URL"
           fullWidth
           margin="normal"
           value={tempImageUrl}
           onChange={(e) => setTempImageUrl(e.target.value)}
-          disabled={!!tempImageFile} // 파일이 선택되면 비활성화
+          disabled={!!tempImageFile}
         />
 
-        {/* 미리보기 섹션 */}
         {tempImageFile && (
           <Box mt={2}>
             <Typography>선택된 파일 미리보기:</Typography>
@@ -88,7 +98,6 @@ export const ImageUploadDialog: React.FC<Props> = ({ open, onClose, onImageChang
         )}
       </DialogContent>
       <DialogActions>
-        {/* 확인 및 취소 버튼 */}
         <Button onClick={onClose}>취소</Button>
         <Button onClick={handleConfirm} disabled={!tempImageUrl && !tempImageFile}>
           확인
@@ -97,3 +106,5 @@ export const ImageUploadDialog: React.FC<Props> = ({ open, onClose, onImageChang
     </Dialog>
   );
 };
+
+export default ImageUploadDialog;
