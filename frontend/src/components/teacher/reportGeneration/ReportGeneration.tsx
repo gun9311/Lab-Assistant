@@ -210,7 +210,7 @@ const ReportGeneration: React.FC<ReportGenerationProps> = ({
               selectedUnits={selectedUnits[subject] || []}
               handleUnitChange={(e) => setSelectedUnits((prev) => ({
                 ...prev,
-                [subject]: e.target.value as string[], // 확실히 string[] 타입으로 변환합니다.
+                [subject]: e.target.value as string[],
               }))}
             />
           ))
@@ -250,7 +250,7 @@ const ReportGeneration: React.FC<ReportGenerationProps> = ({
 
         <Snackbar
           open={snackbarOpen}
-          autoHideDuration={2000} // 알림이 2초 후에 자동으로 사라지도록 설정
+          autoHideDuration={2000} 
           onClose={() => setSnackbarOpen(false)}
           anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
         >

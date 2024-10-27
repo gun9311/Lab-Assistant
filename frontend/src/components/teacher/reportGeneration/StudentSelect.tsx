@@ -8,7 +8,7 @@ type StudentSelectProps = {
   handleStudentChange: (studentId: number) => void;
   handleSelectAllStudents: () => void;
   handleDeselectAllStudents: () => void;
-  sx?: object; // sx 속성을 추가하여 스타일 조정 가능하게 함
+  sx?: object;
 };
 
 const StudentSelect: React.FC<StudentSelectProps> = ({
