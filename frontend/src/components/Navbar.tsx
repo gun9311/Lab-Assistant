@@ -30,6 +30,9 @@ const Navbar: React.FC<{ role: string, isQuizMode: boolean }> = ({ role, isQuizM
       case '/my-quizzes':
         setValue(3);
         break;
+      case '/manage-quizzes': // 새로운 퀴즈 관리 탭
+        setValue(4);
+        break;
       default:
         setValue(0);
         break;
@@ -69,6 +72,11 @@ const Navbar: React.FC<{ role: string, isQuizMode: boolean }> = ({ role, isQuizM
       case 3:
         if (role === 'student') {
           navigate('/my-quizzes');
+        }
+        break;
+      case 4:
+        if (role === 'teacher') {  // 교사일 때만 퀴즈 관리로 이동
+          navigate('/manage-quizzes');
         }
         break;
       default:
@@ -130,6 +138,12 @@ const Navbar: React.FC<{ role: string, isQuizMode: boolean }> = ({ role, isQuizM
           <BottomNavigationAction 
             label="퀴즈" 
             icon={<Quiz />} 
+          />
+        )}
+        {role === 'teacher' && (  // 교사일 경우 퀴즈 관리 탭 추가
+          <BottomNavigationAction
+            label="퀴즈 관리"
+            icon={<Quiz />}
           />
         )}
       </BottomNavigation>

@@ -19,9 +19,17 @@ import StudentLoginPage from "./pages/login/StudentLoginPage";
 import theme from "./theme";
 import Layout from "./components/Layout";
 import { ChatbotProvider } from "./context/ChatbotContext";
-import { NotificationProvider, useNotificationContext } from './context/NotificationContext';
+import {
+  NotificationProvider,
+  useNotificationContext,
+} from "./context/NotificationContext";
 // Firebase import
-import { requestPermissionAndGetToken, onMessageListener } from './firebase'; // 수정된 함수 import
+import { requestPermissionAndGetToken, onMessageListener } from "./firebase"; // 수정된 함수 import
+import ManageQuizzesPage from "./components/teacher/quiz/ManageQuizzes";
+import CreateQuizPage from "./components/teacher/quiz/CreateQuiz";
+import EditQuizPage from "./components/teacher/quiz/EditQuiz";
+import QuizSessionPage from "./components/teacher/quiz/QuizSession";
+import StudentQuizSessionPage from "./components/student/quiz/StudentQuizSession";
 
 // NotificationPayload 타입 정의
 type NotificationPayload = {
@@ -59,10 +67,12 @@ const PrivateRoute: React.FC<PrivateRouteProps> = ({ element, roles }) => {
 };
 
 const AppContent: React.FC = () => {
-  const [notification, setNotification] = useState<NotificationPayload | null>(null);
+  const [notification, setNotification] = useState<NotificationPayload | null>(
+    null
+  );
   const { addNotification } = useNotificationContext();
   const role = getRole();
-  
+
   // isQuizMode 상태를 추가
   const [isQuizMode, setIsQuizMode] = useState<boolean>(false);
 
@@ -79,7 +89,9 @@ const AppContent: React.FC = () => {
           read: false,
         });
       })
-      .catch((err) => console.log("Failed to receive foreground message ", err));
+      .catch((err) =>
+        console.log("Failed to receive foreground message ", err)
+      );
   }, [addNotification]);
 
   return (
@@ -88,17 +100,34 @@ const AppContent: React.FC = () => {
         {role && (
           <>
             <Route path="/admin-login" element={<Navigate to={`/${role}`} />} />
-            <Route path="/teacher-login" element={<Navigate to={`/${role}`} />} />
-            <Route path="/student-login" element={<Navigate to={`/${role}`} />} />
-            <Route path="/teacher-register" element={<Navigate to={`/${role}`} />} />
-            <Route path="/student-register" element={<Navigate to={`/${role}`} />} />
-            <Route path="/admin-register" element={<Navigate to={`/${role}`} />} />
+            <Route
+              path="/teacher-login"
+              element={<Navigate to={`/${role}`} />}
+            />
+            <Route
+              path="/student-login"
+              element={<Navigate to={`/${role}`} />}
+            />
+            <Route
+              path="/teacher-register"
+              element={<Navigate to={`/${role}`} />}
+            />
+            <Route
+              path="/student-register"
+              element={<Navigate to={`/${role}`} />}
+            />
+            <Route
+              path="/admin-register"
+              element={<Navigate to={`/${role}`} />}
+            />
           </>
         )}
         <Route path="/" element={<Navigate to={`/${role}`} />} />
         <Route path="/home" element={<Navigate to={`/${role}`} />} />
 
-        <Route element={<Layout isQuizMode={isQuizMode} />}>  {/* isQuizMode 전달 */}
+        <Route element={<Layout isQuizMode={isQuizMode} />}>
+          {" "}
+          {/* isQuizMode 전달 */}
           <Route
             path="/student"
             element={
@@ -119,10 +148,32 @@ const AppContent: React.FC = () => {
           />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/notifications" element={<NotificationsPage />} />
-          <Route 
-            path="/my-quizzes" 
-            element={<MyQuizzesPage setIsQuizMode={setIsQuizMode} />}  // isQuizMode를 설정하는 함수 전달
+          <Route
+            path="/my-quizzes"
+            element={<MyQuizzesPage setIsQuizMode={setIsQuizMode} />} // isQuizMode를 설정하는 함수 전달
           />
+          <Route
+            path="/manage-quizzes"
+            element={
+              <PrivateRoute
+                roles={["teacher"]}
+                element={<ManageQuizzesPage />}
+              />
+            }
+          />
+          <Route path="/create-quiz" element={<CreateQuizPage />} />{" "}
+          {/* 퀴즈 생성 페이지 */}
+          <Route path="/edit-quiz/:quizId" element={<EditQuizPage />} />
+          <Route
+            path="/start-quiz-session"
+            element={<QuizSessionPage />}
+          />{" "}
+          {/* 퀴즈 세션 페이지 */}
+          <Route
+            path="/quiz-session"
+            element={<StudentQuizSessionPage />}
+          />{" "}
+          {/* 학생 퀴즈 세션 페이지 */}
         </Route>
       </Routes>
 
@@ -131,24 +182,24 @@ const AppContent: React.FC = () => {
           open={true}
           autoHideDuration={2000}
           onClose={() => setNotification(null)}
-          anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-          sx={{ 
+          anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+          sx={{
             marginBottom: {
-              xs: '15%',
-              sm: '10%',
-              md: '7%',
-              lg: '5%',
+              xs: "15%",
+              sm: "10%",
+              md: "7%",
+              lg: "5%",
             },
-            '.MuiSnackbarContent-root': { 
-              backgroundColor: '#323232',
-              color: '#ffffff',
-              borderRadius: '8px',
-              padding: '8px 16px',
+            ".MuiSnackbarContent-root": {
+              backgroundColor: "#323232",
+              color: "#ffffff",
+              borderRadius: "8px",
+              padding: "8px 16px",
               fontSize: {
-                xs: '1rem',
-                sm: '1rem',
-                md: '1rem',
-                lg: '1.125rem',
+                xs: "1rem",
+                sm: "1rem",
+                md: "1rem",
+                lg: "1.125rem",
               },
             },
           }}
@@ -166,7 +217,7 @@ const App: React.FC = () => {
   const [isTokenFound, setTokenFound] = useState(false);
 
   useEffect(() => {
-    console.log('firebase 권한 확인 및 요청');
+    console.log("firebase 권한 확인 및 요청");
     requestPermissionAndGetToken(setTokenFound);
   }, []);
 
@@ -185,16 +236,16 @@ const App: React.FC = () => {
           </ChatbotProvider>
         </NotificationProvider>
       ) : (
-          <Routes>
-            <Route path="/" element={<HomePage />} />
-            <Route path="/home" element={<HomePage />} />
-            <Route path="/admin-login" element={<AdminLoginPage />} />
-            <Route path="/teacher-login" element={<TeacherLoginPage />} />
-            <Route path="/student-login" element={<StudentLoginPage />} />
-            <Route path="/teacher-register" element={<TeacherRegisterPage />} />
-            <Route path="/student-register" element={<StudentRegisterPage />} />
-            <Route path="/admin-register" element={<AdminRegisterPage />} />
-          </Routes>
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/home" element={<HomePage />} />
+          <Route path="/admin-login" element={<AdminLoginPage />} />
+          <Route path="/teacher-login" element={<TeacherLoginPage />} />
+          <Route path="/student-login" element={<StudentLoginPage />} />
+          <Route path="/teacher-register" element={<TeacherRegisterPage />} />
+          <Route path="/student-register" element={<StudentRegisterPage />} />
+          <Route path="/admin-register" element={<AdminRegisterPage />} />
+        </Routes>
       )}
     </ThemeProvider>
   );
