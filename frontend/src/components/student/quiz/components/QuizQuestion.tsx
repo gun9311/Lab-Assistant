@@ -3,15 +3,16 @@ import { Box, Button, Typography, LinearProgress } from '@mui/material';
 
 interface Option {
   text: string;
+  imageUrl?: string; // 선택지 이미지 URL을 추가
 }
 
 interface QuizQuestionComponentProps {
   currentQuestion: {
-    questionText: string;
     options: Option[];
+    imageUrl?: string; // 문제 이미지 URL (필요에 따라 표시 가능)
   };
-  selectedAnswer: string | null;
-  handleAnswerSelect: (answer: string) => void;
+  selectedAnswer: number | null;
+  handleAnswerSelect: (index: number) => void;
   timeLeft: number | null;
 }
 
@@ -31,38 +32,40 @@ const QuizQuestionComponent: React.FC<QuizQuestionComponentProps> = ({
 
   return (
     <Box>
-      {/* 질문 텍스트
-      <Typography
-        variant="h5"
-        sx={{
-          mb: 3,
-          fontWeight: 'bold',
-          textAlign: 'center',
-          color: '#333',
-        }}
-      >
-        {currentQuestion.questionText}
-      </Typography> */}
-
       {/* 옵션 버튼 */}
       {currentQuestion.options.map((option, index) => (
-        <Button
-          key={index}
-          variant={selectedAnswer === option.text ? 'contained' : 'outlined'}
-          color={selectedAnswer === option.text ? 'success' : 'primary'}
-          onClick={() => handleAnswerSelect(option.text)}
-          fullWidth
-          sx={{
-            mb: 2,
-            padding: '10px',
-            fontSize: '1.1rem',
-            fontWeight: 'bold',
-            borderRadius: '8px',
-          }}
-          disabled={!!selectedAnswer}
-        >
-          {option.text}
-        </Button>
+        <Box key={index} sx={{ mb: 2, textAlign: 'center' }}>
+          <Button
+            variant={selectedAnswer === index ? 'contained' : 'outlined'}
+            color={selectedAnswer === index ? 'success' : 'primary'}
+            onClick={() => handleAnswerSelect(index)}
+            fullWidth
+            sx={{
+              padding: '10px',
+              fontSize: '1.1rem',
+              fontWeight: 'bold',
+              borderRadius: '8px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+            }}
+            disabled={!!selectedAnswer}
+          >
+            {option.imageUrl && (
+              <img
+                src={option.imageUrl}
+                alt="선택지 이미지"
+                style={{
+                  maxWidth: '100%',
+                  maxHeight: '100px',
+                  marginBottom: '10px',
+                  borderRadius: '5px',
+                }}
+              />
+            )}
+            {option.text}
+          </Button>
+        </Box>
       ))}
 
       {/* 타이머 */}

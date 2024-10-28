@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Box, Button, Snackbar } from "@mui/material";
+import { Box, Snackbar } from "@mui/material";
 import OverviewPanel from "./slides/OverviewPanel";
 import QuizSlide from "./slides/QuizSlide";
 import ReviewSlide from "./slides/ReviewSlide";
@@ -7,9 +7,11 @@ import SlideNavigation from "./slides/SlideNavigation";
 import ImageUploadDialog from "./ImageUploadDialog";
 import { Question } from "./types";
 import { initialQuestion } from "./utils";
-import { getUnits } from "../../../utils/quizApi";
+import { getUnits, createQuiz } from "../../../utils/quizApi";
+import { useNavigate } from "react-router-dom";
 
 const QuizContainer: React.FC = () => {
+  const navigate = useNavigate();
   const [title, setTitle] = useState("");
   const [grade, setGrade] = useState("");
   const [semester, setSemester] = useState("");
@@ -18,8 +20,8 @@ const QuizContainer: React.FC = () => {
   const [units, setUnits] = useState<string[]>([]);
   const [quizImage, setQuizImage] = useState<File | null>(null);
   const [quizImageUrl, setQuizImageUrl] = useState("");
-  const [questions, setQuestions] = useState<Question[]>([]);
-  const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
+  const [questions, setQuestions] = useState<Question[]>([initialQuestion]); // 첫 문제를 기본으로 추가
+  const [currentSlideIndex, setCurrentSlideIndex] = useState(1); // 첫 번째 문제로 시작
   const [error, setError] = useState<string | null>(null);
   const [imageDialogOpen, setImageDialogOpen] = useState(false);
 
@@ -54,21 +56,50 @@ const QuizContainer: React.FC = () => {
   const removeQuestion = (index: number) => {
     const updatedQuestions = questions.filter((_, i) => i !== index);
     setQuestions(updatedQuestions);
-    setCurrentSlideIndex(Math.max(0, currentSlideIndex - 1));
+    setCurrentSlideIndex(Math.max(1, currentSlideIndex - 1));
   };
 
   const moveToSlide = (index: number) => setCurrentSlideIndex(index);
 
-  const saveQuiz = () => {
-    console.log("퀴즈 저장됨:", {
-      title,
-      grade,
-      semester,
-      subject,
-      unit,
-      quizImage,
-      questions,
-    });
+  const saveQuiz = async () => {
+    try {
+      const formData = new FormData();
+      formData.append("title", title);
+      formData.append("grade", grade);
+      formData.append("subject", subject);
+      formData.append("semester", semester);
+      formData.append("unit", unit);
+      
+      if (quizImage) formData.append("image", quizImage);
+      else if (quizImageUrl) formData.append("imageUrl", quizImageUrl);
+
+      const formattedQuestions = questions.map((question, index) => ({
+        ...question,
+        options: question.options.map((opt) => ({
+          text: opt.text,
+          imageUrl: opt.imageUrl || null,
+          image: opt.image || null,
+        })),
+      }));
+
+      formData.append("questions", JSON.stringify(formattedQuestions));
+
+      questions.forEach((question, index) => {
+        if (question.image) formData.append(`questionImages_${index}`, question.image);
+        else if (question.imageUrl) formData.append(`questionImageUrls_${index}`, question.imageUrl);
+      
+        question.options.forEach((option, optionIndex) => {
+          if (option.image) formData.append(`optionImages_${index}_${optionIndex}`, option.image);
+          else if (option.imageUrl) formData.append(`optionImageUrls_${index}_${optionIndex}`, option.imageUrl);
+        });
+      });
+
+      await createQuiz(formData);
+      navigate("/manage-quizzes");
+      console.log("퀴즈가 성공적으로 생성되었습니다.");
+    } catch (error) {
+      console.error("퀴즈 생성에 실패했습니다.", error);
+    }
   };
 
   return (
@@ -90,17 +121,13 @@ const QuizContainer: React.FC = () => {
         moveToSlide={moveToSlide}
         quizImage={quizImage}
         quizImageUrl={quizImageUrl}
-        setQuizImage={setQuizImage}         // 추가된 코드
-        setQuizImageUrl={setQuizImageUrl}   // 추가된 코드
+        setQuizImage={setQuizImage}
+        setQuizImageUrl={setQuizImageUrl}
         setImageDialogOpen={setImageDialogOpen}
       />
 
       <Box flex="1">
-        {currentSlideIndex === 0 ? (
-          <Button variant="contained" onClick={addQuestion}>
-            첫 번째 문제 추가
-          </Button>
-        ) : currentSlideIndex <= questions.length ? (
+        {currentSlideIndex <= questions.length ? (
           <QuizSlide
             question={questions[currentSlideIndex - 1]}
             questionIndex={currentSlideIndex - 1}
@@ -121,6 +148,8 @@ const QuizContainer: React.FC = () => {
           totalSlides={questions.length + 1}
           setCurrentSlideIndex={setCurrentSlideIndex}
           addQuestion={addQuestion}
+          saveQuiz={saveQuiz}
+          isReviewSlide={currentSlideIndex > questions.length} // 검토 화면일 때만 저장
         />
       </Box>
 

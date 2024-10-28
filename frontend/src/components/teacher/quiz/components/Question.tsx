@@ -7,9 +7,10 @@ import CancelIcon from '@mui/icons-material/Cancel';
 interface Question {
   _id: string;
   questionText: string;
-  options: { text: string }[];
+  options: { text: string; imageUrl?: string }[];
   correctAnswer: number; // 정답을 인덱스 값으로 처리
   timeLimit: number;
+  imageUrl?: string; // 문제 이미지 URL
 }
 
 interface QuestionComponentProps {
@@ -58,6 +59,20 @@ const QuestionComponent: React.FC<QuestionComponentProps> = ({
         padding: '0 2rem',
       }}
     >
+      {/* 문제 이미지 */}
+      {currentQuestion?.imageUrl && (
+        <img
+          src={currentQuestion.imageUrl}
+          alt="문제 이미지"
+          style={{
+            maxWidth: '100%',
+            maxHeight: '300px',
+            marginBottom: '20px',
+            borderRadius: '8px',
+          }}
+        />
+      )}
+
       {/* 문제 텍스트와 타이머 아이콘 */}
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '1rem', marginBottom: '2rem' }}>
         <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
@@ -94,9 +109,8 @@ const QuestionComponent: React.FC<QuestionComponentProps> = ({
             const isCorrect = String(index) === String(currentQuestion.correctAnswer);
 
             return (
-              <Typography
+              <Box
                 key={index}
-                variant="h6"
                 sx={{
                   backgroundColor:
                     allSubmitted && isCorrect
@@ -114,6 +128,13 @@ const QuestionComponent: React.FC<QuestionComponentProps> = ({
                   boxShadow: allSubmitted ? '0px 4px 8px rgba(0, 0, 0, 0.2)' : 'none',
                 }}
               >
+                {option.imageUrl && (
+                  <img
+                    src={option.imageUrl}
+                    alt="선택지 이미지"
+                    style={{ maxWidth: '100%', maxHeight: '100px', marginBottom: '10px', borderRadius: '5px' }}
+                  />
+                )}
                 {option.text}
                 {/* 정답 여부에 따른 애니메이션 효과 아이콘 */}
                 {allSubmitted && (
@@ -125,7 +146,7 @@ const QuestionComponent: React.FC<QuestionComponentProps> = ({
                     )}
                   </Box>
                 )}
-              </Typography>
+              </Box>
             );
           })}
         </Box>

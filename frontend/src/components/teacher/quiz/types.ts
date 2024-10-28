@@ -11,5 +11,6 @@ export type Option = {
     correctAnswer: number;
     image: File | null;
     imageUrl: string;
+    timeLimit: number;
   };
   

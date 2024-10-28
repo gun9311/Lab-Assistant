@@ -19,7 +19,7 @@ const ReviewSlide: React.FC<ReviewSlideProps> = ({
   return (
     <Box sx={{ padding: "2rem" }}>
       <Typography variant="h4" gutterBottom>
-        퀴즈 검토
+        퀴즈 검토 및 저장
       </Typography>
       <Typography variant="subtitle1" gutterBottom>
         아래에서 모든 문제를 검토하고 필요 시 수정하세요.
@@ -35,9 +35,19 @@ const ReviewSlide: React.FC<ReviewSlideProps> = ({
                   {question.questionText || "문제 텍스트가 입력되지 않았습니다."}
                 </Typography>
 
+                {/* 이미지 렌더링 - 파일 또는 URL을 구분하여 표시 */}
                 {question.imageUrl && (
                   <Box mt={1}>
                     <img src={question.imageUrl} alt="문제 이미지" style={{ maxWidth: "100%" }} />
+                  </Box>
+                )}
+                {question.image && (
+                  <Box mt={1}>
+                    <img
+                      src={URL.createObjectURL(question.image)}
+                      alt="문제 이미지"
+                      style={{ maxWidth: "100%" }}
+                    />
                   </Box>
                 )}
 
@@ -52,9 +62,18 @@ const ReviewSlide: React.FC<ReviewSlideProps> = ({
                       >
                         {`${optIndex + 1}. ${option.text || "선택지 텍스트 없음"}`}
                       </Typography>
+
+                      {/* 선택지 이미지 렌더링 - 파일 또는 URL을 구분하여 표시 */}
                       {option.imageUrl && (
                         <img
                           src={option.imageUrl}
+                          alt={`선택지 ${optIndex + 1} 이미지`}
+                          style={{ width: "30px", height: "30px", marginLeft: "0.5rem" }}
+                        />
+                      )}
+                      {option.image && (
+                        <img
+                          src={URL.createObjectURL(option.image)}
                           alt={`선택지 ${optIndex + 1} 이미지`}
                           style={{ width: "30px", height: "30px", marginLeft: "0.5rem" }}
                         />
@@ -81,11 +100,6 @@ const ReviewSlide: React.FC<ReviewSlideProps> = ({
       <Box mt={3} display="flex" justifyContent="space-between">
         <Button variant="outlined" startIcon={<Add />} onClick={addQuestion}>
           문제 추가
-        </Button>
-
-        {/* 퀴즈 저장 버튼 */}
-        <Button variant="contained" color="primary" onClick={saveQuiz}>
-          퀴즈 저장
         </Button>
       </Box>
     </Box>

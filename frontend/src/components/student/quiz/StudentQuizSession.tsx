@@ -12,6 +12,7 @@ import Character2 from '../../../assets/character/character2.png';
 
 interface Option {
   text: string;
+  imageUrl?: string;
 }
 
 interface QuizQuestion {
@@ -29,7 +30,7 @@ const StudentQuizSessionPage: React.FC = () => {
 
   const [webSocket, setWebSocket] = useState<WebSocket | null>(null);
   const [currentQuestion, setCurrentQuestion] = useState<QuizQuestion | null>(null);
-  const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
+  const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
   const [startTime, setStartTime] = useState<number | null>(null); // 문제 시작 시간 저장
   const [isQuizStarting, setIsQuizStarting] = useState<boolean>(false);  // 퀴즈 시작 준비 화면 상태 추가
@@ -173,8 +174,7 @@ const StudentQuizSessionPage: React.FC = () => {
     if (timeLeft === 0 && webSocket && currentQuestion && startTime && !isAnswerSubmitted) {
       const responseTime = Date.now() - startTime;
       const selectedOptionIndex = selectedAnswer
-        ? currentQuestion.options.findIndex(option => option.text === selectedAnswer)
-        : -1; 
+        ? selectedAnswer : -1; 
   
       webSocket.send(
         JSON.stringify({
@@ -202,27 +202,24 @@ const StudentQuizSessionPage: React.FC = () => {
     }
   };
 
-  const handleAnswerSelect = (answer: string) => {
+  const handleAnswerSelect = (index: number) => {
     if (selectedAnswer || isAnswerSubmitted) return; 
+    setIsAnswerSubmitted(true); 
     
-    setSelectedAnswer(answer);
+    console.log(index);
+    setSelectedAnswer(index);
 
     if (webSocket && currentQuestion && startTime) {
       const responseTime = Date.now() - startTime; 
 
-      const selectedOptionIndex = currentQuestion.options.findIndex(
-        option => option.text === answer
-      );
-
       webSocket.send(
         JSON.stringify({
           type: 'submitAnswer',
-          answerIndex: selectedOptionIndex,  
+          answerIndex: index,  
           questionId: currentQuestion.questionId,   
           responseTime: responseTime,        
         })
       );
-      setIsAnswerSubmitted(true); 
       setWaitingForFeedback(true); 
     }
   };

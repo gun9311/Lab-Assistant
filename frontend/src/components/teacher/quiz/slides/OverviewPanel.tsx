@@ -1,6 +1,16 @@
 import React from "react";
-import { Box, Typography, IconButton, Button, TextField, MenuItem, List, ListItem, ListItemText } from "@mui/material";
-import { Image, Add } from "@mui/icons-material";
+import {
+  Box,
+  Typography,
+  IconButton,
+  TextField,
+  MenuItem,
+  List,
+  ListItem,
+  ListItemText,
+  Button,
+} from "@mui/material";
+import { Image } from "@mui/icons-material";
 import { DragDropContext, Draggable, Droppable } from "react-beautiful-dnd";
 import { Question } from "../types";
 
@@ -21,8 +31,8 @@ type OverviewPanelProps = {
   moveToSlide: (index: number) => void;
   quizImage: File | null;
   quizImageUrl: string;
-  setQuizImage: (image: File | null) => void;       // 추가된 코드
-  setQuizImageUrl: (url: string) => void;           // 추가된 코드
+  setQuizImage: (image: File | null) => void;
+  setQuizImageUrl: (url: string) => void;
   setImageDialogOpen: (open: boolean) => void;
 };
 
@@ -43,11 +53,10 @@ const OverviewPanel: React.FC<OverviewPanelProps> = ({
   moveToSlide,
   quizImage,
   quizImageUrl,
-  setQuizImage,               // 추가된 코드
-  setQuizImageUrl,            // 추가된 코드
+  setQuizImage,
+  setQuizImageUrl,
   setImageDialogOpen,
 }) => {
-
   const handleDragEnd = (result: any) => {
     const { destination, source } = result;
     if (!destination || destination.index === source.index) return;
@@ -165,9 +174,15 @@ const OverviewPanel: React.FC<OverviewPanelProps> = ({
         </Droppable>
       </DragDropContext>
 
-      <IconButton color="primary" onClick={() => moveToSlide(questions.length + 1)}>
-        <Add /> 문제 추가
-      </IconButton>
+      {/* 퀴즈 검토 버튼 추가 */}
+      <Button
+        variant="contained"
+        color="primary"
+        onClick={() => moveToSlide(questions.length + 1)}
+        sx={{ marginTop: "1rem" }}
+      >
+        퀴즈 검토 및 저장
+      </Button>
     </Box>
   );
 };

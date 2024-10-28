@@ -48,6 +48,15 @@ const QuizSlide: React.FC<QuizSlideProps> = ({
         sx={{ marginBottom: "1rem" }}
       />
 
+      <TextField
+        fullWidth
+        label="시간 제한 (초)"
+        type="number"
+        value={question.timeLimit}
+        onChange={(e) => handleQuestionChange("timeLimit", parseInt(e.target.value))}
+        sx={{ marginBottom: "1rem" }}
+      />
+
       <IconButton onClick={() => { setImageDialogOpen(true); setImageType("question"); }}>
         <Image />
       </IconButton>

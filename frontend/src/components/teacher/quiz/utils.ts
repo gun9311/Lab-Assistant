@@ -12,4 +12,5 @@ export const initialQuestion: Question = {
   correctAnswer: -1, // 정답 미설정 상태
   image: null, // 문제 이미지 없음
   imageUrl: "", // 문제 이미지 URL 없음
+  timeLimit: 30, // 기본 시간 제한을 30초로 설정
 };
