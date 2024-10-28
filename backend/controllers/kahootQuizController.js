@@ -457,7 +457,7 @@ exports.handleTeacherWebSocketConnection = async (ws, teacherId, pin) => {
             endTime: endTime // 종료 시간 전송
         }));
 
-        const questionOptions = questionContent.questions[0].options.map(option => ({ text: option.text }));
+        const questionOptions = questionContent.questions[0].options.map(option => ({ text: option.text, imageUrl: option.imageUrl }));
         broadcastToStudents(pin, {
             type: 'newQuestionOptions',  // 학생들에게는 선택지만 전송
             questionId: questionContent.questions[0]._id,  
@@ -510,7 +510,7 @@ exports.handleTeacherWebSocketConnection = async (ws, teacherId, pin) => {
           }));
   
           // 학생들에게는 보기만 전송
-          const questionOptions = nextQuestion.options.map(option => ({ text: option.text }));
+          const questionOptions = nextQuestion.options.map(option => ({ text: option.text, imageUrl: option.imageUrl }));
           broadcastToStudents(pin, {
             type: 'newQuestionOptions',  // 학생들에게는 선택지만 전송
             questionId: nextQuestion._id,  // 문제 ID
