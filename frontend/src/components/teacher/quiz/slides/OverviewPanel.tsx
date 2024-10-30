@@ -1,18 +1,6 @@
 import React from "react";
-import {
-  Box,
-  Typography,
-  IconButton,
-  TextField,
-  MenuItem,
-  List,
-  ListItem,
-  ListItemText,
-  Button,
-} from "@mui/material";
+import { Box, Typography, TextField, MenuItem, IconButton, Button } from "@mui/material";
 import { Image } from "@mui/icons-material";
-import { DragDropContext, Draggable, Droppable } from "react-beautiful-dnd";
-import { Question } from "../types";
 
 type OverviewPanelProps = {
   title: string;
@@ -26,9 +14,6 @@ type OverviewPanelProps = {
   unit: string;
   setUnit: (unit: string) => void;
   units: string[];
-  questions: Question[];
-  currentSlideIndex: number;
-  moveToSlide: (index: number) => void;
   quizImage: File | null;
   quizImageUrl: string;
   setQuizImage: (image: File | null) => void;
@@ -48,27 +33,14 @@ const OverviewPanel: React.FC<OverviewPanelProps> = ({
   unit,
   setUnit,
   units,
-  questions,
-  currentSlideIndex,
-  moveToSlide,
   quizImage,
   quizImageUrl,
   setQuizImage,
   setQuizImageUrl,
   setImageDialogOpen,
 }) => {
-  const handleDragEnd = (result: any) => {
-    const { destination, source } = result;
-    if (!destination || destination.index === source.index) return;
-
-    const reorderedQuestions = [...questions];
-    const [movedItem] = reorderedQuestions.splice(source.index, 1);
-    reorderedQuestions.splice(destination.index, 0, movedItem);
-    moveToSlide(currentSlideIndex);
-  };
-
   return (
-    <Box sx={{ width: "250px", padding: "1rem", borderRight: "1px solid #ccc" }}>
+    <Box>
       <Typography variant="h6">퀴즈 개요</Typography>
 
       <Typography variant="subtitle2">퀴즈 제목</Typography>
@@ -147,42 +119,6 @@ const OverviewPanel: React.FC<OverviewPanelProps> = ({
           <Button onClick={() => { setQuizImage(null); setQuizImageUrl(""); }}>이미지 삭제</Button>
         </Box>
       )}
-
-      <DragDropContext onDragEnd={handleDragEnd}>
-        <Droppable droppableId="overview">
-          {(provided:any) => (
-            <List {...provided.droppableProps} ref={provided.innerRef} sx={{ mt: 2 }}>
-              {questions.map((question, index) => (
-                <Draggable key={index} draggableId={String(index)} index={index}>
-                  {(provided:any) => (
-                    <ListItem
-                      button
-                      selected={currentSlideIndex === index + 1}
-                      onClick={() => moveToSlide(index + 1)}
-                      ref={provided.innerRef}
-                      {...provided.draggableProps}
-                      {...provided.dragHandleProps}
-                    >
-                      <ListItemText primary={`문제 ${index + 1}`} />
-                    </ListItem>
-                  )}
-                </Draggable>
-              ))}
-              {provided.placeholder}
-            </List>
-          )}
-        </Droppable>
-      </DragDropContext>
-
-      {/* 퀴즈 검토 버튼 추가 */}
-      <Button
-        variant="contained"
-        color="primary"
-        onClick={() => moveToSlide(questions.length + 1)}
-        sx={{ marginTop: "1rem" }}
-      >
-        퀴즈 검토 및 저장
-      </Button>
     </Box>
   );
 };

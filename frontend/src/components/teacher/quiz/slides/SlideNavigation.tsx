@@ -34,7 +34,7 @@ const SlideNavigation: React.FC<SlideNavigationProps> = ({
     <Box display="flex" justifyContent="space-between" mt={2}>
       <Button
         variant="outlined"
-        disabled={currentSlideIndex === 0}
+        disabled={currentSlideIndex === 1}
         onClick={goToPreviousSlide}
       >
         이전

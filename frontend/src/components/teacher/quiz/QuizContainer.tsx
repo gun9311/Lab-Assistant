@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from "react";
-import { Box, Snackbar } from "@mui/material";
+import { Box, Typography, Snackbar } from "@mui/material";
 import OverviewPanel from "./slides/OverviewPanel";
 import QuizSlide from "./slides/QuizSlide";
 import ReviewSlide from "./slides/ReviewSlide";
 import SlideNavigation from "./slides/SlideNavigation";
 import ImageUploadDialog from "./ImageUploadDialog";
+import QuestionListPanel from "./slides/QuestionListPanel"; // 새로 추가된 문제 목록 패널
 import { Question } from "./types";
 import { initialQuestion } from "./utils";
 import { getUnits, createQuiz } from "../../../utils/quizApi";
@@ -20,8 +21,8 @@ const QuizContainer: React.FC = () => {
   const [units, setUnits] = useState<string[]>([]);
   const [quizImage, setQuizImage] = useState<File | null>(null);
   const [quizImageUrl, setQuizImageUrl] = useState("");
-  const [questions, setQuestions] = useState<Question[]>([initialQuestion]); // 첫 문제를 기본으로 추가
-  const [currentSlideIndex, setCurrentSlideIndex] = useState(1); // 첫 번째 문제로 시작
+  const [questions, setQuestions] = useState<Question[]>([initialQuestion]);
+  const [currentSlideIndex, setCurrentSlideIndex] = useState(1); // 문제 슬라이드 기본 위치
   const [error, setError] = useState<string | null>(null);
   const [imageDialogOpen, setImageDialogOpen] = useState(false);
 
@@ -60,6 +61,14 @@ const QuizContainer: React.FC = () => {
   };
 
   const moveToSlide = (index: number) => setCurrentSlideIndex(index);
+
+  // 문제 순서 재정렬 함수 추가
+  const reorderQuestions = (startIndex: number, endIndex: number) => {
+    const reorderedQuestions = Array.from(questions);
+    const [removed] = reorderedQuestions.splice(startIndex, 1);
+    reorderedQuestions.splice(endIndex, 0, removed);
+    setQuestions(reorderedQuestions);
+  };
 
   const saveQuiz = async () => {
     try {
@@ -104,29 +113,30 @@ const QuizContainer: React.FC = () => {
 
   return (
     <Box display="flex">
-      <OverviewPanel
-        title={title}
-        setTitle={setTitle}
-        grade={grade}
-        setGrade={setGrade}
-        semester={semester}
-        setSemester={setSemester}
-        subject={subject}
-        setSubject={setSubject}
-        unit={unit}
-        setUnit={setUnit}
-        units={units}
-        questions={questions}
-        currentSlideIndex={currentSlideIndex}
-        moveToSlide={moveToSlide}
-        quizImage={quizImage}
-        quizImageUrl={quizImageUrl}
-        setQuizImage={setQuizImage}
-        setQuizImageUrl={setQuizImageUrl}
-        setImageDialogOpen={setImageDialogOpen}
-      />
+      {/* 좌측 패널: 퀴즈 기본 정보 입력 */}
+      <Box sx={{ width: "250px", padding: "1rem", borderRight: "1px solid #ccc" }}>
+        <OverviewPanel
+          title={title}
+          setTitle={setTitle}
+          grade={grade}
+          setGrade={setGrade}
+          semester={semester}
+          setSemester={setSemester}
+          subject={subject}
+          setSubject={setSubject}
+          unit={unit}
+          setUnit={setUnit}
+          units={units}
+          quizImage={quizImage}
+          quizImageUrl={quizImageUrl}
+          setQuizImage={setQuizImage}
+          setQuizImageUrl={setQuizImageUrl}
+          setImageDialogOpen={setImageDialogOpen}
+        />
+      </Box>
 
-      <Box flex="1">
+      {/* 가운데: 문제 슬라이드 */}
+      <Box sx={{ flex: 1, padding: "2rem" }}>
         {currentSlideIndex <= questions.length ? (
           <QuizSlide
             question={questions[currentSlideIndex - 1]}
@@ -142,17 +152,29 @@ const QuizContainer: React.FC = () => {
             moveToSlide={moveToSlide}
           />
         )}
-
+        
         <SlideNavigation
           currentSlideIndex={currentSlideIndex}
           totalSlides={questions.length + 1}
           setCurrentSlideIndex={setCurrentSlideIndex}
           addQuestion={addQuestion}
           saveQuiz={saveQuiz}
-          isReviewSlide={currentSlideIndex > questions.length} // 검토 화면일 때만 저장
+          isReviewSlide={currentSlideIndex > questions.length}
         />
       </Box>
 
+      {/* 우측 패널: 문제 목록 및 순서 조정 */}
+      <Box sx={{ width: "250px", padding: "1rem", borderLeft: "1px solid #ccc" }}>
+        <QuestionListPanel
+          questions={questions}
+          currentSlideIndex={currentSlideIndex}
+          moveToSlide={moveToSlide}
+          reorderQuestions={reorderQuestions} // 문제 순서 변경 함수 전달
+          goToReview={() => setCurrentSlideIndex(questions.length + 1)} // 검토 슬라이드로 이동 함수
+        />
+      </Box>
+
+      {/* 이미지 업로드 다이얼로그 */}
       <ImageUploadDialog
         open={imageDialogOpen}
         onClose={() => setImageDialogOpen(false)}
