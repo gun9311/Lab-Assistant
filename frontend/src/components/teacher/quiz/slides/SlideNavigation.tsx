@@ -7,7 +7,7 @@ type SlideNavigationProps = {
   setCurrentSlideIndex: (index: number) => void;
   addQuestion: () => void;
   saveQuiz: () => void;
-  isReviewSlide?: boolean; // 검토 화면 여부를 추가
+  isReviewSlide?: boolean;
 };
 
 const SlideNavigation: React.FC<SlideNavigationProps> = ({
@@ -16,36 +16,63 @@ const SlideNavigation: React.FC<SlideNavigationProps> = ({
   setCurrentSlideIndex,
   addQuestion,
   saveQuiz,
-  isReviewSlide = false, // 기본값은 false
+  isReviewSlide = false,
 }) => {
   const goToPreviousSlide = () => {
-    if (currentSlideIndex > 0) setCurrentSlideIndex(currentSlideIndex - 1);
+    if (currentSlideIndex > 1) setCurrentSlideIndex(currentSlideIndex - 1);
   };
 
   const goToNextSlide = () => {
     if (currentSlideIndex < totalSlides - 1) {
       setCurrentSlideIndex(currentSlideIndex + 1);
     } else {
-      addQuestion(); // 마지막 슬라이드인 경우 문제 추가
+      addQuestion();
     }
   };
 
   return (
-    <Box display="flex" justifyContent="space-between" mt={2}>
-      <Button
-        variant="outlined"
-        disabled={currentSlideIndex === 1}
-        onClick={goToPreviousSlide}
-      >
-        이전
-      </Button>
+    <Box display="flex" justifyContent={isReviewSlide ? "center" : "space-between"} mt={2}>
+      {!isReviewSlide && (
+        <Button
+          variant="outlined"
+          onClick={goToPreviousSlide}
+          disabled={currentSlideIndex === 1}
+          sx={{
+            borderRadius: "8px",
+            borderColor: "#ff9800",
+            color: "#ff9800",
+            "&:hover": { backgroundColor: "#ffe0b2" },
+          }}
+        >
+          이전
+        </Button>
+      )}
 
       {!isReviewSlide ? (
-        <Button variant="contained" onClick={goToNextSlide}>
+        <Button
+          variant="contained"
+          onClick={goToNextSlide}
+          sx={{
+            borderRadius: "8px",
+            backgroundColor: "#ff9800",
+            color: "#fff",
+            "&:hover": { backgroundColor: "#fb8c00" },
+          }}
+        >
           {currentSlideIndex < totalSlides - 1 ? "다음" : "문제 추가"}
         </Button>
       ) : (
-        <Button variant="contained" color="primary" onClick={saveQuiz}>
+        <Button
+          variant="contained"
+          color="primary"
+          onClick={saveQuiz}
+          sx={{
+            padding: "0.75rem 2rem",
+            borderRadius: "8px",
+            backgroundColor: "#4caf50",
+            "&:hover": { backgroundColor: "#43a047" },
+          }}
+        >
           퀴즈 저장
         </Button>
       )}

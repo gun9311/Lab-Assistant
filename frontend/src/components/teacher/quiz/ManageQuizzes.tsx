@@ -1,3 +1,4 @@
+// ManageQuizzesPage.tsx
 import React, { useEffect, useState } from "react";
 import {
   Box,
@@ -7,16 +8,15 @@ import {
   CircularProgress,
   Snackbar,
   Paper,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
+  Alert,
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import { getQuizzes, deleteQuiz, getUnits } from "../../../utils/quizApi";
 import QuizCard from "./components/QuizCard";
 import QuizFilter from "./components/QuizFilter";
 import api from "../../../utils/api";
+import logo from '../../../../src/assets/quiz_pie-logo2.png';
+import background from '../../../../src/assets/background-logo.webp'; // 배경 이미지 경로 추가
 
 type Quiz = {
   _id: string;
@@ -24,27 +24,27 @@ type Quiz = {
   unit: string;
   questionsCount: number;
   likeCount: number;
-  grade: number; // 학년 필드
-  semester: string; // 학기 필드
-  subject: string; // 과목 필드
-  imageUrl?: string; // 퀴즈 이미지 필드 (옵션)
-  userLiked: boolean; // 백엔드에서 받아온 사용자 좋아요 여부
-  createdBy: string;  // 퀴즈 작성자의 ID
-  createdAt: string;  // 퀴즈 생성 시간
+  grade: number;
+  semester: string;
+  subject: string;
+  imageUrl?: string;
+  userLiked: boolean;
+  createdBy: string;
+  createdAt: string;
 };
 
 const ManageQuizzesPage: React.FC = () => {
   const navigate = useNavigate();
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
-  const [loading, setLoading] = useState<boolean>(true); // 로딩 상태
-  const [error, setError] = useState<string | null>(null); // 에러 상태
-  const [sortBy, setSortBy] = useState<string>("latest"); // 기본 정렬 기준: 최신 순
-  const [isTeamMode, setIsTeamMode] = useState<boolean>(false); // 팀 모드 상태
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState<string>("latest");
+  const [isTeamMode, setIsTeamMode] = useState<boolean>(false);
   const [gradeFilter, setGradeFilter] = useState<number | null>(null);
   const [semesterFilter, setSemesterFilter] = useState<string | null>(null);
   const [subjectFilter, setSubjectFilter] = useState<string | null>(null);
-  const [unitFilter, setUnitFilter] = useState<string | null>(null); // 단원 필터
-  const [units, setUnits] = useState<string[]>([]); // 단원 목록
+  const [unitFilter, setUnitFilter] = useState<string | null>(null);
+  const [units, setUnits] = useState<string[]>([]);
 
   useEffect(() => {
     const fetchQuizzes = async () => {
@@ -78,12 +78,11 @@ const ManageQuizzesPage: React.FC = () => {
     return gradeMatch && semesterMatch && subjectMatch && unitMatch;
   });
 
-  // 정렬 함수
   const getSortedQuizzes = () => {
     if (sortBy === "likes") {
-      return [...filteredQuizzes].sort((a, b) => b.likeCount - a.likeCount);  // 좋아요 순
+      return [...filteredQuizzes].sort((a, b) => b.likeCount - a.likeCount);
     } else {
-      return [...filteredQuizzes].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());  // 최신 순 (기본)
+      return [...filteredQuizzes].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     }
   };
 
@@ -99,10 +98,10 @@ const ManageQuizzesPage: React.FC = () => {
   const handleStartQuiz = async (quizId: string) => {
     try {
       const response = await api.post(`/kahoot-quiz/start-session/${quizId}`, {
-        isTeamMode, // 팀 모드 여부 전달
+        isTeamMode,
       });
       const { pin, sessionId } = response.data;
-      navigate(`/start-quiz-session`, { state: { pin, sessionId } });
+      navigate("/start-quiz-session", { state: { pin, sessionId } });
     } catch (error) {
       setError("퀴즈 세션을 시작하는 중 오류가 발생했습니다.");
     }
@@ -111,80 +110,84 @@ const ManageQuizzesPage: React.FC = () => {
   const sortedQuizzes = getSortedQuizzes();
 
   return (
-    <Box sx={{ padding: "2rem" }}>
-      <Paper elevation={3} sx={{ padding: "2rem", marginBottom: "2rem", borderRadius: '16px', backgroundColor: '#f9f9f9' }}>
-        <Typography variant="h4" gutterBottom sx={{ fontWeight: 'bold', color: '#333' }}>
-          퀴즈 관리
-        </Typography>
+    <Box sx={{ padding: "2rem", backgroundColor: "#ffffff", minHeight: "100vh" }}>
+      <Paper
+        elevation={3}
+        sx={{
+          padding: "2rem",
+          paddingBottom: "0", // 하단 패딩을 줄임
+          marginBottom: "2rem",
+          borderRadius: "16px",
+          backgroundColor: "#f7f7f7",
+          backgroundImage: `url(${background})`, // 배경 이미지 유지
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          position: "relative",
+          minHeight: "350px",
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "space-between", // 상단과 하단에 컨텐츠 배치
+        }}
+      >
+        {/* 퀴즈 생성 버튼을 페이퍼 우측 상단에 배치 */}
+        <Box display="flex" justifyContent="flex-end" sx={{ position: "absolute", top: "1rem", right: "1rem" }}>
+          <Button
+            variant="contained"
+            sx={{
+              borderRadius: "8px",
+              backgroundColor: "#FFC107",
+              fontWeight: "bold",
+              fontSize: "1rem",
+              paddingX: "1.5rem",
+              "&:hover": { backgroundColor: "#FF9800" },
+            }}
+            onClick={() => navigate("/create-quiz")}
+          >
+            퀴즈 생성
+          </Button>
+        </Box>
 
-        <Button
-          variant="contained"
-          color="primary"
-          sx={{ marginBottom: "2rem", borderRadius: "8px", backgroundColor: '#6200EA', fontWeight: 'bold', fontSize: '1rem' }}
-          onClick={() => navigate("/create-quiz")}
-        >
-          퀴즈 만들기
-        </Button>
-
-        <QuizFilter
-          gradeFilter={gradeFilter}
-          setGradeFilter={setGradeFilter}
-          semesterFilter={semesterFilter}
-          setSemesterFilter={setSemesterFilter}
-          subjectFilter={subjectFilter}
-          setSubjectFilter={setSubjectFilter}
-          unitFilter={unitFilter}
-          setUnitFilter={setUnitFilter}
-          units={units}
-        />
-
-        {/* 정렬 기준 선택 */}
-        <FormControl sx={{ marginBottom: "2rem", minWidth: 200 }}>
-          <InputLabel>정렬 기준</InputLabel>
-          <Select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
-            <MenuItem value="latest">최신 순</MenuItem>
-            <MenuItem value="likes">좋아요 순</MenuItem>
-          </Select>
-        </FormControl>
+        {/* QuizFilter를 페이퍼의 하단에 더 가까이 위치시킴 */}
+        <Box sx={{ mt: "auto" }}>
+          <QuizFilter
+            gradeFilter={gradeFilter}
+            setGradeFilter={setGradeFilter}
+            semesterFilter={semesterFilter}
+            setSemesterFilter={setSemesterFilter}
+            subjectFilter={subjectFilter}
+            setSubjectFilter={setSubjectFilter}
+            unitFilter={unitFilter}
+            setUnitFilter={setUnitFilter}
+            units={units}
+            sortBy={sortBy}
+            setSortBy={setSortBy}
+          />
+        </Box>
       </Paper>
 
-      <Paper elevation={3} sx={{ padding: "2rem", borderRadius: '16px', backgroundColor: '#f9f9f9' }}>
+      <Paper elevation={3} sx={{ p: 3, borderRadius: "16px", backgroundColor: "#ffffff" }}>
         {loading ? (
           <Box display="flex" justifyContent="center" alignItems="center" height="50vh">
-            <CircularProgress sx={{ color: '#6200EA' }} />
+            <CircularProgress color="primary" />
           </Box>
         ) : (
-          <Grid container spacing={4}>
+          <Grid container spacing={3}>
             {sortedQuizzes.length === 0 ? (
               <Grid item xs={12}>
-                <Typography variant="h6" align="center" sx={{ fontWeight: 'bold', color: '#ff5252' }}>
+                <Typography variant="h6" align="center" color="textSecondary">
                   필터 조건에 맞는 퀴즈가 없습니다.
                 </Typography>
               </Grid>
             ) : (
               sortedQuizzes.map((quiz) => (
                 <Grid item xs={12} sm={6} md={4} key={quiz._id}>
-                  <QuizCard
-                    quiz={quiz}
-                    onDelete={handleDelete}
-                    onStartQuiz={handleStartQuiz}
-                  />
+                  <QuizCard quiz={quiz} onDelete={handleDelete} onStartQuiz={handleStartQuiz} />
                 </Grid>
               ))
             )}
           </Grid>
         )}
       </Paper>
-
-      {error && (
-        <Snackbar
-          open={true}
-          autoHideDuration={6000}
-          onClose={() => setError(null)}
-          message={error}
-          sx={{ backgroundColor: "#ff5252", color: "white" }}
-        />
-      )}
     </Box>
   );
 };

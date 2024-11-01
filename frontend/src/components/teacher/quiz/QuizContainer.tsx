@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from "react";
-import { Box, Typography, Snackbar } from "@mui/material";
+import { Box, Snackbar, Divider } from "@mui/material";
 import OverviewPanel from "./slides/OverviewPanel";
 import QuizSlide from "./slides/QuizSlide";
 import ReviewSlide from "./slides/ReviewSlide";
 import SlideNavigation from "./slides/SlideNavigation";
 import ImageUploadDialog from "./ImageUploadDialog";
-import QuestionListPanel from "./slides/QuestionListPanel"; // 새로 추가된 문제 목록 패널
+import QuestionListPanel from "./slides/QuestionListPanel";
 import { Question } from "./types";
 import { initialQuestion } from "./utils";
 import { getUnits, createQuiz } from "../../../utils/quizApi";
@@ -22,7 +22,7 @@ const QuizContainer: React.FC = () => {
   const [quizImage, setQuizImage] = useState<File | null>(null);
   const [quizImageUrl, setQuizImageUrl] = useState("");
   const [questions, setQuestions] = useState<Question[]>([initialQuestion]);
-  const [currentSlideIndex, setCurrentSlideIndex] = useState(1); // 문제 슬라이드 기본 위치
+  const [currentSlideIndex, setCurrentSlideIndex] = useState(1);
   const [error, setError] = useState<string | null>(null);
   const [imageDialogOpen, setImageDialogOpen] = useState(false);
 
@@ -62,7 +62,6 @@ const QuizContainer: React.FC = () => {
 
   const moveToSlide = (index: number) => setCurrentSlideIndex(index);
 
-  // 문제 순서 재정렬 함수 추가
   const reorderQuestions = (startIndex: number, endIndex: number) => {
     const reorderedQuestions = Array.from(questions);
     const [removed] = reorderedQuestions.splice(startIndex, 1);
@@ -113,8 +112,21 @@ const QuizContainer: React.FC = () => {
 
   return (
     <Box display="flex">
-      {/* 좌측 패널: 퀴즈 기본 정보 입력 */}
-      <Box sx={{ width: "250px", padding: "1rem", borderRight: "1px solid #ccc" }}>
+      {/* 좌측 패널 */}
+      <Box
+        sx={{
+          width: "260px",
+          padding: "1.5rem",
+          borderRight: "1px solid #ddd",     // 경계선 색상 조정
+          backgroundColor: "#fafafa",         // 패널 배경색 변경
+          borderRadius: "16px 0 0 16px",
+          boxShadow: "2px 0 10px rgba(0, 0, 0, 0.05)",
+          position: "sticky",
+          top: "20px",
+          maxHeight: "calc(100vh - 40px)",
+          overflowY: "auto"
+        }}
+      >
         <OverviewPanel
           title={title}
           setTitle={setTitle}
@@ -136,7 +148,16 @@ const QuizContainer: React.FC = () => {
       </Box>
 
       {/* 가운데: 문제 슬라이드 */}
-      <Box sx={{ flex: 1, padding: "2rem" }}>
+      <Box
+        sx={{
+          flex: 1,
+          padding: "2rem",
+          backgroundColor: "#ffffff",         // 슬라이드 영역 배경색 설정
+          boxShadow: "0px 4px 12px rgba(0, 0, 0, 0.1)",
+          borderRadius: "8px",
+          marginX: "1rem"
+        }}
+      >
         {currentSlideIndex <= questions.length ? (
           <QuizSlide
             question={questions[currentSlideIndex - 1]}
@@ -163,14 +184,27 @@ const QuizContainer: React.FC = () => {
         />
       </Box>
 
-      {/* 우측 패널: 문제 목록 및 순서 조정 */}
-      <Box sx={{ width: "250px", padding: "1rem", borderLeft: "1px solid #ccc" }}>
+      {/* 우측 패널 */}
+      <Box
+        sx={{
+          width: "260px",
+          padding: "1.5rem",
+          borderLeft: "1px solid #ddd",       // 경계선 색상 조정
+          backgroundColor: "#fafafa",         // 패널 배경색 변경
+          borderRadius: "0 16px 16px 0",
+          boxShadow: "-2px 0 10px rgba(0, 0, 0, 0.05)",
+          position: "sticky",
+          top: "20px",
+          maxHeight: "calc(100vh - 40px)",
+          overflowY: "auto"
+        }}
+      >
         <QuestionListPanel
           questions={questions}
           currentSlideIndex={currentSlideIndex}
           moveToSlide={moveToSlide}
-          reorderQuestions={reorderQuestions} // 문제 순서 변경 함수 전달
-          goToReview={() => setCurrentSlideIndex(questions.length + 1)} // 검토 슬라이드로 이동 함수
+          reorderQuestions={reorderQuestions}
+          goToReview={() => setCurrentSlideIndex(questions.length + 1)}
         />
       </Box>
 
@@ -190,6 +224,12 @@ const QuizContainer: React.FC = () => {
           autoHideDuration={6000}
           onClose={() => setError(null)}
           message={error}
+          sx={{
+            backgroundColor: "#e57373",
+            color: "#ffffff",
+            fontWeight: "bold",
+            borderRadius: "8px"
+          }}
         />
       )}
     </Box>

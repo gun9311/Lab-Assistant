@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { Box, TextField, IconButton, Button, Typography, Grid } from "@mui/material";
+import React, { useEffect, useState } from "react";
+import { Box, TextField, IconButton, Button, Typography, Grid, Card, CardContent } from "@mui/material";
 import { Delete, Image } from "@mui/icons-material";
 import { Question } from "../types";
 import ImageUploadDialog from "../ImageUploadDialog";
@@ -21,130 +21,185 @@ const QuizSlide: React.FC<QuizSlideProps> = ({
   const [imageType, setImageType] = useState<"question" | "option">("question");
   const [selectedOptionIndex, setSelectedOptionIndex] = useState<number | null>(null);
 
-  const handleQuestionChange = (field: keyof Question, value: string | number | File | null) => {
-    const updatedQuestion = { ...question, [field]: value };
+  const handleQuestionChange = (fields: Partial<Question>) => {
+    const updatedQuestion = { ...question, ...fields };
     updateQuestion(questionIndex, updatedQuestion);
   };
 
-  const handleOptionChange = (optionIndex: number, field: "text" | "imageUrl" | "image", value: string | File | null) => {
+  const handleOptionChange = (optionIndex: number, fields: Partial<Question["options"][0]>) => {
     const updatedOptions = [...question.options];
-    updatedOptions[optionIndex] = { ...updatedOptions[optionIndex], [field]: value };
+    updatedOptions[optionIndex] = { ...updatedOptions[optionIndex], ...fields };
     updateQuestion(questionIndex, { ...question, options: updatedOptions });
   };
 
   const handleCorrectAnswerChange = (optionIndex: number) => {
-    updateQuestion(questionIndex, { ...question, correctAnswer: optionIndex });
+    handleQuestionChange({ correctAnswer: optionIndex });
   };
 
+  useEffect(() => {
+    if (!question.image && !question.imageUrl) {
+      console.log("이미지 필드가 성공적으로 초기화되었습니다.");
+    }
+  }, [question.image, question.imageUrl]);
+
   return (
-    <Box sx={{ padding: "2rem" }}>
-      <Typography variant="h5" gutterBottom>문제 {questionIndex + 1}</Typography>
+    <Box sx={{ padding: "2rem", borderRadius: "16px", boxShadow: "0px 6px 20px rgba(0, 0, 0, 0.1)", backgroundColor: "#ffffff" }}>
+      <Typography variant="h5" gutterBottom sx={{ fontWeight: "bold", color: "#333" }}>
+        {questionIndex + 1}번 문제
+      </Typography>
 
-      <TextField
-        fullWidth
-        label="문제 텍스트"
-        value={question.questionText}
-        onChange={(e) => handleQuestionChange("questionText", e.target.value)}
-        sx={{ marginBottom: "1rem" }}
-      />
+      {/* 문제 텍스트와 시간 제한 */}
+      <Grid container spacing={2} sx={{ marginBottom: "1.5rem" }}>
+        <Grid item xs={12}>
+          <TextField
+            fullWidth
+            label="문제 텍스트"
+            value={question.questionText}
+            onChange={(e) => handleQuestionChange({ questionText: e.target.value })}
+            sx={{
+              "& .MuiInputBase-root": { borderRadius: "8px", backgroundColor: "#f9f9f9" },
+              marginBottom: "1rem",
+            }}
+          />
+        </Grid>
+        <Grid item xs={12} sm={6}>
+          <TextField
+            fullWidth
+            label="시간 제한 (초)"
+            type="number"
+            value={question.timeLimit}
+            onChange={(e) => handleQuestionChange({ timeLimit: parseInt(e.target.value) })}
+            sx={{ "& .MuiInputBase-root": { borderRadius: "8px", backgroundColor: "#f9f9f9" } }}
+          />
+        </Grid>
+        <Grid item xs={12} sm={6}>
+          <IconButton
+            onClick={() => { setImageDialogOpen(true); setImageType("question"); }}
+            sx={{
+              backgroundColor: "#ffcc00",
+              color: "#000",
+              borderRadius: "8px",
+              width: "100%",
+              height: "100%",
+              "&:hover": { backgroundColor: "#ffaa00" },
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: "0.875rem"
+            }}
+          >
+            <Image sx={{ mr: 0.5 }} /> 문제 이미지 업로드
+          </IconButton>
+        </Grid>
+      </Grid>
 
-      <TextField
-        fullWidth
-        label="시간 제한 (초)"
-        type="number"
-        value={question.timeLimit}
-        onChange={(e) => handleQuestionChange("timeLimit", parseInt(e.target.value))}
-        sx={{ marginBottom: "1rem" }}
-      />
-
-      <IconButton onClick={() => { setImageDialogOpen(true); setImageType("question"); }}>
-        <Image />
-      </IconButton>
-
-      {/* 문제 이미지 렌더링 - 파일 또는 URL을 구분하여 표시 */}
-      {question.image && (
-        <Box>
-          <img
-            src={typeof question.image === "string" ? question.image : URL.createObjectURL(question.image)}
+      {/* 문제 이미지 미리보기 및 삭제 */}
+      {(question.image || question.imageUrl) && (
+        <Box mt={2}>
+          <Box
+            component="img"
+            src={question.image ? URL.createObjectURL(question.image) : question.imageUrl}
             alt="문제 이미지"
-            style={{ maxWidth: "100%", height: "auto" }}
+            sx={{ maxWidth: "100%", height: "auto", borderRadius: "8px", boxShadow: "0px 4px 10px rgba(0, 0, 0, 0.1)" }}
           />
-          <Button onClick={() => handleQuestionChange("image", null)}>이미지 삭제</Button>
+          <Button
+            onClick={() => handleQuestionChange({ image: null, imageUrl: "" })}
+            sx={{ color: "#ff6f61", marginTop: "0.5rem" }}
+          >
+            이미지 삭제
+          </Button>
         </Box>
       )}
-      {question.imageUrl && !question.image && (
-        <Box>
-          <img
-            src={question.imageUrl}
-            alt="문제 이미지 URL"
-            style={{ maxWidth: "100%", height: "auto" }}
-          />
-          <Button onClick={() => handleQuestionChange("imageUrl", "")}>URL 이미지 삭제</Button>
-        </Box>
-      )}
-
-      <Grid container spacing={2}>
+      
+      {/* 선택지 입력 필드 */}
+      <Grid container spacing={2} sx={{ marginTop: "1rem" }}>
         {question.options.map((option, optionIndex) => (
-          <Grid item xs={6} key={optionIndex}>
-            <TextField
-              fullWidth
-              label={`선택지 ${optionIndex + 1}`}
-              value={option.text}
-              onChange={(e) => handleOptionChange(optionIndex, "text", e.target.value)}
-            />
-
-            <IconButton onClick={() => { setImageDialogOpen(true); setImageType("option"); setSelectedOptionIndex(optionIndex); }}>
-              <Image />
-            </IconButton>
-
-            {/* 선택지 이미지 렌더링 - 파일 또는 URL을 구분하여 표시 */}
-            {option.image && (
-              <Box>
-                <img
-                  src={typeof option.image === "string" ? option.image : URL.createObjectURL(option.image)}
-                  alt={`선택지 ${optionIndex + 1} 이미지`}
-                  style={{ maxWidth: "100%", height: "auto" }}
+          <Grid item xs={12} md={6} key={optionIndex}>
+            <Card sx={{ borderRadius: "8px", boxShadow: "0px 2px 4px rgba(0, 0, 0, 0.1)" }}>
+              <CardContent>
+                <TextField
+                  fullWidth
+                  label={`선택지 ${optionIndex + 1}`}
+                  value={option.text}
+                  onChange={(e) => handleOptionChange(optionIndex, { text: e.target.value })}
+                  sx={{
+                    "& .MuiInputBase-root": { borderRadius: "8px", backgroundColor: "#f9f9f9" },
+                    marginBottom: "0.5rem",
+                  }}
                 />
-                <Button onClick={() => handleOptionChange(optionIndex, "image", null)}>이미지 삭제</Button>
-              </Box>
-            )}
-            {option.imageUrl && !option.image && (
-              <Box>
-                <img
-                  src={option.imageUrl}
-                  alt={`선택지 ${optionIndex + 1} 이미지 URL`}
-                  style={{ maxWidth: "100%", height: "auto" }}
-                />
-                <Button onClick={() => handleOptionChange(optionIndex, "imageUrl", "")}>URL 이미지 삭제</Button>
-              </Box>
-            )}
 
-            <Button onClick={() => handleCorrectAnswerChange(optionIndex)} variant={question.correctAnswer === optionIndex ? "contained" : "outlined"}>
-              {question.correctAnswer === optionIndex ? "정답" : "정답으로 설정"}
-            </Button>
+                <Box display="flex" justifyContent="space-between" alignItems="center">
+                  <IconButton
+                    onClick={() => { setImageDialogOpen(true); setImageType("option"); setSelectedOptionIndex(optionIndex); }}
+                    sx={{
+                      backgroundColor: "#ffcc00",
+                      color: "#000",
+                      borderRadius: "8px",
+                      padding: "4px",
+                      "&:hover": { backgroundColor: "#ffaa00" }
+                    }}
+                  >
+                    <Image fontSize="small" />
+                  </IconButton>
+
+                  <Button
+                    onClick={() => handleCorrectAnswerChange(optionIndex)}
+                    variant={question.correctAnswer === optionIndex ? "contained" : "outlined"}
+                    sx={{
+                      color: question.correctAnswer === optionIndex ? "#fff" : "#ff9800",
+                      backgroundColor: question.correctAnswer === optionIndex ? "#ff9800" : "transparent",
+                      "&:hover": { backgroundColor: question.correctAnswer === optionIndex ? "#fb8c00" : "transparent" },
+                      borderRadius: "8px",
+                      fontSize: "0.875rem",
+                      minWidth: "90px"
+                    }}
+                  >
+                    {question.correctAnswer === optionIndex ? "정답" : "정답 설정"}
+                  </Button>
+                </Box>
+
+                {(option.image || option.imageUrl) && (
+                  <Box mt={1}>
+                    <img
+                      src={option.image ? URL.createObjectURL(option.image) : option.imageUrl}
+                      alt={`선택지 ${optionIndex + 1} 이미지`}
+                      style={{ maxWidth: "100%", height: "auto", borderRadius: "8px", boxShadow: "0px 4px 10px rgba(0, 0, 0, 0.1)" }}
+                    />
+                    <Button
+                      onClick={() => handleOptionChange(optionIndex, { image: null, imageUrl: "" })}
+                      sx={{ color: "#ff6f61", marginTop: "0.5rem" }}
+                    >
+                      이미지 삭제
+                    </Button>
+                  </Box>
+                )}
+              </CardContent>
+            </Card>
           </Grid>
         ))}
       </Grid>
 
-      <IconButton color="error" onClick={() => removeQuestion(questionIndex)}>
+      {/* 문제 삭제 버튼 */}
+      <IconButton color="error" onClick={() => removeQuestion(questionIndex)} sx={{ marginTop: "1.5rem", backgroundColor: "#f44336", color: "#fff", borderRadius: "8px" }}>
         <Delete />
       </IconButton>
 
+      {/* 이미지 업로드 다이얼로그 */}
       <ImageUploadDialog
         open={imageDialogOpen}
         onClose={() => setImageDialogOpen(false)}
         onImageChange={(file) => {
           if (imageType === "question") {
-            handleQuestionChange("image", file);
+            handleQuestionChange({ image: file, imageUrl: "" });
           } else if (imageType === "option" && selectedOptionIndex !== null) {
-            handleOptionChange(selectedOptionIndex, "image", file);
+            handleOptionChange(selectedOptionIndex, { image: file, imageUrl: "" });
           }
         }}
         onImageUrlChange={(url) => {
           if (imageType === "question") {
-            handleQuestionChange("imageUrl", url);
+            handleQuestionChange({ imageUrl: url, image: null });
           } else if (imageType === "option" && selectedOptionIndex !== null) {
-            handleOptionChange(selectedOptionIndex, "imageUrl", url);
+            handleOptionChange(selectedOptionIndex, { imageUrl: url, image: null });
           }
         }}
         imageUrl={imageType === "question" ? question.imageUrl : selectedOptionIndex !== null ? question.options[selectedOptionIndex].imageUrl : ""}
