@@ -43,24 +43,19 @@ const ReviewSlide: React.FC<ReviewSlideProps> = ({
                   {`문제 ${index + 1}`}
                 </Typography>
                 <Typography variant="body2" gutterBottom sx={{ color: "#555" }}>
-                  {question.questionText || "문제 텍스트가 입력되지 않았습니다."}
+                  {question.questionText || "문제를 입력하세요."}
                 </Typography>
 
-                {question.imageUrl && (
+                {(question.imageUrl || question.image) && (
                   <Box mt={1}>
                     <img
-                      src={question.imageUrl}
+                      src={question.image ? URL.createObjectURL(question.image) : question.imageUrl}
                       alt="문제 이미지"
-                      style={{ maxWidth: "100%", borderRadius: "8px", boxShadow: "0px 2px 5px rgba(0, 0, 0, 0.1)" }}
-                    />
-                  </Box>
-                )}
-                {question.image && (
-                  <Box mt={1}>
-                    <img
-                      src={URL.createObjectURL(question.image)}
-                      alt="문제 이미지"
-                      style={{ maxWidth: "100%", borderRadius: "8px", boxShadow: "0px 2px 5px rgba(0, 0, 0, 0.1)" }}
+                      style={{
+                        maxWidth: "100%",
+                        borderRadius: "8px",
+                        boxShadow: "0px 2px 5px rgba(0, 0, 0, 0.1)",
+                      }}
                     />
                   </Box>
                 )}
@@ -75,21 +70,20 @@ const ReviewSlide: React.FC<ReviewSlideProps> = ({
                           color: question.correctAnswer === optIndex ? "#ff9800" : "#555",
                         }}
                       >
-                        {`${optIndex + 1}. ${option.text || "선택지 텍스트 없음"}`}
+                        {`${optIndex + 1}. ${option.text || ((option.image || option.imageUrl) ? "" : "선택지를 입력하세요")}`}
                       </Typography>
 
-                      {option.imageUrl && (
+                      {(option.imageUrl || option.image) && (
                         <img
-                          src={option.imageUrl}
+                          src={option.image ? URL.createObjectURL(option.image) : option.imageUrl}
                           alt={`선택지 ${optIndex + 1} 이미지`}
-                          style={{ width: "30px", height: "30px", marginLeft: "0.5rem", borderRadius: "4px", boxShadow: "0px 2px 4px rgba(0, 0, 0, 0.1)" }}
-                        />
-                      )}
-                      {option.image && (
-                        <img
-                          src={URL.createObjectURL(option.image)}
-                          alt={`선택지 ${optIndex + 1} 이미지`}
-                          style={{ width: "30px", height: "30px", marginLeft: "0.5rem", borderRadius: "4px", boxShadow: "0px 2px 4px rgba(0, 0, 0, 0.1)" }}
+                          style={{
+                            width: "30px",
+                            height: "30px",
+                            marginLeft: "0.5rem",
+                            borderRadius: "4px",
+                            boxShadow: "0px 2px 4px rgba(0, 0, 0, 0.1)",
+                          }}
                         />
                       )}
                     </Box>
@@ -143,22 +137,6 @@ const ReviewSlide: React.FC<ReviewSlideProps> = ({
           </Card>
         </Grid>
       </Grid>
-
-      <Box display="flex" justifyContent="center" mt={3}>
-        <Button
-          variant="contained"
-          color="primary"
-          onClick={saveQuiz}
-          sx={{
-            padding: "0.75rem 2rem",
-            borderRadius: "8px",
-            backgroundColor: "#4caf50",
-            "&:hover": { backgroundColor: "#43a047" },
-          }}
-        >
-          퀴즈 저장
-        </Button>
-      </Box>
     </Box>
   );
 };

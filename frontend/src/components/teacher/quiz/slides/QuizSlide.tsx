@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from "react";
-import { Box, TextField, IconButton, Button, Typography, Grid, Card, CardContent } from "@mui/material";
+import React, { useState, useEffect } from "react";
+import { Box, TextField, IconButton, Button, Typography, Grid, Card, CardContent, MenuItem } from "@mui/material";
 import { Delete, Image } from "@mui/icons-material";
 import { Question } from "../types";
 import ImageUploadDialog from "../ImageUploadDialog";
@@ -36,6 +36,27 @@ const QuizSlide: React.FC<QuizSlideProps> = ({
     handleQuestionChange({ correctAnswer: optionIndex });
   };
 
+  const handleQuestionTypeChange = (value: string) => {
+    const updatedQuestion = { ...question, questionType: value };
+
+    if (value === "true-false") {
+      updatedQuestion.options = [
+        { text: "참", imageUrl: "", image: null },
+        { text: "거짓", imageUrl: "", image: null },
+      ];
+    } else if (value === "multiple-choice") {
+      updatedQuestion.options = [
+        { text: "", imageUrl: "", image: null },
+        { text: "", imageUrl: "", image: null },
+        { text: "", imageUrl: "", image: null },
+        { text: "", imageUrl: "", image: null },
+      ];
+    }
+
+    updatedQuestion.correctAnswer = -1;
+    updateQuestion(questionIndex, updatedQuestion);
+  };
+
   useEffect(() => {
     if (!question.image && !question.imageUrl) {
       console.log("이미지 필드가 성공적으로 초기화되었습니다.");
@@ -48,19 +69,20 @@ const QuizSlide: React.FC<QuizSlideProps> = ({
         {questionIndex + 1}번 문제
       </Typography>
 
-      {/* 문제 텍스트와 시간 제한 */}
+      {/* 문제 유형 및 시간 설정 */}
       <Grid container spacing={2} sx={{ marginBottom: "1.5rem" }}>
-        <Grid item xs={12}>
+        <Grid item xs={12} sm={6}>
           <TextField
+            select
+            label="문제 유형"
+            value={question.questionType}
+            onChange={(e) => handleQuestionTypeChange(e.target.value)}
             fullWidth
-            label="문제 텍스트"
-            value={question.questionText}
-            onChange={(e) => handleQuestionChange({ questionText: e.target.value })}
-            sx={{
-              "& .MuiInputBase-root": { borderRadius: "8px", backgroundColor: "#f9f9f9" },
-              marginBottom: "1rem",
-            }}
-          />
+            sx={{ "& .MuiInputBase-root": { borderRadius: "8px", backgroundColor: "#f9f9f9" } }}
+          >
+            <MenuItem value="multiple-choice">선택형</MenuItem>
+            <MenuItem value="true-false">참/거짓</MenuItem>
+          </TextField>
         </Grid>
         <Grid item xs={12} sm={6}>
           <TextField
@@ -72,51 +94,127 @@ const QuizSlide: React.FC<QuizSlideProps> = ({
             sx={{ "& .MuiInputBase-root": { borderRadius: "8px", backgroundColor: "#f9f9f9" } }}
           />
         </Grid>
-        <Grid item xs={12} sm={6}>
+      </Grid>
+
+      {/* 문제 텍스트 입력 필드 및 이미지 업로드 아이콘 */}
+      <Grid container spacing={1} alignItems="center" sx={{ marginBottom: "1.5rem" }}>
+        <Grid item xs={11}>
+          <TextField
+            fullWidth
+            label="문제"
+            value={question.questionText}
+            onChange={(e) => handleQuestionChange({ questionText: e.target.value })}
+            sx={{
+              "& .MuiInputBase-root": { borderRadius: "8px", backgroundColor: "#f9f9f9" },
+              marginBottom: "1rem",
+            }}
+          />
+        </Grid>
+        <Grid item xs={1}>
           <IconButton
             onClick={() => { setImageDialogOpen(true); setImageType("question"); }}
             sx={{
-              backgroundColor: "#ffcc00",
               color: "#000",
+              backgroundColor: "#ffcc00",
               borderRadius: "8px",
-              width: "100%",
-              height: "100%",
               "&:hover": { backgroundColor: "#ffaa00" },
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: "0.875rem"
+              padding: "8px",
             }}
           >
-            <Image sx={{ mr: 0.5 }} /> 문제 이미지 업로드
+            <Image />
           </IconButton>
         </Grid>
       </Grid>
 
       {/* 문제 이미지 미리보기 및 삭제 */}
       {(question.image || question.imageUrl) && (
-        <Box mt={2}>
+        <Box
+          sx={{
+            position: "relative",
+            maxWidth: "100%",  // 가로 화면에 맞춤
+            height: "250px",   // 문제 이미지 높이 고정
+            borderRadius: "8px",
+            overflow: "hidden",
+            boxShadow: "0px 4px 10px rgba(0, 0, 0, 0.1)",
+            border: "1px solid #ddd",
+            marginTop: "1rem",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+          }}
+        >
           <Box
             component="img"
             src={question.image ? URL.createObjectURL(question.image) : question.imageUrl}
             alt="문제 이미지"
-            sx={{ maxWidth: "100%", height: "auto", borderRadius: "8px", boxShadow: "0px 4px 10px rgba(0, 0, 0, 0.1)" }}
+            sx={{
+              width: "auto",
+              height: "100%",  // 높이를 컨테이너에 맞추고, 비율 유지
+              objectFit: "contain",
+            }}
           />
-          <Button
+          <IconButton
             onClick={() => handleQuestionChange({ image: null, imageUrl: "" })}
-            sx={{ color: "#ff6f61", marginTop: "0.5rem" }}
+            sx={{
+              position: "absolute",
+              top: "4px",
+              right: "4px",
+              backgroundColor: "#ff6f61",
+              color: "#fff",
+              width: "24px",
+              height: "24px",
+              "&:hover": { backgroundColor: "#e57373" },
+            }}
+            size="small"
           >
-            이미지 삭제
-          </Button>
+            <Delete fontSize="small" />
+          </IconButton>
         </Box>
       )}
-      
+
       {/* 선택지 입력 필드 */}
       <Grid container spacing={2} sx={{ marginTop: "1rem" }}>
         {question.options.map((option, optionIndex) => (
           <Grid item xs={12} md={6} key={optionIndex}>
             <Card sx={{ borderRadius: "8px", boxShadow: "0px 2px 4px rgba(0, 0, 0, 0.1)" }}>
               <CardContent>
+                {/* 선택지 이미지 */}
+                {(option.image || option.imageUrl) && (
+                  <Box
+                    sx={{
+                      position: "relative",
+                      width: "100%",
+                      height: "150px",
+                      borderRadius: "8px",
+                      overflow: "hidden",
+                      boxShadow: "0px 4px 10px rgba(0, 0, 0, 0.1)",
+                      border: "1px solid #ddd",
+                      marginBottom: "0.5rem",
+                      display: "flex",
+                      justifyContent: "center",
+                      alignItems: "center",
+                    }}
+                  >
+                    <img
+                      src={option.image ? URL.createObjectURL(option.image) : option.imageUrl}
+                      alt={`선택지 ${optionIndex + 1} 이미지`}
+                      style={{
+                        width: "auto",
+                        height: "100%",
+                        objectFit: "contain",
+                      }}
+                    />
+                    <Button
+                      onClick={() => handleOptionChange(optionIndex, { image: null, imageUrl: "" })}
+                      sx={{ color: "#ff6f61", position: "absolute", top: "4px", right: "4px" }}
+                      size="small"
+                    >
+                      <Delete fontSize="small" />
+                    </Button>
+                  </Box>
+                )}
+
+                {/* 선택지 텍스트 */}
                 <TextField
                   fullWidth
                   label={`선택지 ${optionIndex + 1}`}
@@ -128,6 +226,7 @@ const QuizSlide: React.FC<QuizSlideProps> = ({
                   }}
                 />
 
+                {/* 이미지 업로드 아이콘과 정답 버튼 */}
                 <Box display="flex" justifyContent="space-between" alignItems="center">
                   <IconButton
                     onClick={() => { setImageDialogOpen(true); setImageType("option"); setSelectedOptionIndex(optionIndex); }}
@@ -157,22 +256,6 @@ const QuizSlide: React.FC<QuizSlideProps> = ({
                     {question.correctAnswer === optionIndex ? "정답" : "정답 설정"}
                   </Button>
                 </Box>
-
-                {(option.image || option.imageUrl) && (
-                  <Box mt={1}>
-                    <img
-                      src={option.image ? URL.createObjectURL(option.image) : option.imageUrl}
-                      alt={`선택지 ${optionIndex + 1} 이미지`}
-                      style={{ maxWidth: "100%", height: "auto", borderRadius: "8px", boxShadow: "0px 4px 10px rgba(0, 0, 0, 0.1)" }}
-                    />
-                    <Button
-                      onClick={() => handleOptionChange(optionIndex, { image: null, imageUrl: "" })}
-                      sx={{ color: "#ff6f61", marginTop: "0.5rem" }}
-                    >
-                      이미지 삭제
-                    </Button>
-                  </Box>
-                )}
               </CardContent>
             </Card>
           </Grid>

@@ -1,3 +1,4 @@
+// QuizContainer.tsx
 import React, { useState, useEffect } from "react";
 import { Box, Snackbar, Divider } from "@mui/material";
 import OverviewPanel from "./slides/OverviewPanel";
@@ -25,6 +26,7 @@ const QuizContainer: React.FC = () => {
   const [currentSlideIndex, setCurrentSlideIndex] = useState(1);
   const [error, setError] = useState<string | null>(null);
   const [imageDialogOpen, setImageDialogOpen] = useState(false);
+  const [isReviewSlide, setIsReviewSlide] = useState(false);
 
   const fetchUnits = async () => {
     if (grade && semester && subject) {
@@ -39,6 +41,10 @@ const QuizContainer: React.FC = () => {
     }
   };
 
+  useEffect(() => {
+    setIsReviewSlide(currentSlideIndex > questions.length);
+  }, [currentSlideIndex, questions.length]);
+  
   useEffect(() => {
     fetchUnits();
   }, [grade, semester, subject]);
@@ -111,22 +117,9 @@ const QuizContainer: React.FC = () => {
   };
 
   return (
-    <Box display="flex">
-      {/* 좌측 패널 */}
-      <Box
-        sx={{
-          width: "260px",
-          padding: "1.5rem",
-          borderRight: "1px solid #ddd",     // 경계선 색상 조정
-          backgroundColor: "#fafafa",         // 패널 배경색 변경
-          borderRadius: "16px 0 0 16px",
-          boxShadow: "2px 0 10px rgba(0, 0, 0, 0.05)",
-          position: "sticky",
-          top: "20px",
-          maxHeight: "calc(100vh - 40px)",
-          overflowY: "auto"
-        }}
-      >
+    <Box>
+      {/* 상단: 퀴즈 개요 패널 */}
+      <Box sx={{ mb: 3 }}>
         <OverviewPanel
           title={title}
           setTitle={setTitle}
@@ -147,65 +140,69 @@ const QuizContainer: React.FC = () => {
         />
       </Box>
 
-      {/* 가운데: 문제 슬라이드 */}
-      <Box
-        sx={{
-          flex: 1,
-          padding: "2rem",
-          backgroundColor: "#ffffff",         // 슬라이드 영역 배경색 설정
-          boxShadow: "0px 4px 12px rgba(0, 0, 0, 0.1)",
-          borderRadius: "8px",
-          marginX: "1rem"
-        }}
-      >
-        {currentSlideIndex <= questions.length ? (
-          <QuizSlide
-            question={questions[currentSlideIndex - 1]}
-            questionIndex={currentSlideIndex - 1}
-            updateQuestion={updateQuestion}
-            removeQuestion={removeQuestion}
-          />
-        ) : (
-          <ReviewSlide
+      {/* 퀴즈 생성 화면 */}
+      <Box display="flex">
+        {/* 좌측 패널 */}
+        <Box
+          sx={{
+            width: "260px",
+            padding: "1.5rem",
+            borderRight: "1px solid #ddd",
+            backgroundColor: "#fafafa",
+            borderRadius: "16px 0 0 16px",
+            boxShadow: "2px 0 10px rgba(0, 0, 0, 0.05)",
+            position: "sticky",
+            top: "20px",
+            maxHeight: "calc(100vh - 40px)",
+            overflowY: "auto",
+          }}
+        >
+          <QuestionListPanel
             questions={questions}
+            currentSlideIndex={currentSlideIndex}
+            moveToSlide={moveToSlide}
+            reorderQuestions={reorderQuestions}
+            goToReview={() => setCurrentSlideIndex(questions.length + 1)}
+            isReviewSlide={isReviewSlide}
+          />
+        </Box>
+
+        {/* 중앙 패널 */}
+        <Box
+          sx={{
+            flex: 1,
+            padding: "2rem",
+            backgroundColor: "#ffffff",
+            boxShadow: "0px 4px 12px rgba(0, 0, 0, 0.1)",
+            borderRadius: "8px",
+            marginX: "1rem",
+          }}
+        >
+          {currentSlideIndex <= questions.length ? (
+            <QuizSlide
+              question={questions[currentSlideIndex - 1]}
+              questionIndex={currentSlideIndex - 1}
+              updateQuestion={updateQuestion}
+              removeQuestion={removeQuestion}
+            />
+          ) : (
+            <ReviewSlide
+              questions={questions}
+              addQuestion={addQuestion}
+              saveQuiz={saveQuiz}
+              moveToSlide={moveToSlide}
+            />
+          )}
+          
+          <SlideNavigation
+            currentSlideIndex={currentSlideIndex}
+            totalSlides={questions.length + 1}
+            setCurrentSlideIndex={setCurrentSlideIndex}
             addQuestion={addQuestion}
             saveQuiz={saveQuiz}
-            moveToSlide={moveToSlide}
+            isReviewSlide={currentSlideIndex > questions.length}
           />
-        )}
-        
-        <SlideNavigation
-          currentSlideIndex={currentSlideIndex}
-          totalSlides={questions.length + 1}
-          setCurrentSlideIndex={setCurrentSlideIndex}
-          addQuestion={addQuestion}
-          saveQuiz={saveQuiz}
-          isReviewSlide={currentSlideIndex > questions.length}
-        />
-      </Box>
-
-      {/* 우측 패널 */}
-      <Box
-        sx={{
-          width: "260px",
-          padding: "1.5rem",
-          borderLeft: "1px solid #ddd",       // 경계선 색상 조정
-          backgroundColor: "#fafafa",         // 패널 배경색 변경
-          borderRadius: "0 16px 16px 0",
-          boxShadow: "-2px 0 10px rgba(0, 0, 0, 0.05)",
-          position: "sticky",
-          top: "20px",
-          maxHeight: "calc(100vh - 40px)",
-          overflowY: "auto"
-        }}
-      >
-        <QuestionListPanel
-          questions={questions}
-          currentSlideIndex={currentSlideIndex}
-          moveToSlide={moveToSlide}
-          reorderQuestions={reorderQuestions}
-          goToReview={() => setCurrentSlideIndex(questions.length + 1)}
-        />
+        </Box>
       </Box>
 
       {/* 이미지 업로드 다이얼로그 */}
@@ -228,7 +225,7 @@ const QuizContainer: React.FC = () => {
             backgroundColor: "#e57373",
             color: "#ffffff",
             fontWeight: "bold",
-            borderRadius: "8px"
+            borderRadius: "8px",
           }}
         />
       )}

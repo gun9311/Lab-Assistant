@@ -1,3 +1,4 @@
+// QuestionListPanel.tsx
 import React from "react";
 import { Box, List, ListItem, ListItemText, Typography, Button, IconButton } from "@mui/material";
 import { DragDropContext, Draggable, Droppable } from "react-beautiful-dnd";
@@ -10,6 +11,7 @@ type QuestionListPanelProps = {
   moveToSlide: (index: number) => void;
   reorderQuestions: (startIndex: number, endIndex: number) => void;
   goToReview: () => void;
+  isReviewSlide: boolean;
 };
 
 const QuestionListPanel: React.FC<QuestionListPanelProps> = ({
@@ -18,6 +20,7 @@ const QuestionListPanel: React.FC<QuestionListPanelProps> = ({
   moveToSlide,
   reorderQuestions,
   goToReview,
+  isReviewSlide,
 }) => {
   const handleDragEnd = (result: any) => {
     const { destination, source } = result;
@@ -41,11 +44,11 @@ const QuestionListPanel: React.FC<QuestionListPanelProps> = ({
 
       <DragDropContext onDragEnd={handleDragEnd}>
         <Droppable droppableId="question-list">
-          {(provided:any) => (
+          {(provided: any) => (
             <List {...provided.droppableProps} ref={provided.innerRef}>
               {questions.map((question, index) => (
                 <Draggable key={index} draggableId={String(index)} index={index}>
-                  {(provided:any, snapshot:any) => (
+                  {(provided: any, snapshot: any) => (
                     <ListItem
                       button
                       selected={currentSlideIndex === index + 1}
@@ -79,9 +82,11 @@ const QuestionListPanel: React.FC<QuestionListPanelProps> = ({
                         <DragIndicator fontSize="small" />
                       </IconButton>
 
-                      {/* 문제 텍스트 */}
+                      {/* 문제 텍스트 일부 표시, 텍스트가 없을 경우 '비어있음' 표시 */}
                       <ListItemText
-                        primary={`${index + 1}번 문제`}
+                        primary={`${index + 1}. ${
+                          question.questionText ? question.questionText.slice(0, 10) + "..." : "문제 없음"
+                        }`}
                         primaryTypographyProps={{
                           fontSize: "1rem",
                           fontWeight: currentSlideIndex === index + 1 ? "bold" : "normal",
@@ -113,19 +118,20 @@ const QuestionListPanel: React.FC<QuestionListPanelProps> = ({
         variant="contained"
         onClick={goToReview}
         fullWidth
+        disabled={isReviewSlide} // 리뷰 슬라이드일 때 비활성화
         sx={{
           marginTop: "1.5rem",
           borderRadius: "8px",
-          backgroundColor: "#ff9800",
+          backgroundColor: isReviewSlide ? "#bdbdbd" : "#ff9800", // 리뷰 슬라이드일 때 회색
           color: "#fff",
           fontWeight: "bold",
           fontSize: "1rem",
           paddingY: "0.8rem",
           boxShadow: "0px 4px 10px rgba(0, 0, 0, 0.1)",
-          "&:hover": { backgroundColor: "#fb8c00" },
+          "&:hover": { backgroundColor: isReviewSlide ? "#bdbdbd" : "#fb8c00" }, // 비활성화 시 호버 색상 고정
         }}
       >
-        퀴즈 검토 및 저장
+        {isReviewSlide ? "퀴즈 검토 중" : "퀴즈 검토 및 저장"} {/* 텍스트 변경 */}
       </Button>
     </Box>
   );
