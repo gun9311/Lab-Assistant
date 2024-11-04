@@ -6,20 +6,20 @@ import { Question } from "../types";
 type ReviewSlideProps = {
   questions: Question[];
   addQuestion: () => void;
-  saveQuiz: () => void;
   moveToSlide: (index: number) => void;
+  isReadOnly?: boolean; // 읽기 전용 모드 여부
 };
 
 const ReviewSlide: React.FC<ReviewSlideProps> = ({
   questions,
   addQuestion,
-  saveQuiz,
   moveToSlide,
+  isReadOnly = false, // 기본값을 편집 가능 모드로 설정
 }) => {
   return (
     <Box sx={{ padding: "2rem", backgroundColor: "#ffffff", borderRadius: "16px", boxShadow: "0px 6px 20px rgba(0, 0, 0, 0.1)" }}>
       <Typography variant="h4" gutterBottom sx={{ fontWeight: "bold", color: "#333" }}>
-        퀴즈 검토 및 저장
+        {isReadOnly ? "전체 보기" : "퀴즈 검토 및 저장"} {/* 읽기 전용일 때 텍스트 변경 */}
       </Typography>
       <Typography variant="subtitle1" gutterBottom sx={{ color: "#666" }}>
         아래에서 모든 문제를 검토하고 필요 시 수정하세요.
@@ -91,51 +91,57 @@ const ReviewSlide: React.FC<ReviewSlideProps> = ({
                 </Box>
               </CardContent>
 
-              <IconButton
-                aria-label="문제 수정"
-                sx={{
-                  position: "absolute",
-                  top: "10px",
-                  right: "10px",
-                  backgroundColor: "#ff9800",
-                  color: "#fff",
-                  "&:hover": { backgroundColor: "#fb8c00" },
-                  borderRadius: "8px",
-                }}
-                onClick={() => moveToSlide(index + 1)}
-              >
-                <Edit />
-              </IconButton>
+              {/* 읽기 전용이 아닐 때만 문제 편집 버튼 표시 */}
+              {!isReadOnly && (
+                <IconButton
+                  aria-label="문제 수정"
+                  sx={{
+                    position: "absolute",
+                    top: "10px",
+                    right: "10px",
+                    backgroundColor: "#ff9800",
+                    color: "#fff",
+                    "&:hover": { backgroundColor: "#fb8c00" },
+                    borderRadius: "8px",
+                  }}
+                  onClick={() => moveToSlide(index + 1)}
+                >
+                  <Edit />
+                </IconButton>
+              )}
             </Card>
           </Grid>
         ))}
 
-        <Grid item xs={12} sm={6} md={4}>
-          <Card
-            variant="outlined"
-            sx={{
-              height: "100%",
-              display: "flex",
-              justifyContent: "center",
-              alignItems: "center",
-              borderRadius: "8px",
-              boxShadow: "0px 4px 10px rgba(0, 0, 0, 0.1)",
-              backgroundColor: "#ffecb3",
-              color: "#555",
-              transition: "background-color 0.2s ease",
-              "&:hover": { backgroundColor: "#ffe082" },
-            }}
-          >
-            <Button
+        {/* 문제 추가 카드: 읽기 전용이 아닐 때만 표시 */}
+        {!isReadOnly && (
+          <Grid item xs={12} sm={6} md={4}>
+            <Card
               variant="outlined"
-              startIcon={<Add />}
-              onClick={addQuestion}
-              sx={{ color: "#ff9800", borderColor: "#ff9800", "&:hover": { borderColor: "#fb8c00" } }}
+              sx={{
+                height: "100%",
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+                borderRadius: "8px",
+                boxShadow: "0px 4px 10px rgba(0, 0, 0, 0.1)",
+                backgroundColor: "#ffecb3",
+                color: "#555",
+                transition: "background-color 0.2s ease",
+                "&:hover": { backgroundColor: "#ffe082" },
+              }}
             >
-              문제 추가
-            </Button>
-          </Card>
-        </Grid>
+              <Button
+                variant="outlined"
+                startIcon={<Add />}
+                onClick={addQuestion}
+                sx={{ color: "#ff9800", borderColor: "#ff9800", "&:hover": { borderColor: "#fb8c00" } }}
+              >
+                문제 추가
+              </Button>
+            </Card>
+          </Grid>
+        )}
       </Grid>
     </Box>
   );

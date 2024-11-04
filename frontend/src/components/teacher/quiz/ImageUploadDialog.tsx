@@ -111,7 +111,6 @@ const ImageUploadDialog: React.FC<ImageUploadDialogProps> = ({
             {tempImageFile && (
               <Box
                 mt={2}
-                p={2}
                 sx={{
                   display: "flex",
                   flexDirection: "column",
@@ -120,33 +119,34 @@ const ImageUploadDialog: React.FC<ImageUploadDialogProps> = ({
                   backgroundColor: "#f7f7f7",
                   boxShadow: "0px 4px 10px rgba(0, 0, 0, 0.1)",
                   position: "relative",
+                  width: "150px",
+                  height: "150px",
+                  overflow: "hidden",
                 }}
               >
-                <Typography variant="body2" color="textSecondary" gutterBottom>
-                  선택된 파일 미리보기:
-                </Typography>
                 <img
                   src={URL.createObjectURL(tempImageFile)}
                   alt="미리보기"
                   style={{
-                    maxWidth: "100%",
-                    height: "auto",
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "contain",
                     borderRadius: "8px",
-                    marginBottom: "0.5rem",
                   }}
                 />
                 <IconButton
                   onClick={() => setTempImageFile(null)}
                   sx={{
                     position: "absolute",
-                    top: "8px",
-                    right: "8px",
+                    top: "4px",
+                    right: "4px",
                     color: "#ff6f61",
                     backgroundColor: "#fff",
                     "&:hover": { backgroundColor: "#ffe5e5" },
                   }}
+                  size="small"
                 >
-                  <Delete />
+                  <Delete fontSize="small" />
                 </IconButton>
               </Box>
             )}
@@ -179,7 +179,6 @@ const ImageUploadDialog: React.FC<ImageUploadDialogProps> = ({
             {tempImageUrl && (
               <Box
                 mt={2}
-                p={2}
                 sx={{
                   display: "flex",
                   flexDirection: "column",
@@ -188,33 +187,34 @@ const ImageUploadDialog: React.FC<ImageUploadDialogProps> = ({
                   backgroundColor: "#f7f7f7",
                   boxShadow: "0px 4px 10px rgba(0, 0, 0, 0.1)",
                   position: "relative",
+                  width: "150px",
+                  height: "150px",
+                  overflow: "hidden",
                 }}
               >
-                <Typography variant="body2" color="textSecondary" gutterBottom>
-                  입력된 URL 미리보기:
-                </Typography>
                 <img
                   src={tempImageUrl}
                   alt="미리보기"
                   style={{
-                    maxWidth: "100%",
-                    height: "auto",
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "contain",
                     borderRadius: "8px",
-                    marginBottom: "0.5rem",
                   }}
                 />
                 <IconButton
                   onClick={() => setTempImageUrl("")}
                   sx={{
                     position: "absolute",
-                    top: "8px",
-                    right: "8px",
+                    top: "4px",
+                    right: "4px",
                     color: "#ff6f61",
                     backgroundColor: "#fff",
                     "&:hover": { backgroundColor: "#ffe5e5" },
                   }}
+                  size="small"
                 >
-                  <Delete />
+                  <Delete fontSize="small" />
                 </IconButton>
               </Box>
             )}

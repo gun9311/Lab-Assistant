@@ -38,45 +38,14 @@ export const createQuiz = async (quizData: FormData) => {
     }
   };
 
-
-  // 퀴즈 수정 API 호출
-  export const updateQuiz = async (id: string, updatedQuizData: any) => {
-    try {
-      const formData = new FormData();
-      formData.append('title', updatedQuizData.title);
-      formData.append('unit', updatedQuizData.unit);
-  
-      // 문제와 선택지 처리
-      updatedQuizData.questions.forEach((question: any, index: number) => {
-        formData.append(`questions[${index}][questionText]`, question.questionText);
-        formData.append(`questions[${index}][correctAnswer]`, question.correctAnswer);
-  
-        // 선택지 추가
-        question.options.forEach((option: string, optIndex: number) => {
-          formData.append(`questions[${index}][options][${optIndex}]`, option);
-        });
-  
-        // 새 이미지가 있으면 추가하고, 없으면 기존 이미지 URL 유지
-        if (question.newImage) {
-          formData.append(`questions[${index}][image]`, question.newImage);
-        } else if (question.imageUrl) {
-          formData.append(`questions[${index}][imageUrl]`, question.imageUrl);  // 기존 이미지 유지
-        }
-      });
-  
-      // API에 수정된 퀴즈 데이터 전송
-      const response = await api.put(`/kahoot-quiz/${id}`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-  
-      return response.data;
-    } catch (error) {
-      console.error('퀴즈 수정 요청 실패', error);
-      throw error;
-    }
-  };
+// 퀴즈 수정 API 호출
+export const updateQuiz = async (quizId: string, quizData: FormData) => {
+  return await api.put(`/kahoot-quiz/${quizId}`, quizData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+};
 
   // 특정 퀴즈 가져오기 API 호출
 export const getQuizById = async (quizId: string) => {

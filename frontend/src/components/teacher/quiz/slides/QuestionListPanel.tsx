@@ -1,4 +1,3 @@
-// QuestionListPanel.tsx
 import React from "react";
 import { Box, List, ListItem, ListItemText, Typography, Button, IconButton } from "@mui/material";
 import { DragDropContext, Draggable, Droppable } from "react-beautiful-dnd";
@@ -12,6 +11,7 @@ type QuestionListPanelProps = {
   reorderQuestions: (startIndex: number, endIndex: number) => void;
   goToReview: () => void;
   isReviewSlide: boolean;
+  isReadOnly?: boolean; // NEW: 읽기 전용 모드 추가
 };
 
 const QuestionListPanel: React.FC<QuestionListPanelProps> = ({
@@ -21,6 +21,7 @@ const QuestionListPanel: React.FC<QuestionListPanelProps> = ({
   reorderQuestions,
   goToReview,
   isReviewSlide,
+  isReadOnly = false, // 기본값은 편집 모드
 }) => {
   const handleDragEnd = (result: any) => {
     const { destination, source } = result;
@@ -42,12 +43,17 @@ const QuestionListPanel: React.FC<QuestionListPanelProps> = ({
         문제 목록
       </Typography>
 
-      <DragDropContext onDragEnd={handleDragEnd}>
+      <DragDropContext onDragEnd={isReadOnly ? undefined : handleDragEnd}>
         <Droppable droppableId="question-list">
           {(provided: any) => (
             <List {...provided.droppableProps} ref={provided.innerRef}>
               {questions.map((question, index) => (
-                <Draggable key={index} draggableId={String(index)} index={index}>
+                <Draggable
+                  key={index}
+                  draggableId={String(index)}
+                  index={index}
+                  isDragDisabled={isReadOnly} // NEW: 읽기 전용일 때 드래그 비활성화
+                >
                   {(provided: any, snapshot: any) => (
                     <ListItem
                       button
@@ -55,7 +61,7 @@ const QuestionListPanel: React.FC<QuestionListPanelProps> = ({
                       onClick={() => moveToSlide(index + 1)}
                       ref={provided.innerRef}
                       {...provided.draggableProps}
-                      {...provided.dragHandleProps}
+                      {...(!isReadOnly && provided.dragHandleProps)} // NEW: 읽기 전용일 때 드래그 핸들 제거
                       sx={{
                         display: "flex",
                         alignItems: "center",
@@ -70,17 +76,19 @@ const QuestionListPanel: React.FC<QuestionListPanelProps> = ({
                         padding: "0.5rem 1rem",
                       }}
                     >
-                      {/* 드래그 핸들 아이콘 */}
-                      <IconButton
-                        edge="start"
-                        sx={{
-                          color: "#ccc",
-                          cursor: "move",
-                          "&:hover": { color: "#888" },
-                        }}
-                      >
-                        <DragIndicator fontSize="small" />
-                      </IconButton>
+                      {/* 드래그 핸들 아이콘 (읽기 전용일 때 비활성화) */}
+                      {!isReadOnly && (
+                        <IconButton
+                          edge="start"
+                          sx={{
+                            color: "#ccc",
+                            cursor: "move",
+                            "&:hover": { color: "#888" },
+                          }}
+                        >
+                          <DragIndicator fontSize="small" />
+                        </IconButton>
+                      )}
 
                       {/* 문제 텍스트 일부 표시, 텍스트가 없을 경우 '비어있음' 표시 */}
                       <ListItemText
@@ -114,6 +122,7 @@ const QuestionListPanel: React.FC<QuestionListPanelProps> = ({
         </Droppable>
       </DragDropContext>
 
+      {/* 검토 버튼: 읽기 전용일 때는 "전체 보기" 텍스트로 표시 */}
       <Button
         variant="contained"
         onClick={goToReview}
@@ -122,16 +131,16 @@ const QuestionListPanel: React.FC<QuestionListPanelProps> = ({
         sx={{
           marginTop: "1.5rem",
           borderRadius: "8px",
-          backgroundColor: isReviewSlide ? "#bdbdbd" : "#ff9800", // 리뷰 슬라이드일 때 회색
+          backgroundColor: isReviewSlide ? "#bdbdbd" : "#ff9800",
           color: "#fff",
           fontWeight: "bold",
           fontSize: "1rem",
           paddingY: "0.8rem",
           boxShadow: "0px 4px 10px rgba(0, 0, 0, 0.1)",
-          "&:hover": { backgroundColor: isReviewSlide ? "#bdbdbd" : "#fb8c00" }, // 비활성화 시 호버 색상 고정
+          "&:hover": { backgroundColor: isReviewSlide ? "#bdbdbd" : "#fb8c00" },
         }}
       >
-        {isReviewSlide ? "퀴즈 검토 중" : "퀴즈 검토 및 저장"} {/* 텍스트 변경 */}
+        {isReadOnly ? "전체 보기" : isReviewSlide ? "퀴즈 검토 중" : "퀴즈 검토 및 저장"}
       </Button>
     </Box>
   );

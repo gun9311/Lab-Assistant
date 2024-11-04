@@ -1,4 +1,3 @@
-// QuizContainer.tsx
 import React, { useState, useEffect } from "react";
 import { Box, Snackbar, Divider } from "@mui/material";
 import OverviewPanel from "./slides/OverviewPanel";
@@ -9,24 +8,47 @@ import ImageUploadDialog from "./ImageUploadDialog";
 import QuestionListPanel from "./slides/QuestionListPanel";
 import { Question } from "./types";
 import { initialQuestion } from "./utils";
-import { getUnits, createQuiz } from "../../../utils/quizApi";
+import { getUnits, createQuiz, updateQuiz } from "../../../utils/quizApi";
 import { useNavigate } from "react-router-dom";
 
-const QuizContainer: React.FC = () => {
+interface QuizContainerProps {
+  isEdit?: boolean;
+  initialData?: any;
+  isReadOnly?: boolean; // 읽기 전용 모드 추가
+  onStartQuiz?: () => void; // 퀴즈 시작 핸들러 추가
+  onEditQuiz?: () => void; // 퀴즈 편집 핸들러 추가
+}
+
+const QuizContainer: React.FC<QuizContainerProps> = ({ 
+  isEdit = false, 
+  initialData, 
+  isReadOnly = false,
+  onStartQuiz,
+  onEditQuiz,
+}) => {
+  
   const navigate = useNavigate();
-  const [title, setTitle] = useState("");
-  const [grade, setGrade] = useState("");
-  const [semester, setSemester] = useState("");
-  const [subject, setSubject] = useState("");
-  const [unit, setUnit] = useState("");
+  const [title, setTitle] = useState(initialData?.title || "");
+  const [grade, setGrade] = useState(initialData?.grade || "");
+  const [semester, setSemester] = useState(initialData?.semester || "");
+  const [subject, setSubject] = useState(initialData?.subject || "");
+  const [unit, setUnit] = useState(initialData?.unit || "");
   const [units, setUnits] = useState<string[]>([]);
   const [quizImage, setQuizImage] = useState<File | null>(null);
-  const [quizImageUrl, setQuizImageUrl] = useState("");
-  const [questions, setQuestions] = useState<Question[]>([initialQuestion]);
+  const [quizImageUrl, setQuizImageUrl] = useState(initialData?.imageUrl || "");
+  const [questions, setQuestions] = useState<Question[]>(initialData?.questions || [initialQuestion]);
   const [currentSlideIndex, setCurrentSlideIndex] = useState(1);
   const [error, setError] = useState<string | null>(null);
   const [imageDialogOpen, setImageDialogOpen] = useState(false);
   const [isReviewSlide, setIsReviewSlide] = useState(false);
+  
+  useEffect(() => {
+    setIsReviewSlide(currentSlideIndex > questions.length);
+  }, [currentSlideIndex, questions.length]);
+  
+  useEffect(() => {
+    fetchUnits();
+  }, [grade, semester, subject]);
 
   const fetchUnits = async () => {
     if (grade && semester && subject) {
@@ -40,14 +62,6 @@ const QuizContainer: React.FC = () => {
       setUnits([]);
     }
   };
-
-  useEffect(() => {
-    setIsReviewSlide(currentSlideIndex > questions.length);
-  }, [currentSlideIndex, questions.length]);
-  
-  useEffect(() => {
-    fetchUnits();
-  }, [grade, semester, subject]);
 
   const addQuestion = () => {
     setQuestions([...questions, initialQuestion]);
@@ -87,7 +101,7 @@ const QuizContainer: React.FC = () => {
       if (quizImage) formData.append("image", quizImage);
       else if (quizImageUrl) formData.append("imageUrl", quizImageUrl);
 
-      const formattedQuestions = questions.map((question, index) => ({
+      const formattedQuestions = questions.map((question) => ({
         ...question,
         options: question.options.map((opt) => ({
           text: opt.text,
@@ -108,11 +122,14 @@ const QuizContainer: React.FC = () => {
         });
       });
 
-      await createQuiz(formData);
+      if (isEdit && initialData?._id) {
+        await updateQuiz(initialData._id, formData); // 수정 모드에서 호출
+      } else {
+        await createQuiz(formData); // 생성 모드에서 호출
+      }
       navigate("/manage-quizzes");
-      console.log("퀴즈가 성공적으로 생성되었습니다.");
     } catch (error) {
-      console.error("퀴즈 생성에 실패했습니다.", error);
+      console.error("퀴즈 저장에 실패했습니다.", error);
     }
   };
 
@@ -137,6 +154,9 @@ const QuizContainer: React.FC = () => {
           setQuizImage={setQuizImage}
           setQuizImageUrl={setQuizImageUrl}
           setImageDialogOpen={setImageDialogOpen}
+          isReadOnly={isReadOnly} // 읽기 전용 전달
+          onStartQuiz={onStartQuiz}    // 퀴즈 시작 핸들러 전달
+          onEditQuiz={onEditQuiz}      // 편집 핸들러 전달
         />
       </Box>
 
@@ -164,6 +184,7 @@ const QuizContainer: React.FC = () => {
             reorderQuestions={reorderQuestions}
             goToReview={() => setCurrentSlideIndex(questions.length + 1)}
             isReviewSlide={isReviewSlide}
+            isReadOnly={isReadOnly} // 읽기 전용 전달
           />
         </Box>
 
@@ -184,13 +205,14 @@ const QuizContainer: React.FC = () => {
               questionIndex={currentSlideIndex - 1}
               updateQuestion={updateQuestion}
               removeQuestion={removeQuestion}
+              isReadOnly={isReadOnly} // 읽기 전용 전달
             />
           ) : (
             <ReviewSlide
               questions={questions}
               addQuestion={addQuestion}
-              saveQuiz={saveQuiz}
               moveToSlide={moveToSlide}
+              isReadOnly={isReadOnly} // 읽기 전용 전달
             />
           )}
           
@@ -201,6 +223,7 @@ const QuizContainer: React.FC = () => {
             addQuestion={addQuestion}
             saveQuiz={saveQuiz}
             isReviewSlide={currentSlideIndex > questions.length}
+            isReadOnly={isReadOnly} // 읽기 전용 전달
           />
         </Box>
       </Box>

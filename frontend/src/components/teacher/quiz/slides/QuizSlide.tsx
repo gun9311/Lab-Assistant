@@ -9,6 +9,7 @@ type QuizSlideProps = {
   questionIndex: number;
   updateQuestion: (index: number, updatedQuestion: Question) => void;
   removeQuestion: (index: number) => void;
+  isReadOnly?: boolean;  // 추가된 prop
 };
 
 const QuizSlide: React.FC<QuizSlideProps> = ({
@@ -16,27 +17,32 @@ const QuizSlide: React.FC<QuizSlideProps> = ({
   questionIndex,
   updateQuestion,
   removeQuestion,
+  isReadOnly = false,  // 기본값을 false로 설정
 }) => {
   const [imageDialogOpen, setImageDialogOpen] = useState(false);
   const [imageType, setImageType] = useState<"question" | "option">("question");
   const [selectedOptionIndex, setSelectedOptionIndex] = useState<number | null>(null);
 
   const handleQuestionChange = (fields: Partial<Question>) => {
+    if (isReadOnly) return;  // 읽기 전용 모드에서는 변경 방지
     const updatedQuestion = { ...question, ...fields };
     updateQuestion(questionIndex, updatedQuestion);
   };
 
   const handleOptionChange = (optionIndex: number, fields: Partial<Question["options"][0]>) => {
+    if (isReadOnly) return;  // 읽기 전용 모드에서는 변경 방지
     const updatedOptions = [...question.options];
     updatedOptions[optionIndex] = { ...updatedOptions[optionIndex], ...fields };
     updateQuestion(questionIndex, { ...question, options: updatedOptions });
   };
 
   const handleCorrectAnswerChange = (optionIndex: number) => {
+    if (isReadOnly) return;  // 읽기 전용 모드에서는 변경 방지
     handleQuestionChange({ correctAnswer: optionIndex });
   };
 
   const handleQuestionTypeChange = (value: string) => {
+    if (isReadOnly) return;  // 읽기 전용 모드에서는 변경 방지
     const updatedQuestion = { ...question, questionType: value };
 
     if (value === "true-false") {
@@ -79,6 +85,7 @@ const QuizSlide: React.FC<QuizSlideProps> = ({
             onChange={(e) => handleQuestionTypeChange(e.target.value)}
             fullWidth
             sx={{ "& .MuiInputBase-root": { borderRadius: "8px", backgroundColor: "#f9f9f9" } }}
+            disabled={isReadOnly}  // 읽기 전용일 때 비활성화
           >
             <MenuItem value="multiple-choice">선택형</MenuItem>
             <MenuItem value="true-false">참/거짓</MenuItem>
@@ -92,6 +99,7 @@ const QuizSlide: React.FC<QuizSlideProps> = ({
             value={question.timeLimit}
             onChange={(e) => handleQuestionChange({ timeLimit: parseInt(e.target.value) })}
             sx={{ "& .MuiInputBase-root": { borderRadius: "8px", backgroundColor: "#f9f9f9" } }}
+            disabled={isReadOnly}  // 읽기 전용일 때 비활성화
           />
         </Grid>
       </Grid>
@@ -108,22 +116,25 @@ const QuizSlide: React.FC<QuizSlideProps> = ({
               "& .MuiInputBase-root": { borderRadius: "8px", backgroundColor: "#f9f9f9" },
               marginBottom: "1rem",
             }}
+            disabled={isReadOnly}  // 읽기 전용일 때 비활성화
           />
         </Grid>
-        <Grid item xs={1}>
-          <IconButton
-            onClick={() => { setImageDialogOpen(true); setImageType("question"); }}
-            sx={{
-              color: "#000",
-              backgroundColor: "#ffcc00",
-              borderRadius: "8px",
-              "&:hover": { backgroundColor: "#ffaa00" },
-              padding: "8px",
-            }}
-          >
-            <Image />
-          </IconButton>
-        </Grid>
+        {!isReadOnly && (  // 읽기 전용이 아닐 때만 이미지 업로드 버튼 표시
+          <Grid item xs={1}>
+            <IconButton
+              onClick={() => { setImageDialogOpen(true); setImageType("question"); }}
+              sx={{
+                color: "#000",
+                backgroundColor: "#ffcc00",
+                borderRadius: "8px",
+                "&:hover": { backgroundColor: "#ffaa00" },
+                padding: "8px",
+              }}
+            >
+              <Image />
+            </IconButton>
+          </Grid>
+        )}
       </Grid>
 
       {/* 문제 이미지 미리보기 및 삭제 */}
@@ -153,22 +164,24 @@ const QuizSlide: React.FC<QuizSlideProps> = ({
               objectFit: "contain",
             }}
           />
-          <IconButton
-            onClick={() => handleQuestionChange({ image: null, imageUrl: "" })}
-            sx={{
-              position: "absolute",
-              top: "4px",
-              right: "4px",
-              backgroundColor: "#ff6f61",
-              color: "#fff",
-              width: "24px",
-              height: "24px",
-              "&:hover": { backgroundColor: "#e57373" },
-            }}
-            size="small"
-          >
-            <Delete fontSize="small" />
-          </IconButton>
+          {!isReadOnly && ( // 읽기 전용이 아닐 때만 삭제 버튼 표시
+            <IconButton
+              onClick={() => handleQuestionChange({ image: null, imageUrl: "" })}
+              sx={{
+                position: "absolute",
+                top: "4px",
+                right: "4px",
+                backgroundColor: "#ff6f61",
+                color: "#fff",
+                width: "24px",
+                height: "24px",
+                "&:hover": { backgroundColor: "#e57373" },
+              }}
+              size="small"
+            >
+              <Delete fontSize="small" />
+            </IconButton>
+          )}
         </Box>
       )}
 
@@ -204,13 +217,15 @@ const QuizSlide: React.FC<QuizSlideProps> = ({
                         objectFit: "contain",
                       }}
                     />
-                    <Button
-                      onClick={() => handleOptionChange(optionIndex, { image: null, imageUrl: "" })}
-                      sx={{ color: "#ff6f61", position: "absolute", top: "4px", right: "4px" }}
-                      size="small"
-                    >
-                      <Delete fontSize="small" />
-                    </Button>
+                    {!isReadOnly && ( // 읽기 전용이 아닐 때만 삭제 버튼 표시
+                      <Button
+                        onClick={() => handleOptionChange(optionIndex, { image: null, imageUrl: "" })}
+                        sx={{ color: "#ff6f61", position: "absolute", top: "4px", right: "4px" }}
+                        size="small"
+                      >
+                        <Delete fontSize="small" />
+                      </Button>
+                    )}
                   </Box>
                 )}
 
@@ -224,37 +239,42 @@ const QuizSlide: React.FC<QuizSlideProps> = ({
                     "& .MuiInputBase-root": { borderRadius: "8px", backgroundColor: "#f9f9f9" },
                     marginBottom: "0.5rem",
                   }}
+                  disabled={isReadOnly} // 읽기 전용일 때 비활성화
                 />
 
                 {/* 이미지 업로드 아이콘과 정답 버튼 */}
                 <Box display="flex" justifyContent="space-between" alignItems="center">
-                  <IconButton
-                    onClick={() => { setImageDialogOpen(true); setImageType("option"); setSelectedOptionIndex(optionIndex); }}
-                    sx={{
-                      backgroundColor: "#ffcc00",
-                      color: "#000",
-                      borderRadius: "8px",
-                      padding: "4px",
-                      "&:hover": { backgroundColor: "#ffaa00" }
-                    }}
-                  >
-                    <Image fontSize="small" />
-                  </IconButton>
+                  {!isReadOnly && ( // 읽기 전용이 아닐 때만 이미지 업로드 버튼 표시
+                    <IconButton
+                      onClick={() => { setImageDialogOpen(true); setImageType("option"); setSelectedOptionIndex(optionIndex); }}
+                      sx={{
+                        backgroundColor: "#ffcc00",
+                        color: "#000",
+                        borderRadius: "8px",
+                        padding: "4px",
+                        "&:hover": { backgroundColor: "#ffaa00" }
+                      }}
+                    >
+                      <Image fontSize="small" />
+                    </IconButton>
+                  )}
 
-                  <Button
-                    onClick={() => handleCorrectAnswerChange(optionIndex)}
-                    variant={question.correctAnswer === optionIndex ? "contained" : "outlined"}
-                    sx={{
-                      color: question.correctAnswer === optionIndex ? "#fff" : "#ff9800",
-                      backgroundColor: question.correctAnswer === optionIndex ? "#ff9800" : "transparent",
-                      "&:hover": { backgroundColor: question.correctAnswer === optionIndex ? "#fb8c00" : "transparent" },
-                      borderRadius: "8px",
-                      fontSize: "0.875rem",
-                      minWidth: "90px"
-                    }}
-                  >
-                    {question.correctAnswer === optionIndex ? "정답" : "정답 설정"}
-                  </Button>
+                  {!isReadOnly && ( // 읽기 전용이 아닐 때만 정답 버튼 표시
+                    <Button
+                      onClick={() => handleCorrectAnswerChange(optionIndex)}
+                      variant={question.correctAnswer === optionIndex ? "contained" : "outlined"}
+                      sx={{
+                        color: question.correctAnswer === optionIndex ? "#fff" : "#ff9800",
+                        backgroundColor: question.correctAnswer === optionIndex ? "#ff9800" : "transparent",
+                        "&:hover": { backgroundColor: question.correctAnswer === optionIndex ? "#fb8c00" : "transparent" },
+                        borderRadius: "8px",
+                        fontSize: "0.875rem",
+                        minWidth: "90px"
+                      }}
+                    >
+                      {question.correctAnswer === optionIndex ? "정답" : "정답 설정"}
+                    </Button>
+                  )}
                 </Box>
               </CardContent>
             </Card>
@@ -263,9 +283,11 @@ const QuizSlide: React.FC<QuizSlideProps> = ({
       </Grid>
 
       {/* 문제 삭제 버튼 */}
-      <IconButton color="error" onClick={() => removeQuestion(questionIndex)} sx={{ marginTop: "1.5rem", backgroundColor: "#f44336", color: "#fff", borderRadius: "8px" }}>
-        <Delete />
-      </IconButton>
+      {!isReadOnly && ( // 읽기 전용이 아닐 때만 문제 삭제 버튼 표시
+        <IconButton color="error" onClick={() => removeQuestion(questionIndex)} sx={{ marginTop: "1.5rem", backgroundColor: "#f44336", color: "#fff", borderRadius: "8px" }}>
+          <Delete />
+        </IconButton>
+      )}
 
       {/* 이미지 업로드 다이얼로그 */}
       <ImageUploadDialog
@@ -293,3 +315,5 @@ const QuizSlide: React.FC<QuizSlideProps> = ({
 };
 
 export default QuizSlide;
+
+                     
