@@ -112,84 +112,190 @@ exports.createQuiz = async (req, res) => {
     res.status(500).send({ error: '퀴즈 생성 실패' });
   }
 };
-  
 
 // 퀴즈 이미지 업로드 처리
 exports.uploadQuizImage = uploadMultiple;
 
+exports.deleteQuiz = async (req, res) => {
+  try {
+      const quizId = req.params.quizId;
+      const userId = req.user._id;
+
+      // 퀴즈를 찾고 작성자만 삭제 가능하게 설정
+      const quiz = await KahootQuizContent.findById(quizId);
+      if (!quiz) return res.status(404).json({ error: '퀴즈가 존재하지 않습니다.' });
+      if (quiz.createdBy.toString() !== userId.toString()) {
+          return res.status(403).json({ error: '삭제 권한이 없습니다.' });
+      }
+
+      await KahootQuizContent.findByIdAndDelete(quizId);
+      res.status(200).json({ message: '퀴즈가 삭제되었습니다.' });
+  } catch (error) {
+      res.status(500).json({ error: '퀴즈 삭제 중 오류가 발생했습니다.' });
+  }
+};
+
 exports.updateQuiz = async (req, res) => {
-    try {
-      const { title, unit, questions } = req.body;
-      const quizId = req.params.id;
-  
-      let updatedQuiz = await KahootQuizContent.findById(quizId);
-  
-      if (!updatedQuiz) {
-        return res.status(404).send({ error: '퀴즈를 찾을 수 없습니다.' });
-      }
-  
-      updatedQuiz.title = title;
-      updatedQuiz.unit = unit;
-  
-      // 퀴즈 전체 이미지 처리
-      if (req.files && req.files.image) {
-        updatedQuiz.uploadedImageUrl = `https://${process.env.S3_BUCKET_NAME}.s3.amazonaws.com/${req.files.image[0].key}`;
-      }
-  
-      // 문제 및 선택지 이미지 처리
-      updatedQuiz.questions = await Promise.all(questions.map(async (question, index) => {
-        if (req.files && req.files.questionImages && req.files.questionImages[index]) {
-          const uploadedQuestionImageUrl = `https://${process.env.S3_BUCKET_NAME}.s3.amazonaws.com/${req.files.questionImages[index].key}`;
-          question.uploadedImageUrl = uploadedQuestionImageUrl;
-        }
-  
-        // 선택지 이미지 처리
-        question.options = await Promise.all(question.options.map(async (option, optIndex) => {
-          if (req.files && req.files.optionImages && req.files.optionImages[index * 4 + optIndex]) {
-            const uploadedOptionImageUrl = `https://${process.env.S3_BUCKET_NAME}.s3.amazonaws.com/${req.files.optionImages[index * 4 + optIndex].key}`;
-            option.uploadedImageUrl = uploadedOptionImageUrl;
-          }
-          return option;
-        }));
-  
-        return question;
-      }));
-  
-      await updatedQuiz.save();
-      res.status(200).send(updatedQuiz);
-    } catch (error) {
-      res.status(500).send({ error: '퀴즈 수정 실패' });
+  try {
+    const quizId = req.params.id;
+
+    // 기존 퀴즈 찾기
+    const quiz = await KahootQuizContent.findById(quizId);
+    if (!quiz) {
+      return res.status(404).json({ error: "퀴즈를 찾을 수 없습니다." });
     }
-  };
+
+    // 제목, 학년, 학기, 과목, 단원 정보 업데이트
+    quiz.title = req.body.title;
+    quiz.grade = req.body.grade;
+    quiz.semester = req.body.semester;
+    quiz.subject = req.body.subject;
+    quiz.unit = req.body.unit;
+
+    quiz.imageUrl = null;
+
+    // 퀴즈 전체 이미지 처리 (업로드된 파일이 있으면 S3 URL로, 없으면 입력된 URL로 처리)
+    if (req.files) {
+      const imageFile = req.files.find(file => file.fieldname === 'image');
+      if (imageFile) {
+        quiz.imageUrl = `https://${process.env.S3_BUCKET_NAME}.s3.amazonaws.com/${imageFile.key}`;
+      }
+    }
+
+    // 이미지가 없을 경우 입력된 URL을 사용
+    if (!quiz.imageUrl && req.body.imageUrl) {
+      quiz.imageUrl = req.body.imageUrl;
+    }
+
+    // 질문 목록을 업데이트 (새 질문 및 기존 질문 업데이트)
+    const updatedQuestions = JSON.parse(req.body.questions).map((question, index) => {
+      const questionImageKey = `questionImages_${index}`;
+      const questionFile = req.files.find(file => file.fieldname === questionImageKey);
+      if (questionFile) {
+        const uploadedQuestionImageUrl = `https://${process.env.S3_BUCKET_NAME}.s3.amazonaws.com/${questionFile.key}`;
+        question.imageUrl = uploadedQuestionImageUrl;
+      } else if (question.imageUrl) {
+        question.imageUrl = question.imageUrl;  // URL 처리
+      }
+
+      // 선택지 이미지 처리
+      question.options = question.options.map((option, optIndex) => {
+        const optionImageKey = `optionImages_${index}_${optIndex}`;
+        const optionFile = req.files.find(file => file.fieldname === optionImageKey); // find로 필드 검색
+        if (optionFile) {
+          const uploadedOptionImageUrl = `https://${process.env.S3_BUCKET_NAME}.s3.amazonaws.com/${optionFile.key}`;
+          option.imageUrl = uploadedOptionImageUrl;
+        } else if (option.imageUrl) {
+          option.imageUrl = option.imageUrl;  // URL 처리
+        }
+        return option;
+      });
+
+      return question;
+    });
+
+    quiz.questions = updatedQuestions;
+
+    // 데이터 저장
+    await quiz.save();
+    res.status(200).json(quiz);
+  } catch (error) {
+    console.error("퀴즈 수정 중 오류:", error);
+    res.status(500).json({ error: "퀴즈 수정에 실패했습니다." });
+  }
+};
+
+exports.duplicateQuiz = async (req, res) => {
+  try {
+    const quizId = req.params.quizId;
+    const userId = req.user._id;
+
+    // 원본 퀴즈 찾기
+    const originalQuiz = await KahootQuizContent.findById(quizId);
+    if (!originalQuiz) {
+      return res.status(404).json({ error: '복제할 퀴즈를 찾을 수 없습니다.' });
+    }
+
+    // 제목을 "기존 제목의 복제본"으로 설정
+    const clonedTitle = `${originalQuiz.title}의 복제본`;
+
+    // 복제된 퀴즈 데이터 생성
+    const duplicatedQuiz = new KahootQuizContent({
+      title: clonedTitle,
+      grade: originalQuiz.grade,
+      subject: originalQuiz.subject,
+      semester: originalQuiz.semester,
+      unit: originalQuiz.unit,
+      questions: originalQuiz.questions,
+      createdBy: userId, // 복제한 사용자 ID로 설정
+      imageUrl: originalQuiz.imageUrl, // 이미지 URL 복사
+      likes: [], // 복제된 퀴즈는 좋아요가 초기화됩니다.
+      likeCount: 0, // 좋아요 수 초기화
+    });
+
+    // 복제된 퀴즈 저장
+    await duplicatedQuiz.save();
+
+    res.status(201).json({
+      message: '퀴즈가 성공적으로 복제되었습니다.',
+      quizId: duplicatedQuiz._id,
+    });
+  } catch (error) {
+    console.error('퀴즈 복제 중 오류:', error);
+    res.status(500).json({ error: '퀴즈 복제에 실패했습니다.' });
+  }
+};
 
 exports.getQuizzes = async (req, res) => {
   try {
-    // 요청한 사용자의 ID를 가져옵니다. (토큰에서 추출되었다고 가정)
-    const userId = req.user._id;
+    const { page = 1, limit = 6, gradeFilter, semesterFilter, subjectFilter, unitFilter, sortBy = "latest", createdBy } = req.query;
 
-    // 퀴즈 목록을 가져올 때 필요한 필드만 선택
-    const quizzes = await KahootQuizContent.find()
+    // 필터 조건 적용
+    const filter = {};
+    if (gradeFilter) filter.grade = gradeFilter;
+    if (semesterFilter) filter.semester = semesterFilter;
+    if (subjectFilter) filter.subject = subjectFilter;
+    if (unitFilter) filter.unit = unitFilter;
+    if (createdBy) filter.createdBy = createdBy; // 생성자 필터 추가 (내 퀴즈함 기능용)
+
+    // 정렬 조건 설정
+    let sortOption = {};
+    if (sortBy === "likes") {
+      sortOption = { likeCount: -1 }; // 좋아요 순 내림차순
+    } else {
+      sortOption = { createdAt: -1 }; // 최신 순 내림차순
+    }
+
+    // 필터 조건에 맞는 전체 퀴즈 개수
+    const totalCount = await KahootQuizContent.countDocuments(filter);
+
+    // 필터와 정렬이 적용된 데이터 조회 및 페이지네이션 적용
+    const quizzes = await KahootQuizContent.find(filter)
+      .sort(sortOption) // 정렬 적용
+      .skip((page - 1) * limit)
+      .limit(parseInt(limit))
       .select('_id title grade subject semester unit questions createdBy createdAt likes likeCount imageUrl');
 
-    // 퀴즈 목록을 사용자 좋아요 여부와 함께 반환
+    // 사용자 좋아요 상태 추가
+    const userId = req.user._id;
     const quizzesWithDetails = quizzes.map(quiz => ({
       _id: quiz._id,
       title: quiz.title,
       grade: quiz.grade,
       subject: quiz.subject,
       semester: quiz.semester,
-      unit: quiz.unit || '단원 없음',  // unit이 없으면 '단원 없음'으로 설정
+      unit: quiz.unit || '단원 없음',
       questionsCount: quiz.questions.length,
       createdBy: quiz.createdBy,
       createdAt: quiz.createdAt,
       likeCount: quiz.likeCount,
       imageUrl: quiz.imageUrl,
-      // 요청한 사용자가 좋아요를 눌렀는지 확인
-      userLiked: quiz.likes.includes(userId)  // likes 배열에 userId가 포함되어 있는지 확인
+      userLiked: quiz.likes.includes(userId),
     }));
 
-    res.status(200).json(quizzesWithDetails);
+    res.status(200).json({ quizzes: quizzesWithDetails, totalCount });
   } catch (error) {
+    console.error("퀴즈 목록을 가져오는 중 오류 발생:", error);
     res.status(500).json({ error: '퀴즈 목록을 가져오는 데 실패했습니다.' });
   }
 };
@@ -276,13 +382,18 @@ exports.startQuizSession = async (req, res) => {
             teacher: req.user._id,
             isTeamMode,
             pin,  // 고유 PIN 저장
-            participants: [], // 학생 참여 목록 초기화
+            // participants: [], // 학생 참여 목록 초기화
         });
 
         await newSession.save();
 
         // 세션을 Redis에 캐시 (교사만 생성 시점에 저장)
-        await redisClient.set(`session:${pin}`, JSON.stringify(newSession), {
+        await redisClient.set(`session:${pin}`, JSON.stringify({
+          quizContent: quizId,
+          teacher: req.user._id,
+          isTeamMode,
+          pin
+        }), {
             EX: 3600,  // 세션 데이터는 1시간 동안 캐시됨
         });
 
@@ -300,26 +411,26 @@ exports.joinQuizSession = async (req, res) => {
     const { pin } = req.body;
     const studentId = req.user._id;
 
-    // 락 획득 시도 (재시도 로직 포함)
-    const lockAcquired = await acquireLockWithRetry(pin);
-    if (!lockAcquired) {
-      return res.status(429).send({ error: 'Another join request is being processed. Please wait.' });
-    }
+    // // 락 획득 시도 (재시도 로직 포함)
+    // const lockAcquired = await acquireLockWithRetry(pin);
+    // if (!lockAcquired) {
+    //   return res.status(429).send({ error: 'Another join request is being processed. Please wait.' });
+    // }
 
     try {
       // Redis에서 세션 조회
-      let session = await redisClient.get(`session:${pin}`);
-      if (!session) {
-        return res.status(404).send({ error: 'Session not found' });
-      }
+      // let session = await redisClient.get(`session:${pin}`);
+      // if (!session) {
+      //   return res.status(404).send({ error: 'Session not found' });
+      // }
 
-      session = JSON.parse(session);
+      // session = JSON.parse(session);
 
       // 학생이 이미 참여했는지 확인
-      const alreadyJoined = session.participants.some(p => p.student.toString() === studentId.toString());
-      if (alreadyJoined) {
-        return res.status(400).send({ error: 'Already joined' });
-      }
+      // const alreadyJoined = session.participants.some(p => p.student.toString() === studentId.toString());
+      // if (alreadyJoined) {
+      //   return res.status(400).send({ error: 'Already joined' });
+      // }
 
       // 학생의 이름을 DB에서 조회
       const student = await Student.findById(studentId);
@@ -328,21 +439,39 @@ exports.joinQuizSession = async (req, res) => {
       }
 
       // 학생을 세션에 추가 (이름 포함)
-      session.participants.push({ 
-        student: studentId, 
-        name: student.name,   
-        score: 0, 
-        responses: [],
-        status: 'joined'  
-      });
+      // session.participants.push({ 
+      //   student: studentId, 
+      //   name: student.name,   
+      //   score: 0, 
+      //   responses: [],
+      //   status: 'joined'  
+      // });
 
       // Redis에 세션 업데이트
-      await redisClient.set(`session:${pin}`, JSON.stringify(session), { EX: 3600 });
+      // await redisClient.set(`session:${pin}`, JSON.stringify(session), { EX: 3600 });
 
-      res.status(200).send({ message: 'Successfully joined the session', session });
+      // res.status(200).send({ message: 'Successfully joined the session', session });
+         // 참가자 정보 개별 키로 저장
+    const participantKey = `session:${pin}:participant:${studentId}`;
+    const existingParticipant = await redisClient.get(participantKey);
+    if (existingParticipant) {
+      return res.status(400).send({ error: 'Already joined' });
+    }
+
+    const participantData = {
+      student: studentId,
+      name: student.name,
+      score: 0,
+      responses: [],
+      status: 'joined'
+    };
+
+    await redisClient.set(participantKey, JSON.stringify(participantData), { EX: 3600 });
+
+    res.status(200).send({ message: 'Successfully joined the session' });
     } finally {
       // 잠금 해제
-      await releaseLock(pin);
+      // await releaseLock(pin);
     }
   } catch (error) {
     console.error("Error joining quiz session:", error);
@@ -471,12 +600,20 @@ exports.handleTeacherWebSocketConnection = async (ws, teacherId, pin) => {
     if (parsedMessage.type === 'nextQuestion') {
       currentQuestionIndex++; // 다음 문제로 이동
 
-      session.participants.forEach(participant => {
-        participant.hasSubmitted = false; // 새로운 문제에 대한 제출 상태 초기화
-      });
+      // session.participants.forEach(participant => {
+      //   participant.hasSubmitted = false; // 새로운 문제에 대한 제출 상태 초기화
+      // });
 
-      // Redis에 세션 업데이트
-      await redisClient.set(`session:${pin}`, JSON.stringify(session), { EX: 3600 });
+      // // Redis에 세션 업데이트
+      // await redisClient.set(`session:${pin}`, JSON.stringify(session), { EX: 3600 });
+      // 모든 참가자의 제출 상태 초기화
+      const participantKeys = await redisClient.keys(`session:${pin}:participant:*`);
+      await Promise.all(participantKeys.map(async (key) => {
+        const participantData = await redisClient.get(key);
+        const participant = JSON.parse(participantData);
+        participant.hasSubmitted = false;
+        await redisClient.set(key, JSON.stringify(participant), { EX: 3600 });
+      }));
 
       // Redis에서 콘텐츠 만료 시간 갱신
       await redisClient.expire(`questionContent:${session.quizContent}`, 3600);
@@ -486,7 +623,6 @@ exports.handleTeacherWebSocketConnection = async (ws, teacherId, pin) => {
       if (nextQuestion) {
         // 1. 먼저 준비 화면 전송
 
-        // 마지막 문제인지 확인
         const isLastQuestion = currentQuestionIndex === questionContent.questions.length - 1;
 
         const readyMessage = {
@@ -531,7 +667,12 @@ exports.handleTeacherWebSocketConnection = async (ws, teacherId, pin) => {
       try {
         // 1. 퀴즈 결과 저장
         const quizResults = [];
-        for (let participant of session.participants) {
+        const participantKeys = await redisClient.keys(`session:${pin}:participant:*`);
+        const allParticipants = await Promise.all(participantKeys.map(async (key) => {
+          const data = await redisClient.get(key);
+          return JSON.parse(data);
+        }));
+        for (let participant of allParticipants) {
           const correctAnswers = participant.responses.filter(r => r.isCorrect).length;
           const totalQuestions = participant.responses.length;
           const totalScore = (correctAnswers / totalQuestions) * 100; // 100점 만점 기준
@@ -562,6 +703,7 @@ exports.handleTeacherWebSocketConnection = async (ws, teacherId, pin) => {
 
         // 3. Redis에서 세션 데이터 삭제
         await redisClient.del(`session:${pin}`);
+        await Promise.all(participantKeys.map(key => redisClient.del(key)));
         logger.info(`Session ${pin} deleted from Redis.`);
 
         // 4. 웹소켓 연결 종료 (옵션)
@@ -582,15 +724,30 @@ exports.handleTeacherWebSocketConnection = async (ws, teacherId, pin) => {
     // 교사가 결과 자세히 보기를 요청할 때
     if (parsedMessage.type === 'viewDetailedResults') {
       // Redis에 저장된 세션 데이터에서 참여 학생과 각 학생의 응답 결과 가져오기
-      const participantsResults = session.participants.map(participant => ({
+      // const participantsResults = session.participants.map(participant => ({
+      //     studentId: participant.student,
+      //     name: participant.name,
+      //     score: participant.score,
+      //     responses: participant.responses.map(response => ({
+      //         questionId: response.question,
+      //         answer: response.answer,
+      //         isCorrect: response.isCorrect
+      //     }))
+      // }));
+      const participantKeys = await redisClient.keys(`session:${pin}:participant:*`);
+      const participantsResults = await Promise.all(participantKeys.map(async (key) => {
+        const participantData = await redisClient.get(key);
+        const participant = JSON.parse(participantData);
+        return {
           studentId: participant.student,
           name: participant.name,
           score: participant.score,
           responses: participant.responses.map(response => ({
-              questionId: response.question,
-              answer: response.answer,
-              isCorrect: response.isCorrect
+            questionId: response.question,
+            answer: response.answer,
+            isCorrect: response.isCorrect
           }))
+        };
       }));
 
       // 교사에게 결과 데이터를 전송
@@ -666,17 +823,15 @@ exports.handleStudentWebSocketConnection = async (ws, studentId, pin) => {
 
     ws.on('message', async (message) => {
       const parsedMessage = JSON.parse(message);
-      // 락 획득 시도 (재시도 로직 포함)
-      const lockAcquired = await acquireLockWithRetry(pin);
-      // logger.info(`락 획득: ${lockAcquired}`);
-      if (!lockAcquired) {
-        // logger.info(`락 기다림: ${lockAcquired}`);
-        ws.send(JSON.stringify({ error: 'Another operation is being processed. Please wait.' }));
-        return;
-      }
+      console.log(`Received message from student ${studentId}:`, parsedMessage);
+
+      // const lockAcquired = await acquireLockWithRetry(pin);
+      // if (!lockAcquired) {
+      //   ws.send(JSON.stringify({ error: 'Another operation is being processed. Please wait.' }));
+      //   return;
+      // }
 
       try {
-        // 잠금이 걸린 상태에서 세션을 읽음
         let session = await redisClient.get(`session:${pin}`);
         if (!session) {
           ws.send(JSON.stringify({ error: 'Session not found' }));
@@ -687,36 +842,68 @@ exports.handleStudentWebSocketConnection = async (ws, studentId, pin) => {
 
         if (parsedMessage.type === 'characterSelected') {
           const character = parsedMessage.character;
-          const participant = session.participants.find(p => p.student.toString() === studentId.toString());
-          if (participant) {
-            participant.character = character;
-            await redisClient.set(`session:${pin}`, JSON.stringify(session), { EX: 3600 }); // 세션 저장
-            
-            // 락 해제
-            await releaseLock(pin);
+          // const isCharacterTaken = session.participants.some(p => p.character === character);
+          const participantKey = `session:${pin}:participant:${studentId}`;
+          const participantData = await redisClient.get(participantKey);
 
-            broadcastToTeacher(pin, {
-              type: 'studentJoined',
-              studentId: studentId,
-              name: student.name,
-              character: character
-            });
-
-            ws.send(JSON.stringify({ type: 'characterAcknowledged', message: 'Character selection successful' }));
-          } else {
+          if (!participantData) {
             ws.send(JSON.stringify({ error: 'Participant not found' }));
+            return;
           }
-        }
+
+          const participant = JSON.parse(participantData);
+          participant.character = character;
+
+          await redisClient.set(participantKey, JSON.stringify(participant), { EX: 3600 });
+
+          // if (isCharacterTaken) {
+          //   ws.send(JSON.stringify({ error: 'Character already taken' }));
+          // } else {
+          //   const participant = session.participants.find(p => p.student.toString() === studentId.toString());
+          //   if (participant) {
+          //     participant.character = character;
+          //     await redisClient.set(`session:${pin}`, JSON.stringify(session), { EX: 3600 });
+          //     console.log(`Character ${character} assigned to student ${studentId}`);
+          //     await releaseLock(pin);
+
+              broadcastToTeacher(pin, {
+                type: 'studentJoined',
+                studentId: studentId,
+                name: student.name,
+                character: character
+              });
+              console.log(`Notified teacher about student ${studentId} joining with character ${character}`);
+
+              // 학생들에게도 캐릭터 선택을 알림
+              broadcastToStudents(pin, {
+                type: 'characterSelected',
+                studentId: studentId,
+                character: character
+              });
+
+              ws.send(JSON.stringify({ type: 'characterAcknowledged', message: 'Character selection successful' }));
+            };
+          
 
         if (parsedMessage.type === 'ready') {
-          const participant = session.participants.find(p => p.student.toString() === studentId.toString());
-          if (participant) {
-            participant.status = 'ready';
-            await redisClient.set(`session:${pin}`, JSON.stringify(session), { EX: 3600 }); // 세션 저장
+          // const participant = session.participants.find(p => p.student.toString() === studentId.toString());
+          const participantKey = `session:${pin}:participant:${studentId}`;
+          const participantData = await redisClient.get(participantKey);
+          // if (participant) {
+          if (!participantData) {
+            ws.send(JSON.stringify({ error: 'Participant not found' }));
+            return;
+            } else {
+          //   participant.status = 'ready';
+          //   await redisClient.set(`session:${pin}`, JSON.stringify(session), { EX: 3600 });
             
-            // 락 해제
-            await releaseLock(pin);
+          //   await releaseLock(pin);
+        
+            const participant = JSON.parse(participantData);
+            participant.status = 'ready';
 
+            await redisClient.set(participantKey, JSON.stringify(participant), { EX: 3600 });
+          
             broadcastToTeacher(pin, {
               type: 'studentReady',
               studentId: studentId,
@@ -741,9 +928,19 @@ exports.handleStudentWebSocketConnection = async (ws, studentId, pin) => {
             isCorrect = Number(currentQuestion.correctAnswer) === Number(answerIndex);
           }
 
-          const participant = session.participants.find(p => p.student.toString() === studentId.toString());
+          // const participant = session.participants.find(p => p.student.toString() === studentId.toString());
+          const participantKey = `session:${pin}:participant:${studentId}`;
+          const participantData = await redisClient.get(participantKey);
 
-          if (participant) {
+          if (participantData) {
+            // participant.responses.push({
+            //   question: currentQuestion._id,
+            //   answer: answerIndex !== -1 ? answerIndex : null,
+            //   isCorrect: isCorrect,
+            //   responseTime: responseTime
+            // });
+
+            const participant = JSON.parse(participantData);
             participant.responses.push({
               question: currentQuestion._id,
               answer: answerIndex !== -1 ? answerIndex : null,
@@ -770,11 +967,9 @@ exports.handleStudentWebSocketConnection = async (ws, studentId, pin) => {
 
             participant.hasSubmitted = true;
 
-            await redisClient.set(`session:${pin}`, JSON.stringify(session), { EX: 3600 }); // 세션 저장
+            await redisClient.set(participantKey, JSON.stringify(participant), { EX: 3600 });
 
-            // 락 해제
-            // logger.info(`락 해제 직전: ${lockAcquired}`);
-            await releaseLock(pin);
+            // await releaseLock(pin);
 
             broadcastToTeacher(pin, {
               type: 'studentSubmitted',
@@ -783,10 +978,23 @@ exports.handleStudentWebSocketConnection = async (ws, studentId, pin) => {
               character: participant.character
             });
 
-            const allSubmitted = session.participants.every(p => p.hasSubmitted);
+            // Check if all participants have submitted
+            const participantKeys = await redisClient.keys(`session:${pin}:participant:*`);
+            const allParticipants = await Promise.all(participantKeys.map(async (key) => {
+              const data = await redisClient.get(key);
+              return JSON.parse(data);
+            }));
+
+            const allSubmitted = allParticipants.every(p => p.hasSubmitted);
+
+            // const allSubmitted = session.participants.every(p => p.hasSubmitted);
 
             if (allSubmitted) {
-              session.participants.forEach((participant) => {
+              // session.participants.forEach((participant) => {
+              //   const studentWs = kahootClients[pin].students[participant.student];
+              //   if (studentWs && studentWs.readyState === WebSocket.OPEN) {
+              //     const response = participant.responses.find(r => r.question.toString() === currentQuestion._id.toString());
+              allParticipants.forEach((participant) => {
                 const studentWs = kahootClients[pin].students[participant.student];
                 if (studentWs && studentWs.readyState === WebSocket.OPEN) {
                   const response = participant.responses.find(r => r.question.toString() === currentQuestion._id.toString());
@@ -802,7 +1010,8 @@ exports.handleStudentWebSocketConnection = async (ws, studentId, pin) => {
 
               broadcastToTeacher(pin, {
                 type: 'allStudentsSubmitted',
-                feedback: session.participants
+                // feedback: session.participants
+                feedback: allParticipants
                   .sort((a, b) => b.score - a.score)
                   .map((p, index) => ({
                     studentId: p.student,
@@ -818,7 +1027,6 @@ exports.handleStudentWebSocketConnection = async (ws, studentId, pin) => {
           }
         }
       } finally {
-        // 만약 try 블록 내에서 예외가 발생하면 락 해제를 여기서도 처리
         await releaseLock(pin);
       }
     });
