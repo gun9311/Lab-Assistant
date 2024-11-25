@@ -1,13 +1,45 @@
 import api from './api';
 
-// 퀴즈 목록 가져오기 API 호출
-export const getQuizzes = async () => {
+// // 퀴즈 목록 가져오기 API 호출
+// export const getQuizzes = async () => {
+//   try {
+//     const response = await api.get('/kahoot-quiz/list');
+//     return response.data;
+//   } catch (error) {
+//     console.error("퀴즈 목록 가져오기에 실패했습니다.", error);
+//     return [];
+//   }
+// };
+
+interface GetQuizzesParams {
+  page: number;
+  limit: number;
+  gradeFilter?: number | null;
+  semesterFilter?: string | null;
+  subjectFilter?: string | null;
+  unitFilter?: string | null;
+  sortBy?: string; // 정렬 기준 추가
+  createdBy?: string; // 생성자 필터 추가
+}
+
+export const getQuizzes = async (params: GetQuizzesParams) => {
   try {
-    const response = await api.get('/kahoot-quiz/list');
+    const response = await api.get('/kahoot-quiz/list', {
+      params: {
+        page: params.page,
+        limit: params.limit,
+        gradeFilter: params.gradeFilter || undefined,
+        semesterFilter: params.semesterFilter || undefined,
+        subjectFilter: params.subjectFilter || undefined,
+        unitFilter: params.unitFilter || undefined,
+        sortBy: params.sortBy || 'latest', // 기본값 'latest' 설정
+        createdBy: params.createdBy || undefined, // 생성자 필터 추가
+      },
+    });
     return response.data;
   } catch (error) {
     console.error("퀴즈 목록 가져오기에 실패했습니다.", error);
-    return [];
+    return { quizzes: [], totalCount: 0 };
   }
 };
 
@@ -45,6 +77,16 @@ export const updateQuiz = async (quizId: string, quizData: FormData) => {
       'Content-Type': 'multipart/form-data',
     },
   });
+};
+
+export const duplicateQuiz = async (quizId: string) => {
+  try {
+    const response = await api.post(`/kahoot-quiz/duplicate/${quizId}`);
+  return response.data;
+  } catch (error) {
+    console.error(`퀴즈 복제에 실패했습니다: ${quizId}`, error);
+    throw error;
+  }
 };
 
   // 특정 퀴즈 가져오기 API 호출

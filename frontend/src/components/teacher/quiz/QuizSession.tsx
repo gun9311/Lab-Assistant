@@ -1,11 +1,28 @@
+// QuizSessionPage.tsx
+
 import React, { useState, useEffect } from 'react';
-import { Box, Typography } from '@mui/material';
+import { Box, Typography, Button, Chip } from '@mui/material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { getToken } from '../../../utils/auth';
 import StudentListComponent from './components/StudentList';
 import QuestionComponent from './components/Question';
 import ResultComponent from './components/Result';
-import backgroundImage from '../../../assets/quiz_show_background.png';
+// import backgroundImage from '../../../assets/quiz_show_background.png';
+const backgroundImages = [
+  require('../../../assets/quiz-theme/quiz_theme1.webp'),
+  require('../../../assets/quiz-theme/quiz_theme2.webp'),
+  require('../../../assets/quiz-theme/quiz_theme3.webp'),
+  require('../../../assets/quiz-theme/quiz_theme4.webp'),
+  require('../../../assets/quiz-theme/quiz_theme5.webp'),
+  require('../../../assets/quiz-theme/quiz_theme6.webp'),
+  require('../../../assets/quiz-theme/quiz_theme7.webp'),
+  require('../../../assets/quiz-theme/quiz_theme8.webp'),
+  require('../../../assets/quiz-theme/quiz_theme9.webp'),
+  require('../../../assets/quiz-theme/quiz_theme10.webp'),
+  require('../../../assets/quiz-theme/quiz_theme11.webp'),
+  require('../../../assets/quiz-theme/quiz_theme12.webp'),
+  require('../../../assets/quiz-theme/quiz_theme13.webp'),
+];
 
 type Student = {
   id: string;
@@ -15,6 +32,7 @@ type Student = {
   hasSubmitted?: boolean;
   isCorrect?: boolean;
   rank?: number; // 순위 정보 추가
+  prevRank?: number;
 };
 
 type Question = {
@@ -51,11 +69,15 @@ const QuizSessionPage = () => {
   const [quizResults, setQuizResults] = useState<Feedback[] | null>(null);
   const [isViewingResults, setIsViewingResults] = useState(false);
   const [quizStarted, setQuizStarted] = useState(false);
+  const [backgroundImage, setBackgroundImage] = useState<string>(backgroundImages[0]); // 초기값 설정
   const navigate = useNavigate();
 
   const socketRef = React.useRef<WebSocket | null>(null);
 
   useEffect(() => {
+    const randomImage = backgroundImages[Math.floor(Math.random() * backgroundImages.length)];
+    setBackgroundImage(randomImage);
+
     const userToken = getToken();
     const wsUrl = process.env.REACT_APP_WEBSOCKET_URL;
     const socket = new WebSocket(`${wsUrl}?token=${userToken}&pin=${pin}`);
@@ -124,15 +146,17 @@ const QuizSessionPage = () => {
             if (studentFeedback) {
               return {
                 ...student,
-                hasSubmitted: false,
+                // hasSubmitted: false,
                 isCorrect: studentFeedback.isCorrect,
+                prevRank: student.rank,
                 rank: studentFeedback.rank, // 순위 반영
               };
             }
             return student;
           })
         );
-          setIsShowingFeedback(true);  // 피드백 표시 상태로 전환
+        console.log("Updated students with ranks:", students);
+        setIsShowingFeedback(true);  // 피드백 표시 상태로 전환
         }, 3000);  // 3초 지연
         setFeedbacks(feedback);  // 피드백 저장
       } else if (message.type === 'quizCompleted') {
@@ -169,8 +193,8 @@ const QuizSessionPage = () => {
       prevStudents.map((student) => ({
         ...student,
         hasSubmitted: false,
-        isCorrect: undefined,
-        rank: undefined,
+        // isCorrect: undefined,
+        // rank: undefined,
       }))
     );
     if (socketRef.current) {
@@ -202,8 +226,8 @@ const QuizSessionPage = () => {
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        justifyContent: 'flex-start', // 상단으로 문제 영역을 배치
-        padding: '1rem', // 상단에 여유 공간 추가
+        justifyContent: 'flex-start',
+        padding: '1rem',
       }}
     >
       {isViewingResults ? (
@@ -234,15 +258,21 @@ const QuizSessionPage = () => {
             </Box>
           )}
 
-          {/* 문제 컴포넌트 상단 배치 */}
+          {/* 문제 컴포넌트를 위한 독립된 중앙 배치 박스 */}
           {isSessionActive && currentQuestion && (
             <Box
               sx={{
-                display: 'flex', 
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: '100vh',
+                display: 'flex',
                 justifyContent: 'center',
                 alignItems: 'center',
                 opacity: isShowingFeedback ? 0.3 : 1, // 피드백 시 투명도 변화
                 transition: 'opacity 0.5s ease-in-out',
+                pointerEvents: isShowingFeedback ? 'none' : 'auto', // 피드백 시 클릭 차단
               }}
             >
               <QuestionComponent
@@ -254,36 +284,37 @@ const QuizSessionPage = () => {
             </Box>
           )}
 
-          {/* 학생 목록 컴포넌트 */}
-          <Box
-            sx={{
-              position: isShowingFeedback ? 'absolute' : 'fixed', // 피드백 시 상단까지 확장
-              bottom: isShowingFeedback ? '0' : '10%', // 피드백 시 하단 고정 해제
-              top: isShowingFeedback ? '0' : 'auto',  // 피드백 시 상단까지 확장
-              width: '100%',
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'center',
-              gap: '2rem',
-              padding: '0 2rem',
-              height: isShowingFeedback ? '100vh' : 'auto', // 피드백 시 전체 화면 사용
-              transition: 'all 0.5s ease-in-out', // 부드러운 전환
-            }}
-          >
-            <StudentListComponent
-              students={students}
-              feedbacks={feedbacks}
-              allStudentsReady={allStudentsReady}
-              handleStartQuiz={handleStartQuiz}
-              quizStarted={quizStarted}
-              isShowingFeedback={isShowingFeedback}
-              isLastQuestion={isLastQuestion}
-              rankMoveEnabled={isShowingFeedback}  /* 순위 이동 활성화 */
-              handleNextQuestion={handleNextQuestion}  /* 핸들러 추가 */
-              handleEndQuiz={handleEndQuiz}
-              handleViewResults={handleViewResults}
-            />
-          </Box>
+          {/* 학생 목록 컴포넌트를 위한 별도의 중앙 배치 박스 */}
+          {(!isSessionActive || isShowingFeedback) && (
+            <Box
+              sx={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: '100vh',
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                padding: '0 2rem',
+                zIndex: isShowingFeedback ? 10 : 1, // 피드백 시 학생 목록 우선
+              }}
+            >
+              <StudentListComponent
+                students={students}
+                // feedbacks={feedbacks}
+                allStudentsReady={allStudentsReady}
+                handleStartQuiz={handleStartQuiz}
+                quizStarted={quizStarted}
+                isShowingFeedback={isShowingFeedback}
+                isLastQuestion={isLastQuestion}
+                // rankMoveEnabled={isShowingFeedback}  /* 순위 이동 활성화 */
+                handleNextQuestion={handleNextQuestion}
+                handleEndQuiz={handleEndQuiz}
+                handleViewResults={handleViewResults}
+              />
+            </Box>
+          )}
         </>
       )}
     </Box>

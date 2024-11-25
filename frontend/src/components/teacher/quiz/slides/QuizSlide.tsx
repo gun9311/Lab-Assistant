@@ -189,7 +189,13 @@ const QuizSlide: React.FC<QuizSlideProps> = ({
       <Grid container spacing={2} sx={{ marginTop: "1rem" }}>
         {question.options.map((option, optionIndex) => (
           <Grid item xs={12} md={6} key={optionIndex}>
-            <Card sx={{ borderRadius: "8px", boxShadow: "0px 2px 4px rgba(0, 0, 0, 0.1)" }}>
+            <Card sx={{
+                borderRadius: "8px",
+                boxShadow: "0px 2px 4px rgba(0, 0, 0, 0.1)",
+                backgroundColor: isReadOnly && optionIndex == question.correctAnswer ? "#e8f5e9" : "#ffffff",
+                border: isReadOnly && optionIndex == question.correctAnswer ? "2px solid #4caf50" : "1px solid transparent",
+              }}
+            >
               <CardContent>
                 {/* 선택지 이미지 */}
                 {(option.image || option.imageUrl) && (
@@ -262,17 +268,17 @@ const QuizSlide: React.FC<QuizSlideProps> = ({
                   {!isReadOnly && ( // 읽기 전용이 아닐 때만 정답 버튼 표시
                     <Button
                       onClick={() => handleCorrectAnswerChange(optionIndex)}
-                      variant={question.correctAnswer === optionIndex ? "contained" : "outlined"}
+                      variant={question.correctAnswer == optionIndex ? "contained" : "outlined"}
                       sx={{
-                        color: question.correctAnswer === optionIndex ? "#fff" : "#ff9800",
-                        backgroundColor: question.correctAnswer === optionIndex ? "#ff9800" : "transparent",
-                        "&:hover": { backgroundColor: question.correctAnswer === optionIndex ? "#fb8c00" : "transparent" },
+                        color: question.correctAnswer == optionIndex ? "#fff" : "#ff9800",
+                        backgroundColor: question.correctAnswer == optionIndex ? "#ff9800" : "transparent",
+                        "&:hover": { backgroundColor: question.correctAnswer == optionIndex ? "#fb8c00" : "transparent" },
                         borderRadius: "8px",
                         fontSize: "0.875rem",
                         minWidth: "90px"
                       }}
                     >
-                      {question.correctAnswer === optionIndex ? "정답" : "정답 설정"}
+                      {question.correctAnswer == optionIndex ? "정답" : "정답 설정"}
                     </Button>
                   )}
                 </Box>
@@ -315,5 +321,3 @@ const QuizSlide: React.FC<QuizSlideProps> = ({
 };
 
 export default QuizSlide;
-
-                     

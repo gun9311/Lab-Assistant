@@ -51,8 +51,8 @@ const QuestionComponent: React.FC<QuestionComponentProps> = ({
   return (
     <Box
       sx={{
-        position: 'absolute',
-        top: '5%', // 상단에 배치
+        // position: 'absolute',
+        // top: '5%', // 상단에 배치
         width: '100%',
         textAlign: 'center',
         color: '#fff',

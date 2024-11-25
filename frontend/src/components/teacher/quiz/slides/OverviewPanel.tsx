@@ -1,6 +1,9 @@
 import React from "react";
 import { Box, Typography, TextField, MenuItem, IconButton, Grid, Button } from "@mui/material";
 import { Image, Delete } from "@mui/icons-material";
+import backgroundDefault from "../../../../assets/background-default.webp"
+// import { PlayCircleFilled, Edit } from "@mui/icons-material"; // 아이콘 추가
+import { PlayArrow, Edit } from "@mui/icons-material"; // 간결한 아이콘 추가
 
 type OverviewPanelProps = {
   title: string;
@@ -45,7 +48,9 @@ const OverviewPanel: React.FC<OverviewPanelProps> = ({
   onStartQuiz,
   onEditQuiz,
 }) => {
-  const backgroundImageUrl = quizImage ? URL.createObjectURL(quizImage) : quizImageUrl;
+  const backgroundImageUrl = quizImage
+    ? URL.createObjectURL(quizImage)
+    : quizImageUrl || backgroundDefault;
 
   return (
     <Box
@@ -87,19 +92,20 @@ const OverviewPanel: React.FC<OverviewPanelProps> = ({
           <Grid item xs={9}>
             {isReadOnly ? (
               <Typography
-                variant="h6"
-                sx={{
-                  fontWeight: "bold",
-                  color: "#fff",
-                  fontSize: "1.3rem", // 읽기 모드에서 제목 크기 조정
-                  paddingBottom: "0.3rem", // 줄과 제목 간격을 조정
-                  borderBottom: "1px solid rgba(255, 255, 255, 0.7)",
-                  marginBottom: "0.5rem",
-                  textShadow: "1px 1px 3px rgba(0, 0, 0, 0.7)", // 텍스트 그림자 추가
-                }}
-              >
-                {title || "제목 없음"}
-              </Typography>
+  variant="h6"
+  sx={{
+    fontWeight: 600,
+    fontSize: "1.5rem",
+    fontFamily: '"Roboto", "Noto Sans", sans-serif',
+    color: "#fff",
+    paddingBottom: "0.3rem",
+    borderBottom: "1px solid rgba(255, 255, 255, 0.7)",
+    marginBottom: "0.5rem",
+    textShadow: "1px 1px 3px rgba(0, 0, 0, 0.7)",
+  }}
+>
+  {title || "제목 없음"}
+</Typography>
             ) : (
               <TextField
                 fullWidth
@@ -193,7 +199,16 @@ const OverviewPanel: React.FC<OverviewPanelProps> = ({
         <Grid container spacing={isReadOnly ? 1 : 2} sx={{ marginTop: "1rem" }}>
           <Grid item xs={2}>
             {isReadOnly ? (
-              <Typography sx={{ color: "rgba(255, 255, 255, 0.9)", textShadow: "1px 1px 3px rgba(0, 0, 0, 0.7)" }}>
+              <Typography   sx={{
+                fontSize: "1.1rem", // 기존보다 큰 글씨 크기
+                fontWeight: 500,
+                color: "rgba(255, 255, 255, 0.9)",
+                textShadow: "1px 1px 3px rgba(0, 0, 0, 0.7)",
+                whiteSpace: "nowrap", // 텍스트 줄바꿈 방지
+                overflow: "hidden", // 패널을 벗어나지 않도록
+                textOverflow: "ellipsis", // 길 경우 생략 표시
+                maxWidth: "100px", // 패널 내 공간 안에서 크기 제한
+              }}>
                 {grade ? `${grade}학년` : "학년 없음"}
               </Typography>
             ) : (
@@ -216,7 +231,16 @@ const OverviewPanel: React.FC<OverviewPanelProps> = ({
           {/* 학기, 과목, 단원에도 동일한 스타일 적용 */}
           <Grid item xs={2}>
             {isReadOnly ? (
-              <Typography sx={{ color: "rgba(255, 255, 255, 0.9)", textShadow: "1px 1px 3px rgba(0, 0, 0, 0.7)" }}>
+              <Typography   sx={{
+                fontSize: "1.1rem", // 기존보다 큰 글씨 크기
+                fontWeight: 500,
+                color: "rgba(255, 255, 255, 0.9)",
+                textShadow: "1px 1px 3px rgba(0, 0, 0, 0.7)",
+                whiteSpace: "nowrap", // 텍스트 줄바꿈 방지
+                overflow: "hidden", // 패널을 벗어나지 않도록
+                textOverflow: "ellipsis", // 길 경우 생략 표시
+                maxWidth: "100px", // 패널 내 공간 안에서 크기 제한
+              }}>
                 {semester || "학기 없음"}
               </Typography>
             ) : (
@@ -238,7 +262,16 @@ const OverviewPanel: React.FC<OverviewPanelProps> = ({
 
           <Grid item xs={2}>
             {isReadOnly ? (
-              <Typography sx={{ color: "rgba(255, 255, 255, 0.9)", textShadow: "1px 1px 3px rgba(0, 0, 0, 0.7)" }}>
+              <Typography   sx={{
+                fontSize: "1.1rem", // 기존보다 큰 글씨 크기
+                fontWeight: 500,
+                color: "rgba(255, 255, 255, 0.9)",
+                textShadow: "1px 1px 3px rgba(0, 0, 0, 0.7)",
+                whiteSpace: "nowrap", // 텍스트 줄바꿈 방지
+                overflow: "hidden", // 패널을 벗어나지 않도록
+                textOverflow: "ellipsis", // 길 경우 생략 표시
+                maxWidth: "100px", // 패널 내 공간 안에서 크기 제한
+              }}>
                 {subject || "과목 없음"}
               </Typography>
             ) : (
@@ -260,7 +293,16 @@ const OverviewPanel: React.FC<OverviewPanelProps> = ({
 
           <Grid item xs={6}>
             {isReadOnly ? (
-              <Typography sx={{ color: "rgba(255, 255, 255, 0.9)", textShadow: "1px 1px 3px rgba(0, 0, 0, 0.7)" }}>
+              <Typography   sx={{
+                fontSize: "1.1rem", // 기존보다 큰 글씨 크기
+                fontWeight: 500,
+                color: "rgba(255, 255, 255, 0.9)",
+                textShadow: "1px 1px 3px rgba(0, 0, 0, 0.7)",
+                whiteSpace: "nowrap", // 텍스트 줄바꿈 방지
+                overflow: "hidden", // 패널을 벗어나지 않도록
+                textOverflow: "ellipsis", // 길 경우 생략 표시
+                maxWidth: "200px", // 패널 내 공간 안에서 크기 제한
+              }}>
                 {unit || "단원 없음"}
               </Typography>
             ) : (
@@ -283,42 +325,45 @@ const OverviewPanel: React.FC<OverviewPanelProps> = ({
           </Grid>
         </Grid>
 
+
         {isReadOnly && (
-          <Box display="flex" justifyContent="flex-end" gap={2} mt={1}> {/* 오른쪽 정렬 및 여백 조정 */}
-            <Button
-              variant="contained"
-              onClick={onStartQuiz}
-              sx={{
-                fontWeight: "bold",
-                borderRadius: "8px",
-                padding: "0.6rem 1.2rem",
-                backgroundColor: "#4caf50",
-                color: "#fff",
-                "&:hover": {
-                  backgroundColor: "#388e3c",
-                },
-              }}
-            >
-              퀴즈 시작
-            </Button>
-            <Button
-              variant="contained"
-              onClick={onEditQuiz}
-              sx={{
-                fontWeight: "bold",
-                borderRadius: "8px",
-                padding: "0.6rem 1.2rem",
-                backgroundColor: "rgba(0, 0, 0, 0.5)", // 불투명 배경색 추가
-                color: "#fff",
-                "&:hover": {
-                  backgroundColor: "rgba(0, 0, 0, 0.7)", // 호버 시 배경색
-                },
-              }}
-            >
-              수정
-            </Button>
-          </Box>
-        )}
+  <Box display="flex" justifyContent="flex-end" gap={2} mt={1}> 
+    <IconButton
+      onClick={onStartQuiz}
+      sx={{
+        background: "linear-gradient(145deg, #ff9800, #ffc107)", // 밝은 그라데이션 색상
+        color: "#ffffff",
+        borderRadius: "50%", // 원형 버튼
+        boxShadow: "0 6px 12px rgba(0, 0, 0, 0.2)", // 더 강한 그림자
+        "&:hover": {
+          background: "linear-gradient(145deg, #fb8c00, #ff9800)", // 호버 시 더 진한 그라데이션
+          boxShadow: "0 8px 14px rgba(0, 0, 0, 0.3)",
+        },
+        padding: "0.7rem",
+        transition: "all 0.3s ease",
+      }}
+    >
+      <PlayArrow sx={{ fontSize: "2rem" }} /> {/* 퀴즈 시작 아이콘 */}
+    </IconButton>
+    <IconButton
+      onClick={onEditQuiz}
+      sx={{
+        background: "linear-gradient(145deg, #607d8b, #78909c)", // 밝은 회색-블루 그라데이션
+        color: "#ffffff",
+        borderRadius: "50%", // 원형 버튼
+        boxShadow: "0 6px 12px rgba(0, 0, 0, 0.2)",
+        "&:hover": {
+          background: "linear-gradient(145deg, #546e7a, #607d8b)", // 호버 시 더 진한 색상
+          boxShadow: "0 8px 14px rgba(0, 0, 0, 0.3)",
+        },
+        padding: "0.7rem",
+        transition: "all 0.3s ease",
+      }}
+    >
+      <Edit sx={{ fontSize: "1.8rem" }} /> {/* 수정 아이콘 */}
+    </IconButton>
+  </Box>
+)}
       </Box>
     </Box>
   );

@@ -1,4 +1,3 @@
-// QuizCard.tsx
 import React, { useState } from "react";
 import {
   Card,
@@ -21,19 +20,21 @@ import {
 import FavoriteIcon from "@mui/icons-material/Favorite";
 import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorder";
 import DeleteIcon from "@mui/icons-material/Delete";
-import VisibilityIcon from "@mui/icons-material/Visibility"; // 확인 아이콘
+import PlayCircleFilled from "@mui/icons-material/PlayCircleFilled"; // 퀴즈 시작 버튼 아이콘으로 변경
 import { useNavigate } from "react-router-dom";
 import api from "../../../../utils/api";
 import { getUserId } from "../../../../utils/auth";
 import { Quiz } from "../types"; // 공통 Quiz 타입 import
+import backgroundDefault from "../../../../assets/background-default.webp"
 
 interface QuizCardProps {
   quiz: Quiz;
   onDelete: (quizId: string) => void;
   onOpenModal: (quiz: Quiz) => void;
+  isMyQuizzes: boolean; // 내 퀴즈함 여부 prop 추가
 }
 
-const QuizCard: React.FC<QuizCardProps> = ({ quiz, onDelete, onOpenModal }) => {
+const QuizCard: React.FC<QuizCardProps> = ({ quiz, onDelete, onOpenModal, isMyQuizzes }) => {
   const userId = getUserId();
 
   const [isLiking, setIsLiking] = useState<boolean>(false);
@@ -88,31 +89,13 @@ const QuizCard: React.FC<QuizCardProps> = ({ quiz, onDelete, onOpenModal }) => {
         backgroundColor: "#fff7f0",
       }}
     >
-      {quiz.imageUrl ? (
-        <CardMedia
-          component="img"
-          height="140"
-          image={quiz.imageUrl}
-          alt={`${quiz.title} 이미지`}
-          sx={{ borderTopLeftRadius: "16px", borderTopRightRadius: "16px" }}
-        />
-      ) : (
-        <Box
-          sx={{
-            height: 140,
-            backgroundColor: "#f0f0f0",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            borderTopLeftRadius: "16px",
-            borderTopRightRadius: "16px",
-          }}
-        >
-          <Typography variant="h5" color="textSecondary">
-            이미지 없음
-          </Typography>
-        </Box>
-      )}
+      <CardMedia
+        component="img"
+        height="140"
+        image={quiz.imageUrl || backgroundDefault} // 기본 이미지 사용
+        alt={quiz.imageUrl ? `${quiz.title} 이미지` : "기본 이미지"}
+        sx={{ borderTopLeftRadius: "16px", borderTopRightRadius: "16px" }}
+      />
 
       <CardContent>
         <Typography variant="h6" gutterBottom sx={{ fontWeight: "bold" }}>
@@ -121,33 +104,41 @@ const QuizCard: React.FC<QuizCardProps> = ({ quiz, onDelete, onOpenModal }) => {
         <Typography variant="body2" color="textSecondary">
           단원: {quiz.unit} | 문제 수: {quiz.questionsCount}
         </Typography>
-        <Box display="flex" justifyContent="space-between" mt={2}>
+        {/* <Box display="flex" justifyContent="space-between" mt={2}>
           <Chip label={`${quiz.grade}학년`} color="primary" size="small" />
           <Chip label={quiz.semester} color="secondary" size="small" />
           <Chip label={quiz.subject} size="small" />
-        </Box>
+        </Box> */}
       </CardContent>
 
-      <CardActions disableSpacing sx={{ justifyContent: "space-between" }}>
+      <CardActions disableSpacing sx={{ justifyContent: "space-between", paddingX: "1rem" }}>
         <Box display="flex" alignItems="center">
-          {/* 확인 버튼 */}
-          <Tooltip title="퀴즈 확인">
-            <IconButton color="primary" onClick={handleOpenModal}>
-              <VisibilityIcon />
+          {/* 퀴즈 시작 버튼 */}
+          <Tooltip title="퀴즈 시작">
+            <IconButton 
+              sx={{ 
+                color: "#FFC107", 
+                fontSize: "2.5rem", // 크기 확대
+                padding: 0, // 버튼 크기를 아이콘 크기에 맞춤
+              }} 
+              onClick={handleOpenModal}
+            >
+              <PlayCircleFilled fontSize="inherit" /> {/* 아이콘 크기를 상속 */}
             </IconButton>
           </Tooltip>
-
-          {/* 삭제 버튼 (생성자인 경우에만 표시) */}
-          {quiz.createdBy === userId && (
+          {/* 삭제 버튼 ("내 퀴즈함"일 때만 표시) */}
+          {isMyQuizzes && (
             <Tooltip title="퀴즈 삭제">
               <IconButton
-                color="error"
                 onClick={handleDeleteClick}
                 sx={{
                   backgroundColor: "#f44336",
                   color: "#fff",
                   borderRadius: "8px",
                   marginLeft: "8px",
+                  "&:hover": {
+                    backgroundColor: "#d32f2f", // 호버 시 약간 더 어두운 색으로 변경
+                  },
                 }}
               >
                 <DeleteIcon />
@@ -156,13 +147,15 @@ const QuizCard: React.FC<QuizCardProps> = ({ quiz, onDelete, onOpenModal }) => {
           )}
         </Box>
 
-        {/* 좋아요 버튼 */}
         <Box display="flex" alignItems="center">
-          <IconButton onClick={handleLikeToggle} disabled={isLiking}>
+          {/* 좋아요 버튼 */}
+          <IconButton onClick={handleLikeToggle} disabled={isLiking} sx={{ color: "#FF5722" }}>
             <Badge badgeContent={likeCount} color="error">
               {liked ? <FavoriteIcon color="error" /> : <FavoriteBorderIcon />}
             </Badge>
           </IconButton>
+
+          
         </Box>
       </CardActions>
 

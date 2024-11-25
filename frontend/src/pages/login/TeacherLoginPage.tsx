@@ -13,11 +13,12 @@ const TeacherLoginPage = () => {
   const handleLogin = async () => {
     try {
       // FCM 토큰 가져오기 (권한 요청 포함)
-      const fcmToken = await requestPermissionAndGetToken(setTokenFound);
+      let fcmToken = await requestPermissionAndGetToken(setTokenFound);
 
       if (!fcmToken) {
-        setError('알림 권한이 필요합니다. 알림 권한을 허용해주세요.');
-        return;
+        // setError('알림 권한이 필요합니다. 알림 권한을 허용해주세요.');
+        // return;
+        fcmToken = null;
       }
 
       const res = await apiNoAuth.post('/auth/login', { role: 'teacher', email, password, fcmToken });

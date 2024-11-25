@@ -1,0 +1,58 @@
+@keyframes moveUp {
+  from {
+    transform: translateY(50px);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes moveDown {
+  from {
+    transform: translateY(-50px);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+.student-box {
+  transition: all 0.5s ease-in-out;
+}
+
+.student-box.move-up {
+  animation: moveUp 0.5s ease-in-out;
+}
+
+.student-box.move-down {
+  animation: moveDown 0.5s ease-in-out;
+}
+@keyframes moveUp {
+  from {
+    transform: translateY(50px);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes moveDown {
+  from {
+    transform: translateY(-50px);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+.student-box {
+  transition: all 0.5s ease-in-out;
+}
+
+.student-box.move-up {
+  animation: moveUp 0.5s ease-in-out;
+}
+
+.student-box.move-down {
+  animation: moveDown 0.5s ease-in-out;
+}

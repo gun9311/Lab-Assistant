@@ -33,7 +33,7 @@ const QuizFilter: React.FC<QuizFilterProps> = ({
   setSortBy,
 }) => {
   return (
-    <Box sx={{ marginBottom: "2rem", padding: "1rem", borderRadius: "16px", backgroundColor: "#f7f7f7", boxShadow: "0 6px 20px rgba(0, 0, 0, 0.1)" }}>
+    <Box sx={{ marginBottom: "0.5rem", padding: "0.7rem", borderRadius: "16px", backgroundColor: "#f7f7f7", boxShadow: "0 6px 20px rgba(0, 0, 0, 0.1)" }}>
       <Grid container spacing={2} alignItems="center">
         
         {/* 학년 필터 */}
