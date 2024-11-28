@@ -64,38 +64,40 @@ const MyQuizzesPage: React.FC<MyQuizzesPageProps> = ({ setIsQuizMode }) => {
   const [confirmDialogOpen, setConfirmDialogOpen] = useState<boolean>(false);
   const [snackbarOpen, setSnackbarOpen] = useState<boolean>(false);
   const [pin, setPin] = useState<string>(''); // PIN 입력 상태 추가
+  const studentId = getUserId();
   const navigate = useNavigate(); // 페이지 이동을 위한 useNavigate 훅
 
-  const fetchQuizResults = async () => {
-    try {
-      const response = await api.get('/quiz-results');
-      setQuizResults(response.data);
-      setFilteredResults(response.data);
-    } catch (error: any) {
-      console.error('Failed to fetch quiz results:', error);
-      setError(error.response?.data?.message || '퀴즈 결과를 불러오는 데 실패했습니다.');
-    }
-  };
+  // const fetchQuizResults = async () => {
+  //   try {
+  //     const response = await api.get('/quiz-results');
+  //     setQuizResults(response.data);
+  //     setFilteredResults(response.data);
+  //   } catch (error: any) {
+  //     console.error('Failed to fetch quiz results:', error);
+  //     setError(error.response?.data?.message || '퀴즈 결과를 불러오는 데 실패했습니다.');
+  //   }
+  // };
 
-  useEffect(() => {
-    fetchQuizResults();
-  }, []);
+  // useEffect(() => {
+  //   fetchQuizResults();
+  // }, []);
 
-  useEffect(() => {
-    filterResults();
-  }, [selection]);
+  // useEffect(() => {
+  //   filterResults();
+  // }, [selection]);
 
-  const filterResults = () => {
-    setFilteredResults(
-      quizResults.filter(result => 
-        (!selection.semester || result.semester === selection.semester) &&
-        (!selection.subject || result.subject === selection.subject) &&
-        (!selection.unit || result.unit === selection.unit)
-      )
-    );
-  };
+  // const filterResults = () => {
+  //   setFilteredResults(
+  //     quizResults.filter(result => 
+  //       (!selection.semester || result.semester === selection.semester) &&
+  //       (!selection.subject || result.subject === selection.subject) &&
+  //       (!selection.unit || result.unit === selection.unit)
+  //     )
+  //   );
+  // };
 
   const handleSelectionChange = (newSelection: Selection) => {
+    console.log('Selection 변경:', newSelection);
     setSelection(newSelection);
   };
 
@@ -196,9 +198,12 @@ const MyQuizzesPage: React.FC<MyQuizzesPageProps> = ({ setIsQuizMode }) => {
                   handleSelectionChange={handleSelectionChange}
                 />
                 <QuizResults 
-                  filteredResults={filteredResults}
-                  selectedQuiz={selectedQuiz}
-                  handleQuizResultClick={handleQuizResultClick}
+                  // filteredResults={filteredResults}
+                  // selectedQuiz={selectedQuiz}
+                  // handleQuizResultClick={handleQuizResultClick}
+                  studentId={studentId}
+                  selectedSemester={selection.semester || 'All'} // 기본값을 'All'로 설정
+                  selectedSubject={selection.subject || 'All'} // 기본값을 'All'로 설정
                   handleCloseDetails={handleCloseDetails}
                   isStudentView={true}  // 학생이 자신의 결과를 확인할 때 true로 설정
                 />
