@@ -683,6 +683,7 @@ exports.handleTeacherWebSocketConnection = async (ws, teacherId, pin) => {
           // QuizResult 스키마에 결과 저장
           const quizResult = new QuizResult({
             studentId: participant.student,
+            quizId: session.quizContent,
             subject: quizContent.subject,
             semester: quizContent.semester,
             unit: quizContent.unit,
