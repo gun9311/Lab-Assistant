@@ -16,11 +16,7 @@ const login = async (req, res) => {
       user = await Teacher.findOne({ email: loginData.email });
     } else if (role === 'student') {
       user = await Student.findOne({
-        school: loginData.school,
-        grade: loginData.grade,
-        class: loginData.class,
-        studentId: loginData.studentId,
-        name: loginData.name,
+        loginId: loginData.loginId,
       });
     }
 
@@ -130,9 +126,9 @@ const registerTeacher = async (req, res) => {
 };
 
 const registerStudent = async (req, res) => {
-  const { studentId, name, password, grade, class: studentClass, school } = req.body;
+  const { loginId, studentId, name, password, grade, class: studentClass, school } = req.body;
   try {
-    const student = new Student({ studentId, name, password, grade, class: studentClass, school });
+    const student = new Student({ loginId, studentId, name, password, grade, class: studentClass, school });
     await student.save();
     res.status(201).send(student);
   } catch (error) {
@@ -159,4 +155,24 @@ const registerAdmin = async (req, res) => {
   }
 };
 
-module.exports = { login, logout, refreshAccessToken, registerTeacher, registerStudent, registerAdmin };
+const registerStudentByTeacher = async (req, res) => {
+  const students = req.body; // 배열로 전송된 학생 데이터
+  try {
+    const createdStudents = [];
+    for (const studentData of students) {
+      const { loginId, studentId, name, password, grade, studentClass, school } = studentData;
+      const student = new Student({ loginId, studentId, name, password, grade, class: studentClass, school });
+      await student.save();
+      createdStudents.push(student);
+    }
+    res.status(201).send(createdStudents);
+  } catch (error) {
+    if (error.code === 11000) { // 중복된 key 에러
+      res.status(400).send({ error: 'Student with the same school, grade, class, and studentId already exists' });
+    } else {
+      res.status(400).send({ error: 'Failed to create student' });
+    }
+  }
+};
+
+module.exports = { login, logout, refreshAccessToken, registerTeacher, registerStudent, registerAdmin, registerStudentByTeacher };
