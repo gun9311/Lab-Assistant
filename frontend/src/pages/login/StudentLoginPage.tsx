@@ -20,6 +20,7 @@ const StudentLoginPage = () => {
   const [classNumber, setClassNumber] = useState('');
   const [studentId, setStudentId] = useState('');
   const [name, setName] = useState('');
+  const [loginId, setLoginId] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isTokenFound, setTokenFound] = useState(false);
@@ -64,11 +65,12 @@ const StudentLoginPage = () => {
 
       const res = await apiNoAuth.post('/auth/login', {
         role: 'student',
-        school,
-        grade,
-        class: classNumber,
-        studentId,
-        name,
+        // school,
+        // grade,
+        // class: classNumber,
+        // studentId,
+        // name,
+        loginId,
         password,
         fcmToken, // FCM 토큰 추가
       });
@@ -90,7 +92,7 @@ const StudentLoginPage = () => {
         <Typography variant="h4" gutterBottom>
           학생 로그인
         </Typography>
-        <FormControl fullWidth variant="outlined" margin="normal">
+        {/* <FormControl fullWidth variant="outlined" margin="normal">
           <InputLabel>지역</InputLabel>
           <Select
             value={educationOffice}
@@ -151,6 +153,14 @@ const StudentLoginPage = () => {
           label="이름"
           value={name}
           onChange={(e) => setName(e.target.value)}
+        /> */}
+        <TextField
+          fullWidth
+          variant="outlined"
+          margin="normal"
+          label="아이디"
+          value={loginId}
+          onChange={(e) => setLoginId(e.target.value)}
         />
         <TextField
           fullWidth

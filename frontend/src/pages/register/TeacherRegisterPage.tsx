@@ -73,7 +73,7 @@ const TeacherRegisterPage = () => {
       setSuccess(true);
       setTimeout(() => {
         navigate('/home');
-      }, 1300);
+      }, 500);
     } catch (error) {
       setError('교사 등록에 실패했습니다');
     }
@@ -156,7 +156,7 @@ const TeacherRegisterPage = () => {
           onClick={handleRegister}
           sx={{ mt: 2 }}
         >
-          회원가입
+          확인
         </Button>
         {error && <Typography color="error" sx={{ mt: 2 }}>{error}</Typography>}
         <Snackbar

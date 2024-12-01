@@ -19,7 +19,9 @@ import SchoolIcon from "@mui/icons-material/School";
 import GradeIcon from "@mui/icons-material/Grade";
 import ClassIcon from "@mui/icons-material/Class";
 import AssessmentIcon from "@mui/icons-material/Assessment";
+import PersonAddIcon from "@mui/icons-material/PersonAdd"; // 학생 추가 아이콘
 import ReportGeneration from "../../components/teacher/reportGeneration/ReportGeneration";
+import StudentAccountModal from "./StudentAccountModal";
 
 type Student = {
   _id: number;
@@ -37,6 +39,7 @@ const TeacherHomePage: React.FC = () => {
     useState<boolean>(false);
   const school = getSchoolName();
   const theme = useTheme();
+  const [isModalOpen, setModalOpen] = useState(false);
 
   useEffect(() => {
     const fetchStudents = async () => {
@@ -70,21 +73,69 @@ const TeacherHomePage: React.FC = () => {
     setShowReportGeneration(false);
   };
 
+  const handleOpenModal = () => {
+    setModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setModalOpen(false);
+  };
+
+  const handleCreateStudent = async (studentData: any) => {
+    try {
+      const res = await api.post('/auth/register/studentByTeacher', studentData);
+      console.log('학생 계정 생성 완료:', res.data);
+      // 성공 메시지 표시 로직 추가
+    } catch (error) {
+      console.error('학생 계정 생성 실패:', error);
+      // 오류 메시지 표시 로직 추가
+    }
+  };
+
   return (
     <Container component="main" maxWidth="md" sx={{ mt: 8, mb: 4 }}>
       <Paper elevation={3} sx={{ padding: 4, borderRadius: 2 }}>
-        <Typography
-          variant="h4"
-          gutterBottom
-          align="center"
-          sx={{ fontWeight: "bold", color: theme.palette.primary.dark, mb: 6 }} // mb 값을 6으로 설정해 여백을 늘림
+        <Box
+          display="flex"
+          justifyContent="center"
+          alignItems="center"
+          sx={{ mb: 6, position: 'relative' }} // 여백을 더 추가하여 섹션 간의 간격을 늘림
         >
-          <SchoolIcon
-            fontSize="large"
-            sx={{ verticalAlign: "middle", mr: 1 }}
-          />
-          {school}
-        </Typography>
+          <Typography
+            variant="h4"
+            gutterBottom
+            sx={{ fontWeight: "bold", color: theme.palette.primary.dark, textAlign: "center" }}
+          >
+            <SchoolIcon
+              fontSize="large"
+              sx={{ verticalAlign: "middle", mr: 1 }}
+            />
+            {school}
+          </Typography>
+          <Box sx={{ position: 'absolute', right: 0 }}>
+            <Button
+              variant="contained"
+              onClick={handleOpenModal}
+              sx={{
+                backgroundColor: '#333', // 짙은 회색
+                color: '#fff', // 흰색 텍스트
+                padding: '8px 16px',
+                borderRadius: '6px',
+                boxShadow: '0 3px 5px 2px rgba(0, 0, 0, .2)',
+                fontWeight: 'bold', // 굵기
+                fontSize: '14px', // 크기
+                '&:hover': {
+                  backgroundColor: '#555', // 호버 시 밝은 회색
+                },
+                ml: 2
+              }}
+              startIcon={<PersonAddIcon />} // 아이콘 추가
+            >
+              학생 계정 생성
+            </Button>
+          </Box>
+        </Box>
+        <StudentAccountModal open={isModalOpen} onClose={handleCloseModal} onSubmit={handleCreateStudent} school={school} />
         <Box
           display="flex"
           justifyContent="space-between"

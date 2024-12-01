@@ -16,6 +16,7 @@ const StudentRegisterPage = () => {
   const [schools, setSchools] = useState<School[]>([]);
   const [studentId, setStudentId] = useState('');
   const [name, setName] = useState('');
+  const [loginId, setLoginId] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [grade, setGrade] = useState('');
@@ -59,12 +60,12 @@ const StudentRegisterPage = () => {
     }
 
     try {
-      const res = await apiNoAuth.post('/auth/register/student', { studentId, name, password, grade, class: studentClass, school });
+      const res = await apiNoAuth.post('/auth/register/student', { loginId, studentId, name, password, grade, class: studentClass, school });
       console.log('학생 등록 완료:', res.data);
       setSuccess(true);
       setTimeout(() => {
         navigate('/home');
-      }, 1300);
+      }, 500);
     } catch (error) {
       setError('학생 등록에 실패했습니다');
     }
@@ -139,6 +140,14 @@ const StudentRegisterPage = () => {
           onChange={(e) => setName(e.target.value)}
         />
         <TextField
+        fullWidth
+        variant="outlined"
+        margin="normal"
+        label="아이디"
+        value={loginId}
+        onChange={(e) => setLoginId(e.target.value)}
+      />
+        <TextField
           fullWidth
           variant="outlined"
           margin="normal"
@@ -163,7 +172,7 @@ const StudentRegisterPage = () => {
           onClick={handleRegister}
           sx={{ mt: 2 }}
         >
-          회원가입
+          확인
         </Button>
         {error && <Typography color="error" sx={{ mt: 2 }}>{error}</Typography>}
         <Snackbar
