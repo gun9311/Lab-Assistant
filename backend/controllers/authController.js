@@ -1,9 +1,93 @@
+const { OAuth2Client } = require('google-auth-library');
 const Admin = require("../models/Admin");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
 const redisClient = require("../utils/redisClient");
 const Teacher = require('../models/Teacher');
 const Student = require('../models/Student');
+
+const googleClient = new OAuth2Client(
+  process.env.GOOGLE_CLIENT_ID,
+  process.env.GOOGLE_CLIENT_SECRET,
+  process.env.GOOGLE_REDIRECT_URI,
+);
+console.log(googleClient);
+
+const googleLogin = async (req, res) => {
+  const { code, fcmToken } = req.body;
+
+  try {
+    const { tokens } = await googleClient.getToken(code);
+    console.log('Tokens:', tokens);
+    const ticket = await googleClient.verifyIdToken({
+      idToken: tokens.id_token,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+
+    const payload = ticket.getPayload();
+    const email = payload.email;
+    console.log(email);
+
+    let teacher = await Teacher.findOne({ email });
+
+    if (!teacher) {
+      req.session.tempUser = { email };
+      return res.send({ message: 'Google authentication successful, please complete registration.' });
+    }
+
+    // FCM 토큰을 tokens 필드에 추가
+    if (fcmToken) {
+      const tokenExists = teacher.tokens.some(tokenObj => tokenObj.token === fcmToken);
+      if (!tokenExists) {
+        teacher.tokens.push({ token: fcmToken });
+        await teacher.save();
+      }
+    }
+
+    const accessToken = jwt.sign({ _id: teacher._id, role: teacher.role }, process.env.JWT_SECRET, { expiresIn: '15m' });
+    const refreshToken = jwt.sign({ _id: teacher._id, role: teacher.role }, process.env.JWT_REFRESH_SECRET, { expiresIn: '7d' });
+
+    await redisClient.set(teacher._id.toString(), refreshToken, "EX", 7 * 24 * 60 * 60);
+
+    res.send({ accessToken, refreshToken, userId: teacher._id, role: teacher.role, school: teacher.school });
+  } catch (error) {
+    res.status(400).send({ error: 'Google login failed' });
+  }
+};
+
+// authController.js
+const completeRegistration = async (req, res) => {
+  const { name, school, authCode, fcmToken } = req.body;
+  const { email } = req.session.tempUser; // Retrieve email from session
+
+  const VALID_AUTH_CODE = '교사';  // 하드코딩된 인증코드
+
+  if (authCode !== VALID_AUTH_CODE) {
+    return res.status(400).send({ error: 'Invalid authentication code' });
+  }
+
+  try {
+    const teacher = new Teacher({ email, name, school });
+
+    // FCM 토큰을 tokens 필드에 추가
+    if (fcmToken) {
+      teacher.tokens.push({ token: fcmToken });
+    }
+
+    await teacher.save();
+
+    // 가입 후 로그인 처리
+    const accessToken = jwt.sign({ _id: teacher._id, role: teacher.role }, process.env.JWT_SECRET, { expiresIn: '15m' });
+    const refreshToken = jwt.sign({ _id: teacher._id, role: teacher.role }, process.env.JWT_REFRESH_SECRET, { expiresIn: '7d' });
+
+    // Redis에 리프레시 토큰 저장
+    await redisClient.set(teacher._id.toString(), refreshToken, "EX", 7 * 24 * 60 * 60);
+
+    res.status(201).send({ message: 'Registration complete', accessToken, refreshToken, userId: teacher._id, role: teacher.role, school: teacher.school });
+  } catch (error) {
+    res.status(400).send({ error: 'Failed to complete registration' });
+  }
+};
 
 const login = async (req, res) => {
   const { role, password, fcmToken, ...loginData } = req.body;
@@ -175,4 +259,4 @@ const registerStudentByTeacher = async (req, res) => {
   }
 };
 
-module.exports = { login, logout, refreshAccessToken, registerTeacher, registerStudent, registerAdmin, registerStudentByTeacher };
+module.exports = { googleLogin, completeRegistration, login, logout, refreshAccessToken, registerTeacher, registerStudent, registerAdmin, registerStudentByTeacher };

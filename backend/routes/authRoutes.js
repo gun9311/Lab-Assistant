@@ -1,5 +1,5 @@
 const express = require('express');
-const { login, logout, refreshAccessToken, registerTeacher, registerStudent, registerAdmin, registerStudentByTeacher } = require('../controllers/authController');
+const { googleLogin, completeRegistration, login, logout, refreshAccessToken, registerTeacher, registerStudent, registerAdmin, registerStudentByTeacher } = require('../controllers/authController');
 const auth = require('../middleware/auth');
 
 const router = express.Router();
@@ -15,5 +15,9 @@ router.post('/register/admin', registerAdmin); // 관리자 회원가입 엔드�
 
 // 교사가 학생 계정 생성
 router.post('/register/studentByTeacher', auth('teacher'), registerStudentByTeacher);
+
+// 구글 oauth
+router.post('/google', googleLogin);
+router.post('/google/complete-registration', completeRegistration);
 
 module.exports = router;
