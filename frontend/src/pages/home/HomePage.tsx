@@ -140,11 +140,11 @@ const HomePage = () => {
 
       {/* 로그인 선택 다이얼로그 */}
       <Dialog open={loginOpen} onClose={handleLoginClose}>
-        <DialogTitle>로그인 유형 선택</DialogTitle>
+        <DialogTitle>계정 유형을 선택하세요.</DialogTitle>
         <DialogContent>
-          <Typography gutterBottom>
-            로그인할 계정 유형을 선택하세요.
-          </Typography>
+          {/* <Typography gutterBottom>
+            계정 유형을 선택하세요.
+          </Typography> */}
           <Stack spacing={2}>
             <Button
               component={Link}
@@ -163,7 +163,7 @@ const HomePage = () => {
                 transition: 'all 0.3s ease',
               }}
             >
-              교사 로그인
+              교사
             </Button>
             <Button
               component={Link}
@@ -182,11 +182,11 @@ const HomePage = () => {
                 transition: 'all 0.3s ease',
               }}
             >
-              학생 로그인
+              학생
             </Button>
           </Stack>
         </DialogContent>
-        <DialogActions sx={{ justifyContent: 'space-between' }}>
+        {/* <DialogActions sx={{ justifyContent: 'space-between' }}>
           <Button
             onClick={() => {
               setLoginOpen(false); // 로그인 다이얼로그 닫기
@@ -205,7 +205,7 @@ const HomePage = () => {
           <Button onClick={handleLoginClose} color="secondary">
             닫기
           </Button>
-        </DialogActions>
+        </DialogActions> */}
       </Dialog>
 
       {/* 회원가입 선택 다이얼로그 */}

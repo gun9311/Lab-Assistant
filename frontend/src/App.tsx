@@ -15,6 +15,7 @@ import TeacherHomePage from "./pages/home/TeacherHomePage";
 import AdminHomePage from "./pages/home/AdminHomePage";
 import AdminLoginPage from "./pages/login/AdminLoginPage";
 import TeacherLoginPage from "./pages/login/TeacherLoginPage";
+import GoogleCallback from './pages/login/GoogleCallback';
 import StudentLoginPage from "./pages/login/StudentLoginPage";
 import theme from "./theme";
 import Layout from "./components/Layout";
@@ -124,6 +125,7 @@ const AppContent: React.FC = () => {
         )}
         <Route path="/" element={<Navigate to={`/${role}`} />} />
         <Route path="/home" element={<Navigate to={`/${role}`} />} />
+        
 
         <Route element={<Layout isQuizMode={isQuizMode} />}>
           {" "}
@@ -245,6 +247,7 @@ const App: React.FC = () => {
           <Route path="/teacher-register" element={<TeacherRegisterPage />} />
           <Route path="/student-register" element={<StudentRegisterPage />} />
           <Route path="/admin-register" element={<AdminRegisterPage />} />
+          <Route path="/auth/google/callback" element={<GoogleCallback />} />
         </Routes>
       )}
     </ThemeProvider>

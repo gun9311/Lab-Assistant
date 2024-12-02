@@ -9,6 +9,8 @@ const TeacherLoginPage = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isTokenFound, setTokenFound] = useState(false);
+  console.log(process.env.REACT_APP_GOOGLE_CLIENT_ID);
+  console.log(process.env.REACT_APP_GOOGLE_REDIRECT_URI);
 
   const handleLogin = async () => {
     try {
@@ -35,9 +37,12 @@ const TeacherLoginPage = () => {
 
   return (
     <Container component="main" maxWidth="xs" sx={{ marginTop: { xs: 4, sm: 8 } }}>
-      <Paper elevation={3} sx={{ padding: { xs: 2, sm: 4 } }}>
-        <Typography variant="h4" gutterBottom>
+      <Paper elevation={3} sx={{ padding: { xs: 3, sm: 5 }, textAlign: 'center' }}>
+        <Typography variant="h4" gutterBottom sx={{ fontWeight: 'bold', fontSize: { xs: '1.5rem', sm: '2rem' } }}>
           교사 로그인
+        </Typography>
+        <Typography variant="body1" gutterBottom sx={{ color: 'text.secondary', mb: 3 }}>
+          이메일과 비밀번호를 입력하세요.
         </Typography>
         <TextField
           fullWidth
@@ -47,6 +52,7 @@ const TeacherLoginPage = () => {
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
+          sx={{ mb: 2 }}
         />
         <TextField
           fullWidth
@@ -56,15 +62,59 @@ const TeacherLoginPage = () => {
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
+          sx={{ mb: 2 }}
         />
         <Button
           fullWidth
           variant="contained"
           color="primary"
           onClick={handleLogin}
-          sx={{ mt: 2 }}
+          sx={{
+            mt: 2,
+            py: 1.5,
+            fontSize: '1rem',
+            backgroundColor: '#00796b',
+            '&:hover': {
+              backgroundColor: '#004d40',
+            },
+          }}
         >
           로그인
+        </Button>
+        <Button
+          fullWidth
+          variant="contained"
+          color="primary"
+          onClick={() => window.location.href =  
+            `https://accounts.google.com/o/oauth2/v2/auth?client_id=${process.env.REACT_APP_GOOGLE_CLIENT_ID}&redirect_uri=${process.env.REACT_APP_GOOGLE_REDIRECT_URI}&response_type=code&scope=profile email&state=secureRandomState`}
+          sx={{
+            mt: 2,
+            py: 1.5,
+            fontSize: '1rem',
+            backgroundColor: '#4285F4',
+            '&:hover': {
+              backgroundColor: '#357AE8',
+            },
+          }}
+        >
+          Google로 로그인
+        </Button>
+        <Button
+          fullWidth
+          variant="text"
+          color="secondary"
+          onClick={() => window.location.href = '/teacher-register'}
+          sx={{
+            mt: 1,
+            py: 1.5,
+            fontSize: '0.9rem',
+            color: '#00796b',
+            '&:hover': {
+              color: '#004d40',
+            },
+          }}
+        >
+          회원가입
         </Button>
         {error && <Typography color="error" sx={{ mt: 2 }}>{error}</Typography>}
       </Paper>

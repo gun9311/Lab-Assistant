@@ -73,8 +73,8 @@ const StudentRegisterPage = () => {
 
   return (
     <Container component="main" maxWidth="xs" sx={{ marginTop: { xs: 4, sm: 8 } }}>
-      <Paper elevation={3} sx={{ padding: { xs: 2, sm: 4 } }}>
-        <Typography variant="h4" gutterBottom>
+      <Paper elevation={3} sx={{ padding: { xs: 3, sm: 5 }, textAlign: 'center' }}>
+        <Typography variant="h4" gutterBottom sx={{ fontWeight: 'bold', fontSize: { xs: '1.5rem', sm: '2rem' } }}>
           학생 회원가입
         </Typography>
         <FormControl fullWidth variant="outlined" margin="normal">
@@ -118,7 +118,7 @@ const StudentRegisterPage = () => {
           value={studentClass}
           onChange={(e) => setStudentClass(e.target.value)}
           InputProps={{
-            endAdornment: studentClass ? <InputAdornment position="end">반</InputAdornment> : null, // 입력 값이 있을 때만 endAdornment를 보여줍니다.
+            endAdornment: studentClass ? <InputAdornment position="end">반</InputAdornment> : null,
           }}
         />
         <TextField
@@ -140,13 +140,13 @@ const StudentRegisterPage = () => {
           onChange={(e) => setName(e.target.value)}
         />
         <TextField
-        fullWidth
-        variant="outlined"
-        margin="normal"
-        label="아이디"
-        value={loginId}
-        onChange={(e) => setLoginId(e.target.value)}
-      />
+          fullWidth
+          variant="outlined"
+          margin="normal"
+          label="아이디"
+          value={loginId}
+          onChange={(e) => setLoginId(e.target.value)}
+        />
         <TextField
           fullWidth
           variant="outlined"
@@ -170,7 +170,15 @@ const StudentRegisterPage = () => {
           variant="contained"
           color="primary"
           onClick={handleRegister}
-          sx={{ mt: 2 }}
+          sx={{
+            mt: 2,
+            py: 1.5,
+            fontSize: '1rem',
+            backgroundColor: '#00796b',
+            '&:hover': {
+              backgroundColor: '#004d40',
+            },
+          }}
         >
           확인
         </Button>
