@@ -48,13 +48,24 @@ mongoose.connect(process.env.MONGODB_URL)
 // Express 앱 설정
 const app = express();
 
-app.use(cors());
+const allowedOrigins = ['http://localhost:3000', 'https://t-bot.site'];
+
+app.use(cors({
+  origin: (origin, callback) => {
+    if (allowedOrigins.includes(origin) || !origin) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true // 자격 증명을 포함한 요청 허용
+}));
 
 app.use(session({
   store: new RedisStore({ client: redisClient }),
   secret: process.env.SESSION_SECRET,
   resave: false,
-  saveUninitialized: false
+  saveUninitialized: true
 }));
 
 app.use(bodyParser.json());

@@ -1,5 +1,5 @@
 const express = require('express');
-const { googleLogin, completeRegistration, login, logout, refreshAccessToken, registerTeacher, registerStudent, registerAdmin, registerStudentByTeacher } = require('../controllers/authController');
+const { googleLogin, completeRegistration, login, logout, refreshAccessToken, registerTeacher, registerStudent, registerAdmin, registerStudentByTeacher, forgotPassword, resetPassword, forgotStudentPassword,resetStudentPassword } = require('../controllers/authController');
 const auth = require('../middleware/auth');
 
 const router = express.Router();
@@ -19,5 +19,12 @@ router.post('/register/studentByTeacher', auth('teacher'), registerStudentByTeac
 // 구글 oauth
 router.post('/google', googleLogin);
 router.post('/google/complete-registration', completeRegistration);
+
+// 비밀번호 찾기 및 재설정
+router.post('/forgot-password', forgotPassword);
+router.post('/reset-password', resetPassword);
+
+router.post('/forgot-student-password' , auth('teacher'), forgotStudentPassword);
+router.post('/reset-student-password', resetStudentPassword);
 
 module.exports = router;

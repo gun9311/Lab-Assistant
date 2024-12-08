@@ -5,20 +5,21 @@ const bcrypt = require("bcryptjs");
 const redisClient = require("../utils/redisClient");
 const Teacher = require('../models/Teacher');
 const Student = require('../models/Student');
+const nodemailer = require('nodemailer');
+const { google } = require('googleapis');
+const { SESClient, SendEmailCommand } = require('@aws-sdk/client-ses');
 
 const googleClient = new OAuth2Client(
   process.env.GOOGLE_CLIENT_ID,
   process.env.GOOGLE_CLIENT_SECRET,
   process.env.GOOGLE_REDIRECT_URI,
 );
-console.log(googleClient);
 
 const googleLogin = async (req, res) => {
   const { code, fcmToken } = req.body;
 
   try {
     const { tokens } = await googleClient.getToken(code);
-    console.log('Tokens:', tokens);
     const ticket = await googleClient.verifyIdToken({
       idToken: tokens.id_token,
       audience: process.env.GOOGLE_CLIENT_ID,
@@ -26,13 +27,11 @@ const googleLogin = async (req, res) => {
 
     const payload = ticket.getPayload();
     const email = payload.email;
-    console.log(email);
 
     let teacher = await Teacher.findOne({ email });
 
     if (!teacher) {
-      req.session.tempUser = { email };
-      return res.send({ message: 'Google authentication successful, please complete registration.' });
+      return res.send({ message: 'Google authentication successful, please complete registration.', email });
     }
 
     // FCM 토큰을 tokens 필드에 추가
@@ -57,8 +56,7 @@ const googleLogin = async (req, res) => {
 
 // authController.js
 const completeRegistration = async (req, res) => {
-  const { name, school, authCode, fcmToken } = req.body;
-  const { email } = req.session.tempUser; // Retrieve email from session
+  const { name, school, authCode, fcmToken, email } = req.body;
 
   const VALID_AUTH_CODE = '교사';  // 하드코딩된 인증코드
 
@@ -259,4 +257,156 @@ const registerStudentByTeacher = async (req, res) => {
   }
 };
 
-module.exports = { googleLogin, completeRegistration, login, logout, refreshAccessToken, registerTeacher, registerStudent, registerAdmin, registerStudentByTeacher };
+const forgotPassword = async (req, res) => {
+  const { email } = req.body;
+
+  const sesClient = new SESClient({
+    region: process.env.AWS_REGION,
+    credentials: {
+      accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+    },
+  });  
+
+  try {
+    // 1. 이메일 확인
+    const teacher = await Teacher.findOne({ email });
+    if (!teacher) {
+      return res.status(400).send({ error: '등록되지 않은 이메일입니다.' });
+    }
+
+    // 2. 재설정 토큰 생성
+    const resetToken = jwt.sign({ _id: teacher._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
+
+    // 3. 재설정 링크 생성
+    const resetLink = `${process.env.CLIENT_URL}/reset-password?token=${resetToken}`;
+
+    // 4. 이메일 전송 설정
+    const params = {
+      Source: process.env.AWS_SES_VERIFIED_EMAIL, // SES에서 검증된 발신 이메일 주소
+      Destination: {
+        ToAddresses: [email], // 수신자 이메일 주소
+      },
+      Message: {
+        Subject: {
+          Data: '비밀번호 재설정 요청',
+        },
+        Body: {
+          Text: {
+            Data: `안녕하세요, 아래 링크를 통해 비밀번호를 재설정하세요: ${resetLink}`,
+          },
+          Html: {
+            Data: `<p>안녕하세요, 아래 링크를 통해 비밀번호를 재설정하세요:</p><a href="${resetLink}">${resetLink}</a>`,
+          },
+        },
+      },
+    };
+
+    // 5. 이메일 전송
+    const command = new SendEmailCommand(params);
+    await sesClient.send(command);
+
+    // 6. 성공 응답
+    res.status(200).send({ message: '비밀번호 재설정 이메일이 전송되었습니다.' });
+  } catch (error) {
+    console.error('이메일 전송 중 오류:', error);
+    res.status(500).send({ error: '이메일 전송 중 오류가 발생했습니다.' });
+  }
+};
+
+const resetPassword = async (req, res) => {
+  const { token, password } = req.body;
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const teacher = await Teacher.findById(decoded._id);
+
+    if (!teacher) {
+      return res.status(400).send({ error: '유효하지 않은 토큰입니다.' });
+    }
+
+    teacher.password = password;
+    await teacher.save();
+
+    res.send({ message: '비밀번호가 성공적으로 재설정되었습니다.' });
+  } catch (error) {
+    res.status(400).send({ error: '비밀번호 재설정에 실패했습니다.' });
+  }
+};
+
+const forgotStudentPassword = async (req, res) => {
+  const { studentId } = req.body;
+
+  const sesClient = new SESClient({
+    region: process.env.AWS_REGION,
+    credentials: {
+      accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+    },
+  });  
+
+  try {
+    const student = await Student.findOne({ loginId: studentId });
+    if (!student) {
+      return res.status(400).send({ error: '등록되지 않은 학생 아이디입니다.' });
+    }
+
+    const resetToken = jwt.sign({ _id: student._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
+    const resetLink = `${process.env.CLIENT_URL}/reset-student-password?token=${resetToken}`;
+
+    const teacher = await Teacher.findOne({ _id: req.user._id }); // 교사 이메일로 발송
+    if (!teacher) {
+      return res.status(400).send({ error: '교사 정보를 찾을 수 없습니다.' });
+    }
+
+    const params = {
+      Source: process.env.AWS_SES_VERIFIED_EMAIL,
+      Destination: {
+        ToAddresses: [teacher.email],
+      },
+      Message: {
+        Subject: {
+          Data: '학생 비밀번호 재설정 요청',
+        },
+        Body: {
+          Text: {
+            Data: `안녕하세요, 아래 링크를 통해 학생의 비밀번호를 재설정하세요: ${resetLink}`,
+          },
+          Html: {
+            Data: `<p>안녕하세요, 아래 링크를 통해 학생의 비밀번호를 재설정하세요:</p><a href="${resetLink}">${resetLink}</a>`,
+          },
+        },
+      },
+    };
+
+    const command = new SendEmailCommand(params);
+    await sesClient.send(command);
+
+    res.status(200).send({ message: '비밀번호 재설정 이메일이 발송되었습니다.' });
+  } catch (error) {
+    console.error('학생 비밀번호 재설정 중 오류:', error);
+    res.status(500).send({ error: '비밀번호 재설정 중 오류가 발생했습니다.' });
+  }
+};
+
+const resetStudentPassword = async (req, res) => {
+  const { token, password } = req.body;
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const student = await Student.findById(decoded._id);
+
+    if (!student) {
+      return res.status(400).send({ error: '유효하지 않은 토큰입니다.' });
+    }
+
+    student.password = password;
+    await student.save();
+
+    res.send({ message: '비밀번호가 성공적으로 재설정되었습니다.' });
+  } catch (error) {
+    res.status(400).send({ error: '비밀번호 재설정에 실패했습니다.' });
+  }
+};
+
+module.exports = { googleLogin, completeRegistration, login, logout, refreshAccessToken, registerTeacher, registerStudent, registerAdmin, registerStudentByTeacher, forgotPassword, resetPassword, forgotStudentPassword,resetStudentPassword };
