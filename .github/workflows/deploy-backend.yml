@@ -42,11 +42,17 @@ jobs:
             REPORT_QUEUE_URL=${{ secrets.REPORT_QUEUE_URL }}
             AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
             AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
+            AWS_REGION=${{ secrets.AWS_REGION }}
+            AWS_SES_VERIFIED_EMAIL=${{ secrets.AWS_SES_VERIFIED_EMAIL }}
             FIREBASE_PRIVATE_KEY=${{ secrets.FIREBASE_PRIVATE_KEY }}
             S3_ACCESS_KEY_ID=${{ secrets.S3_ACCESS_KEY_ID }}
             S3_SECRET_ACCESS_KEY=${{ secrets.S3_SECRET_ACCESS_KEY }}
             S3_REGION=${{ secrets.S3_REGION }}
             S3_BUCKET_NAME=${{ secrets.S3_BUCKET_NAME }}
+            GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
+            GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
+            GOOGLE_REDIRECT_URI=${{ secrets.GOOGLE_REDIRECT_URI }}
+            CLIENT_URL=${{ secrets.CLIENT_URL }}
 
       - name: Set up SSH agent
         uses: webfactory/ssh-agent@v0.5.3
