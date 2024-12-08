@@ -11,6 +11,7 @@ const resultSchema = new mongoose.Schema({
 // 퀴즈 결과 스키마
 const quizResultSchema = new mongoose.Schema({
   studentId: { type: Schema.Types.ObjectId, ref: 'Student', required: true }, // 학생 ID
+  quizId: { type: Schema.Types.ObjectId, ref: 'KahootQuizContent', required: true }, // 퀴즈 ID 추가
   subject: { type: String, required: true }, // 과목
   semester: { type: String, required: true }, // 학기
   unit: { type: String, required: true }, // 단원

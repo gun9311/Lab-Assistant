@@ -1,3 +1,6 @@
+require('dotenv').config();
+require('./services/fcmService');
+
 const express = require('express');
 const bodyParser = require('body-parser');
 const mongoose = require('mongoose');
@@ -6,7 +9,7 @@ const RedisStore = require('connect-redis').default;
 const { WebSocketServer } = require('ws');
 const jwt = require('jsonwebtoken');
 const authRoutes = require('./routes/authRoutes');
-const quizRoutes = require('./routes/quizRoutes');
+// const quizRoutes = require('./routes/quizRoutes');
 const quizResultsRoutes = require('./routes/quizResultsRoutes');
 const chatRoutes = require('./routes/chatRoutes');
 const kahootQuizRoutes = require('./routes/kahootQuizRoutes');  // 새로 추가한 라우트
@@ -23,9 +26,6 @@ const redisClient = require('./utils/redisClient');
 const cors = require('cors');
 const winston = require('winston');
 const KahootQuizSession = require('./models/KahootQuizSession');
-
-require('dotenv').config();
-require('./services/fcmService');
 
 // Winston 로거 설정
 const logger = winston.createLogger({
@@ -48,18 +48,29 @@ mongoose.connect(process.env.MONGODB_URL)
 // Express 앱 설정
 const app = express();
 
-app.use(cors());
+const allowedOrigins = ['http://localhost:3000', 'https://t-bot.site'];
+
+app.use(cors({
+  origin: (origin, callback) => {
+    if (allowedOrigins.includes(origin) || !origin) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true // 자격 증명을 포함한 요청 허용
+}));
 
 app.use(session({
   store: new RedisStore({ client: redisClient }),
   secret: process.env.SESSION_SECRET,
   resave: false,
-  saveUninitialized: false
+  saveUninitialized: true
 }));
 
 app.use(bodyParser.json());
 app.use('/api/auth', authRoutes);
-app.use('/api/quiz', quizRoutes);
+// app.use('/api/quiz', quizRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/admin', adminRoutes);

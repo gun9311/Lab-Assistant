@@ -1,17 +1,39 @@
 import React, { useEffect, useState } from 'react';
-import { Container, Paper, Box, Typography, Button, CircularProgress } from '@mui/material';
+import { Container, Paper, Box, Typography, Button, CircularProgress, Tooltip } from '@mui/material';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { getToken } from '../../../utils/auth';
 import QuizQuestionComponent from './components/QuizQuestion';
 import QuizFeedbackComponent from './components/QuizFeedback';
 import WaitingScreenComponent from './components/WaitingScreen';
 
+// 각 캐릭터 이미지를 정적으로 가져와 배열에 저장
 import Character1 from '../../../assets/character/character1.png';
 import Character2 from '../../../assets/character/character2.png';
+import Character3 from '../../../assets/character/character3.png';
+import Character4 from '../../../assets/character/character4.png';
+import Character5 from '../../../assets/character/character5.png';
+import Character6 from '../../../assets/character/character6.png';
+import Character7 from '../../../assets/character/character7.png';
+import Character8 from '../../../assets/character/character8.png';
+import Character9 from '../../../assets/character/character9.png';
+import Character10 from '../../../assets/character/character10.png';
 
+const characterImages = [
+  Character1,
+  Character2,
+  Character3,
+  Character4,
+  Character5,
+  Character6,
+  Character7,
+  Character8,
+  Character9,
+  Character10,
+];
 
 interface Option {
   text: string;
+  imageUrl?: string;
 }
 
 interface QuizQuestion {
@@ -26,10 +48,10 @@ const StudentQuizSessionPage: React.FC = () => {
   const navigate = useNavigate();
   const { pin, sessionId } = location.state; // state에서 전달된 pin과 sessionId 받기
   const userToken = getToken(); // 사용자 토큰 가져오기
-
+  
   const [webSocket, setWebSocket] = useState<WebSocket | null>(null);
   const [currentQuestion, setCurrentQuestion] = useState<QuizQuestion | null>(null);
-  const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
+  const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
   const [startTime, setStartTime] = useState<number | null>(null); // 문제 시작 시간 저장
   const [isQuizStarting, setIsQuizStarting] = useState<boolean>(false);  // 퀴즈 시작 준비 화면 상태 추가
@@ -43,8 +65,9 @@ const StudentQuizSessionPage: React.FC = () => {
   const [isAnswerSubmitted, setIsAnswerSubmitted] = useState<boolean>(false); // 정답 제출 상태 관리
   const [waitingForFeedback, setWaitingForFeedback] = useState<boolean>(false); // 피드백 대기 상태
   const [isFeedbackReceived, setIsFeedbackReceived] = useState<boolean>(false);  // 피드백 상태 추가
-  const [selectedCharacter, setSelectedCharacter] = useState<string | null>(null); // 캐릭터 선택 상태
-
+  const [selectedCharacter, setSelectedCharacter] = useState<number | string | null>(null); // 캐릭터 선택 상태
+  const [takenCharacters, setTakenCharacters] = useState<Set<number>>(new Set());
+  
   // 웹소켓 연결 설정
   useEffect(() => {
     if (!pin || !userToken) {
@@ -107,6 +130,13 @@ const StudentQuizSessionPage: React.FC = () => {
         setWaitingForFeedback(false); 
         setIsFeedbackReceived(true);  
       }
+      // else if (parsedData.type === 'characterAcknowledged') {
+      //   setSelectedCharacter(parsedData.character);
+      else if (parsedData.error === 'Character already taken') {
+        alert('이미 선택된 캐릭터입니다. 다른 캐릭터를 선택하세요.');
+      } else if (parsedData.type === 'characterSelected') {
+        setTakenCharacters(prev => new Set(prev).add(parseInt(parsedData.character.replace('character', '')) - 1));
+      }
       else if (parsedData.type === 'quizCompleted') {
         navigate(`/quiz-result/${pin}`);
       } 
@@ -135,9 +165,9 @@ const StudentQuizSessionPage: React.FC = () => {
   }, [pin, userToken, navigate]);
 
   // 캐릭터 선택 시 메시지 전송
-  const sendCharacterSelection = (character: string) => {
-    if (webSocket && webSocket.readyState === WebSocket.OPEN) {
-      const message = JSON.stringify({ type: 'characterSelected', character });
+  const sendCharacterSelection = (characterIndex: number) => {
+    if (webSocket && webSocket.readyState === WebSocket.OPEN && !takenCharacters.has(characterIndex)) {
+      const message = JSON.stringify({ type: 'characterSelected', character: `character${characterIndex + 1}` });
       webSocket.send(message);
       console.log(`캐릭터 선택 메시지 전송: ${message}`);
     }
@@ -173,8 +203,7 @@ const StudentQuizSessionPage: React.FC = () => {
     if (timeLeft === 0 && webSocket && currentQuestion && startTime && !isAnswerSubmitted) {
       const responseTime = Date.now() - startTime;
       const selectedOptionIndex = selectedAnswer
-        ? currentQuestion.options.findIndex(option => option.text === selectedAnswer)
-        : -1; 
+        ? selectedAnswer : -1; 
   
       webSocket.send(
         JSON.stringify({
@@ -189,9 +218,9 @@ const StudentQuizSessionPage: React.FC = () => {
     }
   }, [timeLeft, selectedAnswer, currentQuestion, startTime, webSocket, isAnswerSubmitted]);
 
-  const handleCharacterSelect = (character: string) => {
-    setSelectedCharacter(character);
-    sendCharacterSelection(character); // 캐릭터 선택 시 메시지 전송
+  const handleCharacterSelect = (index: number) => {
+    setSelectedCharacter(index);
+    sendCharacterSelection(index);
   };
 
   const handleReady = () => {
@@ -202,27 +231,24 @@ const StudentQuizSessionPage: React.FC = () => {
     }
   };
 
-  const handleAnswerSelect = (answer: string) => {
+  const handleAnswerSelect = (index: number) => {
     if (selectedAnswer || isAnswerSubmitted) return; 
+    setIsAnswerSubmitted(true); 
     
-    setSelectedAnswer(answer);
+    console.log(index);
+    setSelectedAnswer(index);
 
     if (webSocket && currentQuestion && startTime) {
       const responseTime = Date.now() - startTime; 
 
-      const selectedOptionIndex = currentQuestion.options.findIndex(
-        option => option.text === answer
-      );
-
       webSocket.send(
         JSON.stringify({
           type: 'submitAnswer',
-          answerIndex: selectedOptionIndex,  
+          answerIndex: index,  
           questionId: currentQuestion.questionId,   
           responseTime: responseTime,        
         })
       );
-      setIsAnswerSubmitted(true); 
       setWaitingForFeedback(true); 
     }
   };
@@ -233,13 +259,27 @@ const StudentQuizSessionPage: React.FC = () => {
         {!selectedCharacter ? (
           <Box sx={{ textAlign: 'center', mt: 4 }}>
             <Typography variant="h6">캐릭터를 선택하세요:</Typography>
-            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
-              <Button onClick={() => handleCharacterSelect('character1')}>
-                <img src={Character1} alt="캐릭터 1" width={100} />
-              </Button>
-              <Button onClick={() => handleCharacterSelect('character2')}>
-                <img src={Character2} alt="캐릭터 2" width={100} />
-              </Button>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', mt: 2, gap: 2 }}>
+              {characterImages.map((characterImage, index) => (
+                <Tooltip
+                  key={index}
+                  title={takenCharacters.has(index) ? "이미 선택된 캐릭터입니다" : ""}
+                  arrow
+                >
+                  <Button
+                    onClick={() => handleCharacterSelect(index)}
+                    sx={{
+                      p: 0,
+                      filter: takenCharacters.has(index) ? 'grayscale(100%)' : 'none',
+                      opacity: takenCharacters.has(index) ? 0.5 : 1,
+                      cursor: takenCharacters.has(index) ? 'not-allowed' : 'pointer',
+                    }}
+                    disabled={takenCharacters.has(index)}
+                  >
+                    <img src={characterImage} alt={`캐릭터 ${index + 1}`} width={100} />
+                  </Button>
+                </Tooltip>
+              ))}
             </Box>
           </Box>
         ) : (

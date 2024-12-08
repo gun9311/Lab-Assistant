@@ -15,6 +15,7 @@ import TeacherHomePage from "./pages/home/TeacherHomePage";
 import AdminHomePage from "./pages/home/AdminHomePage";
 import AdminLoginPage from "./pages/login/AdminLoginPage";
 import TeacherLoginPage from "./pages/login/TeacherLoginPage";
+import GoogleCallback from './pages/login/GoogleCallback';
 import StudentLoginPage from "./pages/login/StudentLoginPage";
 import theme from "./theme";
 import Layout from "./components/Layout";
@@ -30,6 +31,9 @@ import CreateQuizPage from "./components/teacher/quiz/CreateQuiz";
 import EditQuizPage from "./components/teacher/quiz/EditQuiz";
 import QuizSessionPage from "./components/teacher/quiz/QuizSession";
 import StudentQuizSessionPage from "./components/student/quiz/StudentQuizSession";
+import ForgotPasswordPage from './pages/login/ForgotPasswordPage';
+import ResetPasswordPage from './pages/login/ResetPasswordPage';
+import ResetStudentPasswordPage from "./pages/login/ResetStudentPasswordPage";
 
 // NotificationPayload 타입 정의
 type NotificationPayload = {
@@ -124,9 +128,8 @@ const AppContent: React.FC = () => {
         )}
         <Route path="/" element={<Navigate to={`/${role}`} />} />
         <Route path="/home" element={<Navigate to={`/${role}`} />} />
-
+        
         <Route element={<Layout isQuizMode={isQuizMode} />}>
-          {" "}
           {/* isQuizMode 전달 */}
           <Route
             path="/student"
@@ -174,6 +177,12 @@ const AppContent: React.FC = () => {
             element={<StudentQuizSessionPage />}
           />{" "}
           {/* 학생 퀴즈 세션 페이지 */}
+          <Route
+            path="/reset-student-password"
+            element={
+              <PrivateRoute roles={["teacher"]} element={<ResetStudentPasswordPage />} />
+            }
+          />
         </Route>
       </Routes>
 
@@ -245,6 +254,9 @@ const App: React.FC = () => {
           <Route path="/teacher-register" element={<TeacherRegisterPage />} />
           <Route path="/student-register" element={<StudentRegisterPage />} />
           <Route path="/admin-register" element={<AdminRegisterPage />} />
+          <Route path="/auth/google/callback" element={<GoogleCallback />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
         </Routes>
       )}
     </ThemeProvider>

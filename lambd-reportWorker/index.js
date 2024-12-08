@@ -27,16 +27,16 @@ const studentReportSchema = new Schema({
 
 const StudentReport = mongoose.model("StudentReport", studentReportSchema);
 
+// 개별 문제의 결과 스키마
 const resultSchema = new mongoose.Schema({
-  questionId: { type: Schema.Types.ObjectId, ref: "Quiz", required: true },
-  taskText: { type: String, required: true },
-  correctAnswer: { type: String, required: true },
-  studentAnswer: { type: String, required: false },
-  similarity: { type: Number, required: true },
+  questionId: { type: Schema.Types.ObjectId, ref: 'KahootQuizContent.questions', required: true }, // 퀴즈 문제 ID
+  studentAnswer: { type: Number, required: false }, // 학생의 답변
+  isCorrect: { type: Boolean, required: true } // 정답 여부 (True/False)
 });
 
 const quizResultSchema = new mongoose.Schema({
   studentId: { type: Schema.Types.ObjectId, ref: "Student", required: true },
+  quizId: { type: Schema.Types.ObjectId, ref: 'KahootQuizContent', required: true },
   subject: { type: String, required: true },
   semester: { type: String, required: true },
   unit: { type: String, required: true },
@@ -141,11 +141,24 @@ const processMessage = async (message) => {
           for (const subject of selectedSubjects) {
             console.log(`Processing subject: ${subject}`);
             const quizResults = await QuizResult.find({ studentId, semester, subject })
-              .sort({ score: -1 })
-              .limit(reportLines);
+            //   .sort({ score: -1 })
+            //   .limit(reportLines);
+            // 단원별로 그룹화하여 최고 점수 선택
+            const bestResultsByUnit = quizResults.reduce((acc, result) => {
+              const unit = result.unit;
+              if (!acc[unit] || acc[unit].score < result.score) {
+                acc[unit] = result;
+              }
+              return acc;
+            }, {});
+
+            // 단원별 최고 점수 결과를 배열로 변환하고, reportLines 수만큼 제한
+            const selectedResults = Object.values(bestResultsByUnit)
+              .sort((a, b) => b.score - a.score) // 점수 내림차순 정렬
+              .slice(0, reportLines); // 결과 제한
 
             let comments = [];
-            if (quizResults.length === 0) {
+            if (selectedResults.length === 0) {
               console.warn(`No quiz results found for student ${studentId}, semester ${semester}, subject ${subject}`);
               await StudentReport.findOneAndUpdate(
                 { studentId, subject, semester },
@@ -155,7 +168,7 @@ const processMessage = async (message) => {
               continue;
             }
 
-            for (const result of quizResults) {
+            for (const result of selectedResults) {
               const unit = result.unit;
               const score = result.score;
               console.log(`Processing result: ${result._id}, Score: ${score}, Unit: ${unit}`);
@@ -172,7 +185,7 @@ const processMessage = async (message) => {
                 continue;
               }
 
-              const ratingLevel = score >= 80 ? '상' : score >= 60 ? '중' : '하';
+              const ratingLevel = score >= 75 ? '상' : score >= 55 ? '중' : '하';
               const ratingData = unitData.ratings.find(r => r.level === ratingLevel);
               if (ratingData) {
                 const comment = ratingData.comments[Math.floor(Math.random() * ratingData.comments.length)];
@@ -207,7 +220,9 @@ const processMessage = async (message) => {
                 subject,
                 semester,
                 unit
-              });
+              })
+              .sort({ score: -1 }) // 점수 내림차순 정렬
+              .limit(1); // 최고 점수 하나만 선택
 
               if (quizResults.length === 0) {
                 console.warn(`No quiz results found for student ${studentId}, unit ${unit}`);
@@ -223,7 +238,7 @@ const processMessage = async (message) => {
                 const unitData = subjectData.units.find(u => u.name === unit);
                 if (!unitData) continue;
 
-                const ratingLevel = result.score >= 80 ? "상" : result.score >= 60 ? "중" : "하";
+                const ratingLevel = result.score >= 75 ? "상" : result.score >= 55 ? "중" : "하";
                 const ratingData = unitData.ratings.find(r => r.level === ratingLevel);
 
                 if (ratingData) {

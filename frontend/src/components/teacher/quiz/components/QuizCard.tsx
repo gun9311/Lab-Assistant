@@ -10,65 +10,69 @@ import {
   Chip,
   Box,
   Tooltip,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
+  Button,
 } from "@mui/material";
-import FavoriteIcon from '@mui/icons-material/Favorite';
-import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder'; // 비어있는 하트 아이콘
-import DeleteIcon from '@mui/icons-material/Delete';
-import EditIcon from '@mui/icons-material/Edit';
-import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import FavoriteIcon from "@mui/icons-material/Favorite";
+import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorder";
+import DeleteIcon from "@mui/icons-material/Delete";
+import PlayCircleFilled from "@mui/icons-material/PlayCircleFilled"; // 퀴즈 시작 버튼 아이콘으로 변경
 import { useNavigate } from "react-router-dom";
 import api from "../../../../utils/api";
 import { getUserId } from "../../../../utils/auth";
-
-type Quiz = {
-  _id: string;
-  title: string;
-  unit: string;
-  questionsCount: number;
-  likeCount: number;
-  grade: number;
-  semester: string;
-  subject: string;
-  imageUrl?: string;
-  userLiked: boolean; // 백엔드에서 받아온 사용자 좋아요 여부
-  createdBy: string;  // 퀴즈 작성자의 ID
-};
+import { Quiz } from "../types"; // 공통 Quiz 타입 import
+import backgroundDefault from "../../../../assets/background-default.webp"
 
 interface QuizCardProps {
   quiz: Quiz;
-  onStartQuiz: (quizId: string) => void;
   onDelete: (quizId: string) => void;
+  onOpenModal: (quiz: Quiz) => void;
+  isMyQuizzes: boolean; // 내 퀴즈함 여부 prop 추가
 }
 
-const QuizCard: React.FC<QuizCardProps> = ({ quiz, onDelete, onStartQuiz }) => {
-  const navigate = useNavigate();
+const QuizCard: React.FC<QuizCardProps> = ({ quiz, onDelete, onOpenModal, isMyQuizzes }) => {
   const userId = getUserId();
 
-  // 좋아요 상태 및 좋아요 수 상태를 관리
   const [isLiking, setIsLiking] = useState<boolean>(false);
-  const [liked, setLiked] = useState<boolean>(quiz.userLiked); // 초기 좋아요 상태를 서버로부터 받은 값으로 설정
-  const [likeCount, setLikeCount] = useState<number>(quiz.likeCount); // 좋아요 수
+  const [liked, setLiked] = useState<boolean>(quiz.userLiked);
+  const [likeCount, setLikeCount] = useState<number>(quiz.likeCount);
+  const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
 
+  // 좋아요 토글 핸들러
   const handleLikeToggle = async () => {
-    if (isLiking) return; // 중복 클릭 방지
+    if (isLiking) return;
     setIsLiking(true);
 
     try {
-      // 서버에 좋아요/좋아요 취소 요청을 보냅니다
-      const response = await api.post(`/kahoot-quiz/${quiz._id}/like`);
-
-      // 좋아요 상태를 반전시킵니다
+      await api.post(`/kahoot-quiz/${quiz._id}/like`);
       setLiked((prevLiked) => !prevLiked);
-
-      // 좋아요 수 업데이트 (좋아요 눌렀으면 증가, 취소했으면 감소)
-      setLikeCount((prevLikeCount) =>
-        liked ? prevLikeCount - 1 : prevLikeCount + 1
-      );
+      setLikeCount((prevLikeCount) => (liked ? prevLikeCount - 1 : prevLikeCount + 1));
     } catch (error) {
       console.error("좋아요 처리 중 오류가 발생했습니다.", error);
     } finally {
       setIsLiking(false);
     }
+  };
+
+  const handleDeleteClick = () => {
+    setOpenDeleteDialog(true);
+  };
+
+  const handleCloseDeleteDialog = () => {
+    setOpenDeleteDialog(false);
+  };
+
+  const handleConfirmDelete = () => {
+    onDelete(quiz._id);
+    handleCloseDeleteDialog();
+  };
+
+  const handleOpenModal = () => {
+    onOpenModal(quiz);
   };
 
   return (
@@ -85,116 +89,97 @@ const QuizCard: React.FC<QuizCardProps> = ({ quiz, onDelete, onStartQuiz }) => {
         backgroundColor: "#fff7f0",
       }}
     >
-      {/* 이미지가 있을 경우, 없을 경우에는 기본 배경을 제공 */}
-      {quiz.imageUrl ? (
-        <CardMedia
-          component="img"
-          height="140"
-          image={quiz.imageUrl}
-          alt={`${quiz.title} 이미지`}
-          sx={{ borderTopLeftRadius: "16px", borderTopRightRadius: "16px" }}
-        />
-      ) : (
-        <Box
-          sx={{
-            height: 140,
-            backgroundColor: "#f0f0f0",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            borderTopLeftRadius: "16px",
-            borderTopRightRadius: "16px",
-          }}
-        >
-          <Typography variant="h5" color="textSecondary">
-            이미지 없음
-          </Typography>
-        </Box>
-      )}
+      <CardMedia
+        component="img"
+        height="140"
+        image={quiz.imageUrl || backgroundDefault} // 기본 이미지 사용
+        alt={quiz.imageUrl ? `${quiz.title} 이미지` : "기본 이미지"}
+        sx={{ borderTopLeftRadius: "16px", borderTopRightRadius: "16px" }}
+      />
 
       <CardContent>
-        {/* 퀴즈 제목과 주요 정보 */}
         <Typography variant="h6" gutterBottom sx={{ fontWeight: "bold" }}>
           {quiz.title}
         </Typography>
         <Typography variant="body2" color="textSecondary">
           단원: {quiz.unit} | 문제 수: {quiz.questionsCount}
         </Typography>
-
-        {/* 학년, 학기, 과목 정보 */}
-        <Box display="flex" justifyContent="space-between" mt={2}>
+        {/* <Box display="flex" justifyContent="space-between" mt={2}>
           <Chip label={`${quiz.grade}학년`} color="primary" size="small" />
           <Chip label={quiz.semester} color="secondary" size="small" />
           <Chip label={quiz.subject} size="small" />
-        </Box>
+        </Box> */}
       </CardContent>
 
-      {/* 카드 하단 액션: 퀴즈 시작, 수정, 삭제, 좋아요 */}
-      <CardActions disableSpacing sx={{ justifyContent: "space-between" }}>
+      <CardActions disableSpacing sx={{ justifyContent: "space-between", paddingX: "1rem" }}>
         <Box display="flex" alignItems="center">
           {/* 퀴즈 시작 버튼 */}
           <Tooltip title="퀴즈 시작">
-            <IconButton
-              color="primary"
-              onClick={() => onStartQuiz(quiz._id)}
-              sx={{
-                backgroundColor: "#ffcc00",
-                color: "#000",
-                borderRadius: "8px",
-                marginRight: "8px",
-              }}
+            <IconButton 
+              sx={{ 
+                color: "#FFC107", 
+                fontSize: "2.5rem", // 크기 확대
+                padding: 0, // 버튼 크기를 아이콘 크기에 맞춤
+              }} 
+              onClick={handleOpenModal}
             >
-              <PlayArrowIcon />
+              <PlayCircleFilled fontSize="inherit" /> {/* 아이콘 크기를 상속 */}
             </IconButton>
           </Tooltip>
-
-          {/* 수정 버튼, 삭제 버튼은 작성자에게만 보여줍니다 */}
-          {quiz.createdBy === userId && (
-            <>
-              <Tooltip title="퀴즈 수정">
-                <IconButton
-                  color="secondary"
-                  onClick={() => navigate(`/edit-quiz/${quiz._id}`)}
-                  sx={{
-                    backgroundColor: "#ff9800",
-                    color: "#fff",
-                    borderRadius: "8px",
-                    marginRight: "8px",
-                  }}
-                >
-                  <EditIcon />
-                </IconButton>
-              </Tooltip>
-              <Tooltip title="퀴즈 삭제">
-                <IconButton
-                  color="error"
-                  onClick={() => onDelete(quiz._id)}
-                  sx={{
-                    backgroundColor: "#f44336",
-                    color: "#fff",
-                    borderRadius: "8px",
-                  }}
-                >
-                  <DeleteIcon />
-                </IconButton>
-              </Tooltip>
-            </>
+          {/* 삭제 버튼 ("내 퀴즈함"일 때만 표시) */}
+          {isMyQuizzes && (
+            <Tooltip title="퀴즈 삭제">
+              <IconButton
+                onClick={handleDeleteClick}
+                sx={{
+                  backgroundColor: "#f44336",
+                  color: "#fff",
+                  borderRadius: "8px",
+                  marginLeft: "8px",
+                  "&:hover": {
+                    backgroundColor: "#d32f2f", // 호버 시 약간 더 어두운 색으로 변경
+                  },
+                }}
+              >
+                <DeleteIcon />
+              </IconButton>
+            </Tooltip>
           )}
         </Box>
 
-        {/* 좋아요 버튼 및 수 */}
         <Box display="flex" alignItems="center">
-          <IconButton onClick={handleLikeToggle} disabled={isLiking}>
+          {/* 좋아요 버튼 */}
+          <IconButton onClick={handleLikeToggle} disabled={isLiking} sx={{ color: "#FF5722" }}>
             <Badge badgeContent={likeCount} color="error">
-              {liked ? (
-                <FavoriteIcon color="error" /> // 좋아요가 눌려있을 때 (색칠된 하트)
-              ) : (
-                <FavoriteBorderIcon /> // 좋아요가 안 눌려있을 때 (비어있는 하트)
-              )}
+              {liked ? <FavoriteIcon color="error" /> : <FavoriteBorderIcon />}
             </Badge>
           </IconButton>
+
+          
         </Box>
       </CardActions>
+
+      {/* 삭제 확인 다이얼로그 */}
+      <Dialog
+        open={openDeleteDialog}
+        onClose={handleCloseDeleteDialog}
+        aria-labelledby="delete-dialog-title"
+      >
+        <DialogTitle id="delete-dialog-title">퀴즈 삭제</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            정말로 이 퀴즈를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseDeleteDialog} color="primary">
+            취소
+          </Button>
+          <Button onClick={handleConfirmDelete} color="error">
+            삭제
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Card>
   );
 };

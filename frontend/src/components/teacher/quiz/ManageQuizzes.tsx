@@ -7,50 +7,72 @@ import {
   CircularProgress,
   Snackbar,
   Paper,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
+  Alert,
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  IconButton,
+  Pagination,
+  Tabs,
+  Tab,
 } from "@mui/material";
+import QuizIcon from "@mui/icons-material/Quiz"; // 전체 퀴즈 아이콘
+import PersonIcon from "@mui/icons-material/Person"; // 내 퀴즈 아이콘
 import { useNavigate } from "react-router-dom";
-import { getQuizzes, deleteQuiz, getUnits } from "../../../utils/quizApi";
+import { getQuizzes, deleteQuiz, getQuizById, getUnits, duplicateQuiz } from "../../../utils/quizApi";
 import QuizCard from "./components/QuizCard";
 import QuizFilter from "./components/QuizFilter";
+import CloseIcon from "@mui/icons-material/Close";
+import AddIcon from "@mui/icons-material/Add"; // 추가된 아이콘
 import api from "../../../utils/api";
-
-type Quiz = {
-  _id: string;
-  title: string;
-  unit: string;
-  questionsCount: number;
-  likeCount: number;
-  grade: number; // 학년 필드
-  semester: string; // 학기 필드
-  subject: string; // 과목 필드
-  imageUrl?: string; // 퀴즈 이미지 필드 (옵션)
-  userLiked: boolean; // 백엔드에서 받아온 사용자 좋아요 여부
-  createdBy: string;  // 퀴즈 작성자의 ID
-  createdAt: string;  // 퀴즈 생성 시간
-};
+import background from '../../../../src/assets/background-logo.webp';
+import { Quiz } from "./types";
+import QuizContainer from "../quiz/QuizContainer";
+import { getUserId } from "../../../utils/auth";
 
 const ManageQuizzesPage: React.FC = () => {
   const navigate = useNavigate();
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
-  const [loading, setLoading] = useState<boolean>(true); // 로딩 상태
-  const [error, setError] = useState<string | null>(null); // 에러 상태
-  const [sortBy, setSortBy] = useState<string>("latest"); // 기본 정렬 기준: 최신 순
-  const [isTeamMode, setIsTeamMode] = useState<boolean>(false); // 팀 모드 상태
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  const [sortBy, setSortBy] = useState<string>("latest");
+  const [isTeamMode, setIsTeamMode] = useState<boolean>(false);
   const [gradeFilter, setGradeFilter] = useState<number | null>(null);
   const [semesterFilter, setSemesterFilter] = useState<string | null>(null);
   const [subjectFilter, setSubjectFilter] = useState<string | null>(null);
-  const [unitFilter, setUnitFilter] = useState<string | null>(null); // 단원 필터
-  const [units, setUnits] = useState<string[]>([]); // 단원 목록
+  const [unitFilter, setUnitFilter] = useState<string | null>(null);
+  const [units, setUnits] = useState<string[]>([]);
 
+  const [selectedQuiz, setSelectedQuiz] = useState<Quiz | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const [page, setPage] = useState(1);
+  const [limit] = useState(6);
+  const [totalCount, setTotalCount] = useState(0);
+
+  const [isMyQuizzes, setIsMyQuizzes] = useState(false);
+
+  const userId = getUserId();
+
+  // 퀴즈 목록 가져오기
   useEffect(() => {
     const fetchQuizzes = async () => {
+      setLoading(true);
       try {
-        const data = await getQuizzes();
-        setQuizzes(data);
+        const { quizzes, totalCount } = await getQuizzes({
+          page,
+          limit,
+          gradeFilter,
+          semesterFilter,
+          subjectFilter,
+          unitFilter,
+          sortBy,
+          createdBy: isMyQuizzes && userId ? userId : undefined,
+        });
+        setQuizzes(quizzes);
+        setTotalCount(totalCount);
       } catch (err) {
         setError("퀴즈 목록을 가져오는 중 오류가 발생했습니다.");
       } finally {
@@ -58,32 +80,50 @@ const ManageQuizzesPage: React.FC = () => {
       }
     };
     fetchQuizzes();
-  }, []);
+  }, [page, gradeFilter, semesterFilter, subjectFilter, unitFilter, sortBy, isMyQuizzes]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [gradeFilter, semesterFilter, subjectFilter, unitFilter]);
 
   useEffect(() => {
     if (gradeFilter && semesterFilter && subjectFilter) {
       const fetchUnits = async () => {
-        const { units } = await getUnits(gradeFilter.toString(), semesterFilter, subjectFilter);
-        setUnits(units);
+        try {
+          const { units } = await getUnits(gradeFilter.toString(), semesterFilter, subjectFilter);
+          setUnits(units);
+        } catch (err) {
+          setError("단원 목록을 가져오는 중 오류가 발생했습니다.");
+        }
       };
       fetchUnits();
+    } else {
+      setUnits([]);
     }
   }, [gradeFilter, semesterFilter, subjectFilter]);
 
-  const filteredQuizzes = quizzes.filter((quiz) => {
-    const gradeMatch = gradeFilter ? quiz.grade === gradeFilter : true;
-    const semesterMatch = semesterFilter ? quiz.semester === semesterFilter : true;
-    const subjectMatch = subjectFilter ? quiz.subject === subjectFilter : true;
-    const unitMatch = unitFilter ? quiz.unit === unitFilter : true;
-    return gradeMatch && semesterMatch && subjectMatch && unitMatch;
-  });
+  const handlePageChange = (event: any, value: any) => {
+    setPage(value);
+  };
 
-  // 정렬 함수
-  const getSortedQuizzes = () => {
-    if (sortBy === "likes") {
-      return [...filteredQuizzes].sort((a, b) => b.likeCount - a.likeCount);  // 좋아요 순
+  const totalPages = Math.ceil(totalCount / limit);
+
+  const handleEditQuiz = async () => {
+    if (!selectedQuiz) return;
+
+    if (selectedQuiz.createdBy === userId) {
+      navigate(`/edit-quiz/${selectedQuiz._id}`);
     } else {
-      return [...filteredQuizzes].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());  // 최신 순 (기본)
+      const confirmClone = window.confirm("수정하려면 퀴즈를 복제해야 합니다. 복제하시겠습니까?");
+      if (confirmClone) {
+        try {
+          const { quizId: duplicatedQuizId } = await duplicateQuiz(selectedQuiz._id);
+          alert("복제된 퀴즈는 '내 퀴즈'에서 확인할 수 있습니다.");
+          navigate(`/edit-quiz/${duplicatedQuizId}`);
+        } catch (error) {
+          setError("퀴즈 복제 중 오류가 발생했습니다.");
+        }
+      }
     }
   };
 
@@ -91,83 +131,173 @@ const ManageQuizzesPage: React.FC = () => {
     try {
       await deleteQuiz(quizId);
       setQuizzes(quizzes.filter((quiz) => quiz._id !== quizId));
+      setSuccessMessage("퀴즈가 성공적으로 삭제되었습니다.");
     } catch (err) {
       setError("퀴즈를 삭제하는 중 오류가 발생했습니다.");
     }
   };
 
+  const handleCloseSnackbar = () => {
+    setError(null);
+    setSuccessMessage(null);
+  };
+
+  const handleOpenModal = async (quizId: string) => {
+    try {
+      const quizData = await getQuizById(quizId);
+      setSelectedQuiz(quizData);
+      setIsModalOpen(true);
+    } catch (err) {
+      setError("퀴즈 데이터를 가져오는 중 오류가 발생했습니다.");
+    }
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setSelectedQuiz(null);
+  };
+
   const handleStartQuiz = async (quizId: string) => {
     try {
       const response = await api.post(`/kahoot-quiz/start-session/${quizId}`, {
-        isTeamMode, // 팀 모드 여부 전달
+        isTeamMode,
       });
       const { pin, sessionId } = response.data;
-      navigate(`/start-quiz-session`, { state: { pin, sessionId } });
+      navigate("/start-quiz-session", { state: { pin, sessionId } });
     } catch (error) {
       setError("퀴즈 세션을 시작하는 중 오류가 발생했습니다.");
     }
   };
 
-  const sortedQuizzes = getSortedQuizzes();
+  const toggleMyQuizzes = (event: React.SyntheticEvent, newValue: number) => {
+    setIsMyQuizzes(newValue === 1);
+    setPage(1);
+  };
 
   return (
-    <Box sx={{ padding: "2rem" }}>
-      <Paper elevation={3} sx={{ padding: "2rem", marginBottom: "2rem", borderRadius: '16px', backgroundColor: '#f9f9f9' }}>
-        <Typography variant="h4" gutterBottom sx={{ fontWeight: 'bold', color: '#333' }}>
-          퀴즈 관리
-        </Typography>
+    <Box sx={{ padding: "2rem", backgroundColor: "#ffffff", minHeight: "100vh" }}>
+      <Paper
+        elevation={3}
+        sx={{
+          padding: "2rem",
+          paddingBottom: "0",
+          marginBottom: "2rem",
+          borderRadius: "16px",
+          backgroundColor: "#f7f7f7",
+          backgroundImage: `url(${background})`,
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          position: "relative",
+          minHeight: "280px",
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "space-between",
+        }}
+      >
+        {/* 탭 형식으로 변경 */}
+        <Box display="flex" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+          <Tabs
+            value={isMyQuizzes ? 1 : 0}
+            onChange={(event, newValue) => {
+              setPage(1);
+              setIsMyQuizzes(newValue === 1);
+            }}
+            centered
+            TabIndicatorProps={{
+              style: {
+                backgroundColor: "#8B4513", // 하이라이트 컬러 (짙은 갈색 계열)
+                height: "3px",
+              },
+            }}
+            sx={{
+              "& .MuiTab-root": {
+                fontFamily: "'Poppins', sans-serif",
+                fontWeight: "bold",
+                color: "#5D4037", // 기본 글씨 색상 (짙은 갈색)
+                opacity: 0.8,
+                transition: "color 0.3s ease",
+              },
+              "& .MuiTab-root.Mui-selected": {
+                color: "#4E342E", // 선택된 탭의 글씨 색상 (조금 더 어두운 갈색)
+              },
+              "& .MuiTab-root:hover": {
+                color: "#8B4513", // 호버 시 글씨 색상 (짙은 갈색 계열)
+              },
+              // "& .MuiTabs-flexContainer": {
+              //   backgroundColor: "rgba(255, 235, 205, 0.3)",
+              //   borderRadius: "8px",
+              //   padding: "0.5rem 1rem",
+              // },
+            }}
+          >
+            <Tab
+              icon={<QuizIcon />} // 전체 퀴즈 아이콘 추가
+              iconPosition="start"
+              label="전체 퀴즈"
+            />
+            <Tab
+              icon={<PersonIcon />} // 내 퀴즈 아이콘 추가
+              iconPosition="start"
+              label="내 퀴즈"
+            />
+          </Tabs>
 
-        <Button
-          variant="contained"
-          color="primary"
-          sx={{ marginBottom: "2rem", borderRadius: "8px", backgroundColor: '#6200EA', fontWeight: 'bold', fontSize: '1rem' }}
-          onClick={() => navigate("/create-quiz")}
-        >
-          퀴즈 만들기
-        </Button>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />} // 아이콘 추가
+            sx={{
+              borderRadius: "8px",
+              backgroundColor: "#FFC107",
+              fontWeight: "bold",
+              fontSize: "1rem",
+              paddingX: "1.5rem",
+              "&:hover": { backgroundColor: "#FF9800" },
+            }}
+            onClick={() => navigate("/create-quiz")}
+          >
+            퀴즈 생성
+          </Button>
+        </Box>
 
-        <QuizFilter
-          gradeFilter={gradeFilter}
-          setGradeFilter={setGradeFilter}
-          semesterFilter={semesterFilter}
-          setSemesterFilter={setSemesterFilter}
-          subjectFilter={subjectFilter}
-          setSubjectFilter={setSubjectFilter}
-          unitFilter={unitFilter}
-          setUnitFilter={setUnitFilter}
-          units={units}
-        />
-
-        {/* 정렬 기준 선택 */}
-        <FormControl sx={{ marginBottom: "2rem", minWidth: 200 }}>
-          <InputLabel>정렬 기준</InputLabel>
-          <Select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
-            <MenuItem value="latest">최신 순</MenuItem>
-            <MenuItem value="likes">좋아요 순</MenuItem>
-          </Select>
-        </FormControl>
+        <Box sx={{ mt: "auto" }}>
+          <QuizFilter
+            gradeFilter={gradeFilter}
+            setGradeFilter={setGradeFilter}
+            semesterFilter={semesterFilter}
+            setSemesterFilter={setSemesterFilter}
+            subjectFilter={subjectFilter}
+            setSubjectFilter={setSubjectFilter}
+            unitFilter={unitFilter}
+            setUnitFilter={setUnitFilter}
+            units={units}
+            sortBy={sortBy}
+            setSortBy={setSortBy}
+          />
+        </Box>
       </Paper>
 
-      <Paper elevation={3} sx={{ padding: "2rem", borderRadius: '16px', backgroundColor: '#f9f9f9' }}>
+      {/* 기존 코드 유지 */}
+      <Paper elevation={3} sx={{ p: 3, borderRadius: "16px", backgroundColor: "#ffffff" }}>
         {loading ? (
           <Box display="flex" justifyContent="center" alignItems="center" height="50vh">
-            <CircularProgress sx={{ color: '#6200EA' }} />
+            <CircularProgress color="primary" />
           </Box>
         ) : (
-          <Grid container spacing={4}>
-            {sortedQuizzes.length === 0 ? (
+          <Grid container spacing={3}>
+            {quizzes.length === 0 ? (
               <Grid item xs={12}>
-                <Typography variant="h6" align="center" sx={{ fontWeight: 'bold', color: '#ff5252' }}>
+                <Typography variant="h6" align="center" color="textSecondary">
                   필터 조건에 맞는 퀴즈가 없습니다.
                 </Typography>
               </Grid>
             ) : (
-              sortedQuizzes.map((quiz) => (
+              quizzes.map((quiz) => (
                 <Grid item xs={12} sm={6} md={4} key={quiz._id}>
                   <QuizCard
                     quiz={quiz}
                     onDelete={handleDelete}
-                    onStartQuiz={handleStartQuiz}
+                    onOpenModal={() => handleOpenModal(quiz._id)}
+                    isMyQuizzes={isMyQuizzes}
                   />
                 </Grid>
               ))
@@ -176,15 +306,46 @@ const ManageQuizzesPage: React.FC = () => {
         )}
       </Paper>
 
-      {error && (
-        <Snackbar
-          open={true}
-          autoHideDuration={6000}
-          onClose={() => setError(null)}
-          message={error}
-          sx={{ backgroundColor: "#ff5252", color: "white" }}
-        />
-      )}
+      <Pagination
+        count={totalPages}
+        page={page}
+        onChange={handlePageChange}
+        sx={{ display: "flex", justifyContent: "center", marginTop: "2rem" }}
+      />
+
+      <Snackbar open={!!error || !!successMessage} autoHideDuration={6000} onClose={handleCloseSnackbar}>
+        <Alert onClose={handleCloseSnackbar} severity={error ? "error" : "success"} sx={{ width: "100%" }}>
+          {error || successMessage}
+        </Alert>
+      </Snackbar>
+
+      <Dialog open={isModalOpen} onClose={handleCloseModal} maxWidth="md" fullWidth>
+        {/* <DialogTitle>
+          퀴즈 확인 */}
+          <IconButton
+            aria-label="close"
+            onClick={handleCloseModal}
+            sx={{
+              position: "absolute",
+              right: 8,
+              top: 8,
+              color: (theme) => theme.palette.grey[500],
+            }}
+          >
+            <CloseIcon />
+          </IconButton>
+        {/* </DialogTitle> */}
+        <DialogContent>
+          {selectedQuiz && (
+            <QuizContainer
+              isReadOnly={true}
+              initialData={selectedQuiz}
+              onStartQuiz={() => handleStartQuiz(selectedQuiz._id)}
+              onEditQuiz={handleEditQuiz}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </Box>
   );
 };

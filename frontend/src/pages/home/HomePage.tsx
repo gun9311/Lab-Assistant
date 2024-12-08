@@ -140,11 +140,11 @@ const HomePage = () => {
 
       {/* 로그인 선택 다이얼로그 */}
       <Dialog open={loginOpen} onClose={handleLoginClose}>
-        <DialogTitle>로그인 유형 선택</DialogTitle>
+        <DialogTitle>계정 유형을 선택하세요.</DialogTitle>
         <DialogContent>
-          <Typography gutterBottom>
-            로그인할 계정 유형을 선택하세요.
-          </Typography>
+          {/* <Typography gutterBottom>
+            계정 유형을 선택하세요.
+          </Typography> */}
           <Stack spacing={2}>
             <Button
               component={Link}
@@ -153,8 +153,17 @@ const HomePage = () => {
               color="primary"
               fullWidth
               startIcon={<img src={teacherIcon} alt="교사" width="24" height="24" />}
+              sx={{
+                borderRadius: '20px',
+                backgroundColor: '#00796b',
+                '&:hover': {
+                  backgroundColor: '#004d40',
+                  boxShadow: '0px 4px 10px rgba(0, 0, 0, 0.2)',
+                },
+                transition: 'all 0.3s ease',
+              }}
             >
-              교사 로그인
+              교사
             </Button>
             <Button
               component={Link}
@@ -163,16 +172,40 @@ const HomePage = () => {
               color="primary"
               fullWidth
               startIcon={<img src={studentIcon} alt="학생" width="24" height="24" />}
+              sx={{
+                borderRadius: '20px',
+                backgroundColor: '#00796b',
+                '&:hover': {
+                  backgroundColor: '#004d40',
+                  boxShadow: '0px 4px 10px rgba(0, 0, 0, 0.2)',
+                },
+                transition: 'all 0.3s ease',
+              }}
             >
-              학생 로그인
+              학생
             </Button>
           </Stack>
         </DialogContent>
-        <DialogActions>
+        {/* <DialogActions sx={{ justifyContent: 'space-between' }}>
+          <Button
+            onClick={() => {
+              setLoginOpen(false); // 로그인 다이얼로그 닫기
+              setRegisterOpen(true); // 회원가입 다이얼로그 열기
+            }}
+            sx={{
+              borderRadius: '20px',
+              color: '#1976d2',
+              '&:hover': {
+                color: '#115293',
+              },
+            }}
+          >
+            회원가입
+          </Button>
           <Button onClick={handleLoginClose} color="secondary">
             닫기
           </Button>
-        </DialogActions>
+        </DialogActions> */}
       </Dialog>
 
       {/* 회원가입 선택 다이얼로그 */}
@@ -190,6 +223,17 @@ const HomePage = () => {
               color="primary"
               fullWidth
               startIcon={<img src={teacherIcon} alt="교사" width="24" height="24" />}
+              sx={{
+                borderRadius: '20px',
+                borderColor: '#00796b',
+                color: '#00796b',
+                '&:hover': {
+                  borderColor: '#004d40',
+                  color: '#004d40',
+                  boxShadow: '0px 4px 10px rgba(0, 0, 0, 0.2)',
+                },
+                transition: 'all 0.3s ease',
+              }}
             >
               교사 회원가입
             </Button>
@@ -200,12 +244,38 @@ const HomePage = () => {
               color="primary"
               fullWidth
               startIcon={<img src={studentIcon} alt="학생" width="24" height="24" />}
+              sx={{
+                borderRadius: '20px',
+                borderColor: '#00796b',
+                color: '#00796b',
+                '&:hover': {
+                  borderColor: '#004d40',
+                  color: '#004d40',
+                  boxShadow: '0px 4px 10px rgba(0, 0, 0, 0.2)',
+                },
+                transition: 'all 0.3s ease',
+              }}
             >
               학생 회원가입
             </Button>
           </Stack>
         </DialogContent>
-        <DialogActions>
+        <DialogActions sx={{ justifyContent: 'space-between' }}>
+          <Button
+            onClick={() => {
+              setRegisterOpen(false); // 회원가입 다이얼로그 닫기
+              setLoginOpen(true); // 로그인 다이얼로그 열기
+            }}
+            sx={{
+              borderRadius: '20px',
+              color: '#1976d2',
+              '&:hover': {
+                color: '#115293',
+              },
+            }}
+          >
+            로그인
+          </Button>
           <Button onClick={handleRegisterClose} color="secondary">
             닫기
           </Button>

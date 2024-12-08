@@ -3,24 +3,41 @@ import { Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper
 import { Visibility, VisibilityOff } from '@mui/icons-material';
 import api from '../../../utils/api';
 
+// interface QuizResult {
+//   _id: string;
+//   subject: string;
+//   semester: string;
+//   unit: string;
+//   score: number;
+//   createdAt: string;
+//   results: {
+//     questionId: string;
+//     taskText: string;
+//     studentAnswer: string;
+//     correctAnswer: string;
+//     similarity: number; // 문제당 개별 점수
+//   }[];
+// }
+
 interface QuizResult {
   _id: string;
+  quizId: string; // 퀴즈 ID 추가
   subject: string;
   semester: string;
   unit: string;
   score: number;
   createdAt: string;
-  results: {
-    questionId: string;
-    taskText: string;
-    studentAnswer: string;
-    correctAnswer: string;
-    similarity: number; // 문제당 개별 점수
-  }[];
+}
+
+interface QuizDetail {
+  questionText: string;
+  correctAnswer: string;
+  studentAnswer: string;
+  isCorrect: boolean;
 }
 
 interface QuizResultsProps {
-  studentId?: number;
+  studentId?: number | string | null;
   filteredResults?: QuizResult[];
   selectedQuiz?: QuizResult | null;
   selectedSemester?: string;
@@ -45,6 +62,7 @@ const QuizResults: React.FC<QuizResultsProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [noData, setNoData] = useState<boolean>(false);
   const [expandedQuizId, setExpandedQuizId] = useState<string | null>(null);
+  const [quizDetails, setQuizDetails] = useState<QuizDetail[]>([]);
 
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
@@ -73,13 +91,16 @@ const QuizResults: React.FC<QuizResultsProps> = ({
 
   useEffect(() => {
     const fetchQuizResults = async () => {
+      console.log(studentId);
       if (studentId) {
         setLoading(true);
         try {
           const response = await api.get(`/quiz-results/${studentId}`);
+          console.log('API 호출 성공:', response.data);
           setQuizResults(response.data);
           setNoData(response.data.length === 0);
         } catch (err) {
+          console.error('API 호출 실패:', err);
           setError('퀴즈 결과를 가져오는 중 오류가 발생했습니다.');
           setNoData(true);
         } finally {
@@ -88,6 +109,7 @@ const QuizResults: React.FC<QuizResultsProps> = ({
       }
     };
     fetchQuizResults();
+    console.log('퀴즈결과 호출');
   }, [studentId]);
 
   const results = studentId ? quizResults : filteredResults || [];
@@ -107,8 +129,26 @@ const QuizResults: React.FC<QuizResultsProps> = ({
     return <Typography>Error: {error}</Typography>;
   }
 
+  const fetchQuizDetails = async (quizId: string) => {
+    try {
+      const response = await api.get(`/quiz-results/details/${quizId}/${studentId}`);
+      setQuizDetails(response.data);
+    } catch (err) {
+      console.error('Failed to fetch quiz details:', err);
+    }
+  };
+
+  // const toggleQuizDetails = (quizId: string) => {
+    // setExpandedQuizId(prev => (prev === quizId ? null : quizId));
+  // };
+
   const toggleQuizDetails = (quizId: string) => {
-    setExpandedQuizId(prev => (prev === quizId ? null : quizId));
+    if (expandedQuizId === quizId) {
+      setExpandedQuizId(null);
+    } else {
+      setExpandedQuizId(quizId);
+      fetchQuizDetails(quizId);
+    }
   };
 
   return (
@@ -143,26 +183,25 @@ const QuizResults: React.FC<QuizResultsProps> = ({
                     <TableCell>{result.subject}</TableCell>
                     {!isMobile && <TableCell>{result.unit}</TableCell>}
                     
-                    {/* 학생이 자신의 결과를 볼 때는 이모티콘과 문구로 표시 */}
                     <TableCell>
                       {isStudentView
                         ? `${getEvaluation(result.score).text} ${getEvaluation(result.score).emoji}`
-                        : getTeacherUnitEvaluation(result.score)} {/* 교사는 점수를 "상/중/하"로 표시 */}
+                        : getTeacherUnitEvaluation(result.score)}
                     </TableCell>
 
                     <TableCell align="center">
                       <IconButton 
-                        onClick={() => toggleQuizDetails(result._id)}
+                        onClick={() => toggleQuizDetails(result.quizId)}
                         color="primary"
                         aria-label="view details"
                       >
-                        {expandedQuizId === result._id ? <VisibilityOff /> : <Visibility />}
+                        {expandedQuizId === result.quizId ? <VisibilityOff /> : <Visibility />}
                       </IconButton>
                     </TableCell>
                   </TableRow>
                   <TableRow>
                     <TableCell colSpan={isMobile ? 5 : 6} sx={{ padding: 0, borderBottom: 'none' }}>
-                      <Collapse in={expandedQuizId === result._id} timeout="auto" unmountOnExit>
+                      <Collapse in={expandedQuizId === result.quizId} timeout="auto" unmountOnExit>
                         <Box sx={{ padding: 2 }}>
                           <Typography variant="h6" gutterBottom>
                             퀴즈 상세 내용
@@ -171,7 +210,6 @@ const QuizResults: React.FC<QuizResultsProps> = ({
                           <Typography variant="body1">단원: {result.unit}</Typography>
                           <Typography variant="body1">총평: {isStudentView ? `${getEvaluation(result.score).text} ${getEvaluation(result.score).emoji}` : getTeacherUnitEvaluation(result.score)}</Typography>
                           
-                          {/* 학생에게는 문제별 점수만 숨기고, 문제와 답변은 그대로 보여줍니다. */}
                           <TableContainer component={Paper} sx={{ mt: 2 }}>
                             <Table>
                               <TableHead>
@@ -179,16 +217,16 @@ const QuizResults: React.FC<QuizResultsProps> = ({
                                   <TableCell>문제</TableCell>
                                   <TableCell>예시답안</TableCell>
                                   <TableCell>내 답변</TableCell>
-                                  {!isStudentView && <TableCell>점수</TableCell>} {/* 교사만 문제별 점수 표시 */}
+                                  {!isStudentView && <TableCell>정답 여부</TableCell>}
                                 </TableRow>
                               </TableHead>
                               <TableBody>
-                                {result.results.map((detail, index) => (
+                                {quizDetails.map((detail, index) => (
                                   <TableRow key={index}>
-                                    <TableCell>{detail.taskText || '문제를 찾을 수 없음'}</TableCell>
+                                    <TableCell>{detail.questionText || '문제를 찾을 수 없음'}</TableCell>
                                     <TableCell>{detail.correctAnswer}</TableCell>
                                     <TableCell>{detail.studentAnswer}</TableCell>
-                                    {!isStudentView && <TableCell>{detail.similarity}</TableCell>} {/* 교사에게만 점수 표시 */}
+                                    {!isStudentView && <TableCell>{detail.isCorrect ? '정답' : '오답'}</TableCell>}
                                   </TableRow>
                                 ))}
                               </TableBody>
