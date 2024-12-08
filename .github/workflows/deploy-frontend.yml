@@ -25,6 +25,9 @@ jobs:
           cd frontend
           echo "REACT_APP_API_URL=${{ secrets.REACT_APP_API_URL }}" >> .env
           echo "REACT_APP_WEBSOCKET_URL=${{ secrets.REACT_APP_WEBSOCKET_URL }}" >> .env
+          echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> .env
+          echo "REACT_APP_GOOGLE_CLIENT_ID=${{ secrets.REACT_APP_GOOGLE_CLIENT_ID }}" >> .env
+          echo "REACT_APP_GOOGLE_REDIRECT_URI=${{ secrets.REACT_APP_GOOGLE_REDIRECT_URI }}" >> .env
           yarn install
           yarn build
 
