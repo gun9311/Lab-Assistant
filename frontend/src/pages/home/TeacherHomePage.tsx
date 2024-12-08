@@ -14,6 +14,10 @@ import {
   TextField,
   Button,
   useTheme,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
 } from "@mui/material";
 import SchoolIcon from "@mui/icons-material/School";
 import GradeIcon from "@mui/icons-material/Grade";
@@ -40,6 +44,8 @@ const TeacherHomePage: React.FC = () => {
   const school = getSchoolName();
   const theme = useTheme();
   const [isModalOpen, setModalOpen] = useState(false);
+  const [studentId, setStudentId] = useState('');
+  const [isResetModalOpen, setResetModalOpen] = useState(false);
 
   useEffect(() => {
     const fetchStudents = async () => {
@@ -92,6 +98,24 @@ const TeacherHomePage: React.FC = () => {
     }
   };
 
+  const handleOpenResetModal = () => {
+    setResetModalOpen(true);
+  };
+
+  const handleCloseResetModal = () => {
+    setResetModalOpen(false);
+  };
+
+  const handleStudentPasswordReset = async () => {
+    try {
+      await api.post('/auth/forgot-student-password', { studentId });
+      alert('비밀번호 재설정 링크가 이메일로 발송되었습니다.');
+      setResetModalOpen(false);
+    } catch (error) {
+      console.error('학생 비밀번호 재설정 요청에 실패했습니다:', error);
+    }
+  };
+
   return (
     <Container component="main" maxWidth="md" sx={{ mt: 8, mb: 4 }}>
       <Paper elevation={3} sx={{ padding: 4, borderRadius: 2 }}>
@@ -133,9 +157,49 @@ const TeacherHomePage: React.FC = () => {
             >
               학생 계정 생성
             </Button>
+            <Button
+              variant="contained"
+              onClick={handleOpenResetModal}
+              sx={{
+                backgroundColor: '#1976d2',
+                color: '#fff',
+                padding: '8px 16px',
+                borderRadius: '6px',
+                boxShadow: '0 3px 5px 2px rgba(0, 0, 0, .2)',
+                fontWeight: 'bold',
+                fontSize: '14px',
+                '&:hover': {
+                  backgroundColor: '#1565c0',
+                },
+                ml: 2
+              }}
+            >
+              학생 비밀번호 재설정
+            </Button>
           </Box>
         </Box>
         <StudentAccountModal open={isModalOpen} onClose={handleCloseModal} onSubmit={handleCreateStudent} school={school} />
+        <Dialog open={isResetModalOpen} onClose={handleCloseResetModal}>
+          <DialogTitle>학생 비밀번호 재설정</DialogTitle>
+          <DialogContent>
+            <TextField
+              fullWidth
+              variant="outlined"
+              margin="normal"
+              label="학생 아이디"
+              value={studentId}
+              onChange={(e) => setStudentId(e.target.value)}
+            />
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleCloseResetModal} color="primary">
+              취소
+            </Button>
+            <Button onClick={handleStudentPasswordReset} color="primary">
+              확인
+            </Button>
+          </DialogActions>
+        </Dialog>
         <Box
           display="flex"
           justifyContent="space-between"
