@@ -23,7 +23,7 @@ const ResetPasswordPage = () => {
     try {
       await apiNoAuth.post('/auth/reset-password', { token, password });
       setSuccess(true);
-      setTimeout(() => navigate('/teacher-login'), 3000);
+      setTimeout(() => navigate('/teacher-login'), 2000);
     } catch (error) {
       setError('비밀번호 재설정에 실패했습니다. 다시 시도해주세요.');
     }
@@ -70,12 +70,12 @@ const ResetPasswordPage = () => {
           borderRadius: '8px',
         }}
       >
-        비밀번호 재설정
+        확인
       </Button>
       {error && <Typography color="error" sx={{ mt: 2 }}>{error}</Typography>}
       <Snackbar
         open={success}
-        autoHideDuration={3000}
+        autoHideDuration={2000}
         onClose={() => setSuccess(false)}
         anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
       >

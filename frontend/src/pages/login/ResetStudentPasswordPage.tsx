@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Container, TextField, Button, Typography, Paper } from '@mui/material';
+import { Container, TextField, Button, Typography, Paper, Snackbar, Alert } from '@mui/material';
 import apiNoAuth from '../../utils/apiNoAuth';
 
 const ResetStudentPasswordPage = () => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
   const location = useLocation();
@@ -20,8 +21,8 @@ const ResetStudentPasswordPage = () => {
 
     try {
       await apiNoAuth.post('/auth/reset-student-password', { token, password });
-      alert('비밀번호가 성공적으로 재설정되었습니다.');
-      navigate('/teacher');
+      setSuccess(true);
+      setTimeout(() => navigate('/teacher'), 3000);
     } catch (error) {
       setError('비밀번호 재설정에 실패했습니다.');
     }
@@ -51,7 +52,6 @@ const ResetStudentPasswordPage = () => {
           value={confirmPassword}
           onChange={(e) => setConfirmPassword(e.target.value)}
         />
-        {error && <Typography color="error" sx={{ mt: 2 }}>{error}</Typography>}
         <Button
           fullWidth
           variant="contained"
@@ -59,8 +59,30 @@ const ResetStudentPasswordPage = () => {
           onClick={handlePasswordReset}
           sx={{ mt: 2 }}
         >
-          비밀번호 재설정
+          확인
         </Button>
+        <Snackbar
+          open={success}
+          autoHideDuration={2000}
+          onClose={() => setSuccess(false)}
+          anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+        >
+          <Alert onClose={() => setSuccess(false)} severity="success" sx={{ width: '100%' }}>
+            비밀번호가 성공적으로 재설정되었습니다.
+          </Alert>
+        </Snackbar>
+        {error && (
+          <Snackbar
+            open={!!error}
+            autoHideDuration={3000}
+            onClose={() => setError('')}
+            anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+          >
+            <Alert onClose={() => setError('')} severity="error" sx={{ width: '100%' }}>
+              {error}
+            </Alert>
+          </Snackbar>
+        )}
       </Paper>
     </Container>
   );

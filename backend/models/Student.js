@@ -21,6 +21,8 @@ studentSchema.pre('save', async function(next) {
   next();
 });
 
+studentSchema.index({ school: 1, grade: 1, class: 1, studentId: 1 }, { unique: true });
+
 const Student = mongoose.model('Student', studentSchema);
 
 module.exports = Student;

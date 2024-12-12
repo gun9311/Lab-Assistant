@@ -5,8 +5,6 @@ const bcrypt = require("bcryptjs");
 const redisClient = require("../utils/redisClient");
 const Teacher = require('../models/Teacher');
 const Student = require('../models/Student');
-const nodemailer = require('nodemailer');
-const { google } = require('googleapis');
 const { SESClient, SendEmailCommand } = require('@aws-sdk/client-ses');
 
 const googleClient = new OAuth2Client(
@@ -239,22 +237,33 @@ const registerAdmin = async (req, res) => {
 
 const registerStudentByTeacher = async (req, res) => {
   const students = req.body; // 배열로 전송된 학생 데이터
-  try {
-    const createdStudents = [];
-    for (const studentData of students) {
+  const results = {
+    success: [],
+    failed: []
+  };
+
+  for (const studentData of students) {
+    // 필수 필드 검증
+    if (!studentData.loginId || !studentData.studentId || !studentData.name || !studentData.password || !studentData.grade || !studentData.studentClass || !studentData.school) {
+      results.failed.push({ studentData, error: '필수 필드가 누락되었습니다.' });
+      continue;
+    }
+    try {
       const { loginId, studentId, name, password, grade, studentClass, school } = studentData;
       const student = new Student({ loginId, studentId, name, password, grade, class: studentClass, school });
       await student.save();
-      createdStudents.push(student);
-    }
-    res.status(201).send(createdStudents);
-  } catch (error) {
-    if (error.code === 11000) { // 중복된 key 에러
-      res.status(400).send({ error: 'Student with the same school, grade, class, and studentId already exists' });
-    } else {
-      res.status(400).send({ error: 'Failed to create student' });
+      results.success.push(student);
+    } catch (error) {
+      if (error.code === 11000) { // 중복된 key 에러
+        const duplicateField = error.keyPattern.loginId ? '로그인 ID' : '학교의 학년, 반, 출석번호';
+        results.failed.push({ studentData, error: `이미 동일한 ${duplicateField}가 존재합니다.` });
+      } else {
+        results.failed.push({ studentData, error: '학생 생성에 실패했습니다.' });
+      }
     }
   }
+
+  res.status(207).send(results); // 207: Multi-Status
 };
 
 const forgotPassword = async (req, res) => {
