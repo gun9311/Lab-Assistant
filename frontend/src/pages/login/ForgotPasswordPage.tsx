@@ -52,7 +52,7 @@ const ForgotPasswordPage = () => {
       {error && <Typography color="error" sx={{ mt: 2 }}>{error}</Typography>}
       <Snackbar
         open={success}
-        autoHideDuration={3000}
+        autoHideDuration={5000}
         onClose={() => setSuccess(false)}
         anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
       >
