@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import StudentList from "../../components/teacher/StudentList";
 import { getSchoolName } from "../../utils/auth";
 import api from "../../utils/api";
@@ -23,8 +23,8 @@ import GradeIcon from "@mui/icons-material/Grade";
 import ClassIcon from "@mui/icons-material/Class";
 import AssessmentIcon from "@mui/icons-material/Assessment";
 import UnifiedModal from "./UnifiedModal";
-import ReportGeneration from '../../components/teacher/reportGeneration/ReportGeneration';
-import StudentRegistrationResultModal from './StudentRegistrationResultModal';
+import ReportGeneration from "../../components/teacher/reportGeneration/ReportGeneration";
+import StudentRegistrationResultModal from "./StudentRegistrationResultModal";
 
 type Student = {
   _id: number;
@@ -51,7 +51,6 @@ interface FailedStudent {
 
 type CreateResult = {
   success: boolean;
-  // message?: string;
   message: string;
   missingNameIndexes?: number[];
 };
@@ -60,21 +59,19 @@ const TeacherHomePage: React.FC = () => {
   const [grade, setGrade] = useState<number | null>(null);
   const [classNumber, setClassNumber] = useState<string>("");
   const [students, setStudents] = useState<Student[]>([]);
-  const [showReportGeneration, setShowReportGeneration] = useState<boolean>(false);
+  const [showReportGeneration, setShowReportGeneration] =
+    useState<boolean>(false);
   const [isModalOpen, setModalOpen] = useState(false);
-  const [modalData, setModalData] = useState<{ success: Student[], failed: FailedStudent[] }>({ success: [], failed: [] });
-  const [isResultModalOpen, setResultModalOpen] = useState(false); // ResultModal 상태 추가
-
-  // 성공/실패 메시지 상태 관리
-  // const [successCreate, setSuccessCreate] = useState(false); // 계정 생성 성공 메시지
-  const [successReset, setSuccessReset] = useState(false); // 비밀번호 재설정 성공 메시지
-  // const [errorCreate, setErrorCreate] = useState(""); // 계정 생성 실패 메시지
-  const [errorReset, setErrorReset] = useState(""); // 비밀번호 재설정 실패 메시지
-
+  const [modalData, setModalData] = useState<{
+    success: Student[];
+    failed: FailedStudent[];
+  }>({ success: [], failed: [] });
+  const [isResultModalOpen, setResultModalOpen] = useState(false);
+  const [successReset, setSuccessReset] = useState(false);
+  const [errorReset, setErrorReset] = useState("");
   const school = getSchoolName();
   const theme = useTheme();
 
-  // Fetch students when grade or class changes
   useEffect(() => {
     const fetchStudents = async () => {
       if (school && grade && classNumber) {
@@ -114,11 +111,13 @@ const TeacherHomePage: React.FC = () => {
     setModalOpen(false);
   };
 
-  const handleCreateStudent = async (studentData: any): Promise<CreateResult> => {
+  const handleCreateStudent = async (
+    studentData: any
+  ): Promise<CreateResult> => {
     // 필수 필드 검증
     const missingFields: string[] = [];
     const missingNameIndexes: number[] = [];
-    
+
     for (const student of studentData) {
       if (!student.name) {
         missingNameIndexes.push(parseInt(student.studentId));
@@ -128,66 +127,81 @@ const TeacherHomePage: React.FC = () => {
     if (missingNameIndexes.length > 0) {
       return {
         success: false,
-        message: '입력되지 않은 학생 이름이 있습니다.',
-        missingNameIndexes
+        message: "입력되지 않은 학생 이름이 있습니다.",
+        missingNameIndexes,
       };
     }
 
     try {
-      const res = await api.post('/auth/register/studentByTeacher', studentData);
+      const res = await api.post(
+        "/auth/register/studentByTeacher",
+        studentData
+      );
       const { success, failed } = res.data;
 
       setModalData({ success, failed });
       setResultModalOpen(true);
 
-      return { success: true, message: '학생 계정 생성 완료' };
+      return { success: true, message: "학생 계정 생성 완료" };
     } catch (error) {
-      console.error('학생 계정 생성 중 오류:', error);
+      console.error("학생 계정 생성 중 오류:", error);
       return {
         success: false,
-        message: '학생 계정 생성 중 오류가 발생했습니다.'
+        message: "학생 계정 생성 중 오류가 발생했습니다.",
       };
     }
   };
-  
+
   const handleResetStudentPassword = async (studentId: string) => {
     try {
-      await api.post('/auth/forgot-student-password', { studentId });
+      await api.post("/auth/forgot-student-password", { studentId });
       setSuccessReset(true);
     } catch (error) {
-      console.error('비밀번호 재설정 실패:', error);
-      setErrorReset('비밀번호 재설정 요청에 실패했습니다.');
+      console.error("비밀번호 재설정 실패:", error);
+      setErrorReset("비밀번호 재설정 요청에 실패했습니다.");
     }
   };
 
   return (
     <Container component="main" maxWidth="md" sx={{ mt: 8, mb: 4 }}>
       <Paper elevation={3} sx={{ padding: 4, borderRadius: 2 }}>
-        <Box display="flex" justifyContent="center" alignItems="center" sx={{ mb: 6, position: 'relative' }}>
+        <Box
+          display="flex"
+          justifyContent="center"
+          alignItems="center"
+          sx={{ mb: 6, position: "relative" }}
+        >
           <Typography
             variant="h4"
             gutterBottom
-            sx={{ fontWeight: "bold", color: theme.palette.primary.dark, textAlign: "center" }}
+            sx={{
+              fontWeight: "bold",
+              color: theme.palette.primary.dark,
+              textAlign: "center",
+            }}
           >
-            <SchoolIcon fontSize="large" sx={{ verticalAlign: "middle", mr: 1 }} />
+            <SchoolIcon
+              fontSize="large"
+              sx={{ verticalAlign: "middle", mr: 1 }}
+            />
             {school}
           </Typography>
-          <Box sx={{ position: 'absolute', right: 0 }}>
+          <Box sx={{ position: "absolute", right: 0 }}>
             <Button
               variant="contained"
               onClick={handleOpenModal}
               sx={{
-                backgroundColor: '#333',
-                color: '#fff',
-                padding: '8px 16px',
-                borderRadius: '6px',
-                boxShadow: '0 3px 5px 2px rgba(0, 0, 0, .2)',
-                fontWeight: 'bold',
-                fontSize: '14px',
-                '&:hover': {
-                  backgroundColor: '#555',
+                backgroundColor: "#333",
+                color: "#fff",
+                padding: "8px 16px",
+                borderRadius: "6px",
+                boxShadow: "0 3px 5px 2px rgba(0, 0, 0, .2)",
+                fontWeight: "bold",
+                fontSize: "14px",
+                "&:hover": {
+                  backgroundColor: "#555",
                 },
-                ml: 2
+                ml: 2,
               }}
             >
               학생 관리
@@ -201,7 +215,12 @@ const TeacherHomePage: React.FC = () => {
           onSubmitReset={handleResetStudentPassword}
           school={school}
         />
-        <Box display="flex" justifyContent="space-between" alignItems="center" sx={{ mb: 8 }}>
+        <Box
+          display="flex"
+          justifyContent="space-between"
+          alignItems="center"
+          sx={{ mb: 8 }}
+        >
           <Box display="flex" gap={2}>
             <FormControl sx={{ minWidth: 120 }}>
               <InputLabel>
@@ -288,9 +307,13 @@ const TeacherHomePage: React.FC = () => {
           open={successReset}
           autoHideDuration={5000}
           onClose={() => setSuccessReset(false)}
-          anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+          anchorOrigin={{ vertical: "top", horizontal: "center" }}
         >
-          <Alert onClose={() => setSuccessReset(false)} severity="success" sx={{ width: '100%' }}>
+          <Alert
+            onClose={() => setSuccessReset(false)}
+            severity="success"
+            sx={{ width: "100%" }}
+          >
             비밀번호 재설정 링크가 이메일로 발송되었습니다.
           </Alert>
         </Snackbar>
@@ -300,10 +323,14 @@ const TeacherHomePage: React.FC = () => {
           <Snackbar
             open={!!errorReset}
             autoHideDuration={2000}
-            onClose={() => setErrorReset('')}
-            anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+            onClose={() => setErrorReset("")}
+            anchorOrigin={{ vertical: "top", horizontal: "center" }}
           >
-            <Alert onClose={() => setErrorReset('')} severity="error" sx={{ width: '100%' }}>
+            <Alert
+              onClose={() => setErrorReset("")}
+              severity="error"
+              sx={{ width: "100%" }}
+            >
               {errorReset}
             </Alert>
           </Snackbar>
