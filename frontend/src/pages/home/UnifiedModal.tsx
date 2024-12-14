@@ -21,8 +21,10 @@ import {
   Tab,
   Snackbar,
   Alert,
+  Tooltip,
 } from "@mui/material";
 import ErrorIcon from "@mui/icons-material/Error";
+import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
 
 // 타입 정의
 type CreateResult = {
@@ -43,6 +45,7 @@ type FieldErrors = {
   grade: boolean;
   class: boolean;
   names: boolean[];
+  uniqueIdentifier: boolean;
 };
 
 const UnifiedModal: React.FC<UnifiedModalProps> = ({
@@ -56,6 +59,7 @@ const UnifiedModal: React.FC<UnifiedModalProps> = ({
   const [commonGrade, setCommonGrade] = useState("");
   const [commonClass, setCommonClass] = useState("");
   const [studentId, setStudentId] = useState("");
+  const [uniqueIdentifier, setUniqueIdentifier] = useState(""); // 고유 식별자 상태 추가
   const initialStudents = Array(10)
     .fill({ name: "", studentId: "", loginId: "", password: "" })
     .map((student, index) => ({
@@ -68,6 +72,7 @@ const UnifiedModal: React.FC<UnifiedModalProps> = ({
     grade: false,
     class: false,
     names: Array(10).fill(false),
+    uniqueIdentifier: false,
   });
   const [snackbarMessage, setSnackbarMessage] = useState("");
   const [snackbarOpen, setSnackbarOpen] = useState(false);
@@ -81,12 +86,12 @@ const UnifiedModal: React.FC<UnifiedModalProps> = ({
         return {
           ...student,
           studentId: (index + 1).toString(),
-          loginId: `${schoolPrefix}${commonGrade}${commonClass}${paddedStudentId}`,
+          loginId: `${uniqueIdentifier}${schoolPrefix}${commonGrade}${commonClass}${paddedStudentId}`, // 고유 식별자 추가
           password: "123",
         };
       })
     );
-  }, [commonGrade, commonClass, schoolPrefix]);
+  }, [commonGrade, commonClass, schoolPrefix, uniqueIdentifier]); // uniqueIdentifier 추가
 
   const handleStudentChange = (index: number, field: string, value: string) => {
     const updatedStudents = [...students];
@@ -115,14 +120,15 @@ const UnifiedModal: React.FC<UnifiedModalProps> = ({
   };
 
   const handleSubmitCreate = async () => {
-    // 학년과 반이 선택되지 않았을 경우 검증
-    if (!commonGrade || !commonClass) {
+    // 학년, 반, 식별코드가 선택되지 않았을 경우 검증
+    if (!commonGrade || !commonClass || !uniqueIdentifier) {
       setFieldErrors((prev) => ({
         ...prev,
         grade: !commonGrade,
         class: !commonClass,
+        uniqueIdentifier: !uniqueIdentifier,
       }));
-      setSnackbarMessage("학년과 반을 선택해주세요.");
+      setSnackbarMessage("식별코드, 학년, 반을 모두 입력해주세요.");
       setSnackbarOpen(true);
       return;
     }
@@ -165,10 +171,12 @@ const UnifiedModal: React.FC<UnifiedModalProps> = ({
     setStudents(initialStudents);
     setCommonGrade("");
     setCommonClass("");
+    setUniqueIdentifier("");
     setFieldErrors({
       grade: false,
       class: false,
       names: Array(10).fill(false),
+      uniqueIdentifier: false,
     });
   };
 
@@ -179,6 +187,7 @@ const UnifiedModal: React.FC<UnifiedModalProps> = ({
       grade: false,
       class: false,
       names: Array(10).fill(false),
+      uniqueIdentifier: false,
     });
   };
 
@@ -189,6 +198,7 @@ const UnifiedModal: React.FC<UnifiedModalProps> = ({
       grade: false,
       class: false,
       names: Array(10).fill(false),
+      uniqueIdentifier: false,
     });
   };
 
@@ -202,7 +212,8 @@ const UnifiedModal: React.FC<UnifiedModalProps> = ({
           transform: "translate(-50%, -50%)",
           padding: 4,
           backgroundColor: "white",
-          maxWidth: 800,
+          width: "60%", // 가로 넓이를 80%로 설정
+          maxWidth: 1200,
           maxHeight: "80vh",
           overflowY: "auto",
           borderRadius: 2,
@@ -232,7 +243,43 @@ const UnifiedModal: React.FC<UnifiedModalProps> = ({
               }}
             >
               <Box sx={{ display: "flex", alignItems: "center" }}>
-                <FormControl sx={{ minWidth: 120, marginRight: 2 }}>
+                <TextField
+                  label="식별코드"
+                  value={uniqueIdentifier}
+                  onChange={(e) => {
+                    setUniqueIdentifier(e.target.value);
+                    if (fieldErrors.uniqueIdentifier) {
+                      setFieldErrors((prev) => ({
+                        ...prev,
+                        uniqueIdentifier: false,
+                      }));
+                    }
+                  }}
+                  error={fieldErrors.uniqueIdentifier}
+                  placeholder="예: 숫자"
+                  sx={{ width: 120, marginRight: 2 }}
+                  InputProps={{
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <Tooltip
+                          title={
+                            <Typography
+                              variant="body1"
+                              sx={{ fontSize: "1rem" }}
+                            >
+                              학생 계정에 대한 정확한 식별을 목적으로 하며,
+                              아이디의 앞부분으로 설정됩니다. 문자나 숫자, 기호
+                              모두 가능합니다.
+                            </Typography>
+                          }
+                        >
+                          <HelpOutlineIcon />
+                        </Tooltip>
+                      </InputAdornment>
+                    ),
+                  }}
+                />
+                <FormControl sx={{ minWidth: 100, marginRight: 2 }}>
                   <InputLabel error={fieldErrors.grade}>학년</InputLabel>
                   <Select
                     value={commonGrade}
@@ -365,8 +412,8 @@ const UnifiedModal: React.FC<UnifiedModalProps> = ({
 
         {activeTab === 1 && (
           <Box>
-            <Typography variant="h6" gutterBottom>
-              교사의 이메일로 재설정 링크가 전송됩니다.
+            <Typography variant="body1" gutterBottom>
+              학생 계정의 아이디를 입력하세요. 교사의 이메일로 재설정 링크가 전송됩니다.
             </Typography>
             <TextField
               fullWidth
@@ -375,13 +422,15 @@ const UnifiedModal: React.FC<UnifiedModalProps> = ({
               onChange={(e) => setStudentId(e.target.value)}
               sx={{ marginBottom: 2 }}
             />
-            <Button
-              onClick={handleSubmitReset}
-              variant="contained"
-              color="primary"
-            >
-              재설정
-            </Button>
+            <Box display="flex" justifyContent="center">
+              <Button
+                onClick={handleSubmitReset}
+                variant="contained"
+                color="primary"
+              >
+                재설정
+              </Button>
+            </Box>
           </Box>
         )}
 

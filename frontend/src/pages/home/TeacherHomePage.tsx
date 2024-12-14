@@ -17,14 +17,18 @@ import {
   Snackbar,
   Alert,
   Modal,
+  InputAdornment,
+  Tooltip,
 } from "@mui/material";
 import SchoolIcon from "@mui/icons-material/School";
 import GradeIcon from "@mui/icons-material/Grade";
 import ClassIcon from "@mui/icons-material/Class";
 import AssessmentIcon from "@mui/icons-material/Assessment";
+import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
 import UnifiedModal from "./UnifiedModal";
 import ReportGeneration from "../../components/teacher/reportGeneration/ReportGeneration";
 import StudentRegistrationResultModal from "./StudentRegistrationResultModal";
+import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 
 type Student = {
   _id: number;
@@ -58,6 +62,7 @@ type CreateResult = {
 const TeacherHomePage: React.FC = () => {
   const [grade, setGrade] = useState<number | null>(null);
   const [classNumber, setClassNumber] = useState<string>("");
+  const [uniqueIdentifier, setUniqueIdentifier] = useState<string>("");
   const [students, setStudents] = useState<Student[]>([]);
   const [showReportGeneration, setShowReportGeneration] =
     useState<boolean>(false);
@@ -74,10 +79,10 @@ const TeacherHomePage: React.FC = () => {
 
   useEffect(() => {
     const fetchStudents = async () => {
-      if (school && grade && classNumber) {
+      if (school && grade && classNumber && uniqueIdentifier) {
         try {
           const res = await api.get("/users/teacher/students", {
-            params: { school, grade, class: classNumber },
+            params: { school, grade, class: classNumber, uniqueIdentifier },
           });
           const sortedStudents = res.data.sort((a: Student, b: Student) =>
             a.studentId.localeCompare(b.studentId)
@@ -89,7 +94,7 @@ const TeacherHomePage: React.FC = () => {
       }
     };
     fetchStudents();
-  }, [school, grade, classNumber]);
+  }, [school, grade, classNumber, uniqueIdentifier]);
 
   const handleShowReportGeneration = () => {
     if (grade && classNumber) {
@@ -204,7 +209,8 @@ const TeacherHomePage: React.FC = () => {
                 ml: 2,
               }}
             >
-              학생 관리
+              <AccountCircleIcon sx={{ mr: 1, verticalAlign: "middle" }} />
+              학생 계정 관리
             </Button>
           </Box>
         </Box>
@@ -222,6 +228,35 @@ const TeacherHomePage: React.FC = () => {
           sx={{ mb: 8 }}
         >
           <Box display="flex" gap={2}>
+            <FormControl sx={{ minWidth: 120, width: 120 }}>
+              <TextField
+                label="식별코드"
+                placeholder="식별코드"
+                value={uniqueIdentifier}
+                onChange={(e) => setUniqueIdentifier(e.target.value)}
+                variant="outlined"
+                sx={{
+                  borderRadius: 1,
+                  backgroundColor: theme.palette.background.paper,
+                  width: 120,
+                }}
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <Tooltip
+                        title={
+                          <Typography variant="body1" sx={{ fontSize: "1rem" }}>
+                            학생 계정 생성에서 설정했던 식별코드를 입력하세요.
+                          </Typography>
+                        }
+                      >
+                        <HelpOutlineIcon />
+                      </Tooltip>
+                    </InputAdornment>
+                  ),
+                }}
+              />
+            </FormControl>
             <FormControl sx={{ minWidth: 120 }}>
               <InputLabel>
                 <GradeIcon sx={{ mr: 1, verticalAlign: "middle" }} />
@@ -243,17 +278,21 @@ const TeacherHomePage: React.FC = () => {
                 <MenuItem value={6}>6</MenuItem>
               </Select>
             </FormControl>
-            <FormControl sx={{ minWidth: 120 }}>
+            <FormControl sx={{ minWidth: 120, width: 120 }}>
               <TextField
                 label={<ClassIcon sx={{ mr: 1, verticalAlign: "middle" }} />}
-                placeholder="반"
                 value={classNumber}
                 onChange={(e) => setClassNumber(e.target.value)}
                 variant="outlined"
                 sx={{
                   borderRadius: 1,
                   backgroundColor: theme.palette.background.paper,
-                  minWidth: 120,
+                  width: 120,
+                }}
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">반</InputAdornment>
+                  ),
                 }}
               />
             </FormControl>
