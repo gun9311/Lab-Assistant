@@ -2,10 +2,15 @@ const Teacher = require('../models/Teacher');
 const Student = require('../models/Student');
 
 const getStudents = async (req, res) => {
-  const { school, grade, class: classNumber } = req.query;
+  const { school, grade, class: classNumber, uniqueIdentifier } = req.query;
   
   try {
-    const students = await Student.find({ school, grade, class: classNumber });
+    const students = await Student.find({
+      school,
+      grade,
+      class: classNumber,
+      loginId: { $regex: `^${uniqueIdentifier}` } // loginId의 앞부분으로 필터링
+    });
     res.status(200).send(students);
   } catch (error) {
     res.status(500).send({ error: 'Failed to fetch students' });
