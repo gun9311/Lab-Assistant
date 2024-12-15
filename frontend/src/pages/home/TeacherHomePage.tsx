@@ -259,7 +259,7 @@ const TeacherHomePage: React.FC = () => {
             </FormControl>
             <FormControl sx={{ minWidth: 120 }}>
               <InputLabel>
-                <GradeIcon sx={{ mr: 1, verticalAlign: "middle" }} />
+                {/* <GradeIcon sx={{ mr: 1, verticalAlign: "middle" }} /> */}
                 학년
               </InputLabel>
               <Select
