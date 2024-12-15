@@ -1,5 +1,6 @@
 const Teacher = require('../models/Teacher');
 const Student = require('../models/Student');
+const bcrypt = require('bcryptjs');
 
 const getStudents = async (req, res) => {
   const { school, grade, class: classNumber, uniqueIdentifier } = req.query;
@@ -38,13 +39,13 @@ const getProfile = async (req, res) => {
 
 const updateProfile = async (req, res) => {
   const updates = Object.keys(req.body);
-  const allowedUpdates = req.user.role === 'teacher' ? ['name', 'school', 'password'] : ['name', 'school', 'password', 'grade', 'class'];
-  const isValidOperation = updates.every(update => allowedUpdates.includes(update));
+  // const allowedUpdates = req.user.role === 'teacher' ? ['name', 'school', 'email'] : ['password'];
+  // const isValidOperation = updates.every(update => allowedUpdates.includes(update));
 
-  if (!isValidOperation) {
-    console.warn('Invalid updates:', updates);
-    return res.status(400).send({ error: 'Invalid updates!' });
-  }
+  // if (!isValidOperation) {
+  //   console.warn('Invalid updates:', updates);
+  //   return res.status(400).send({ error: 'Invalid updates!' });
+  // }
 
   try {
     let user;
@@ -55,16 +56,34 @@ const updateProfile = async (req, res) => {
     }
 
     if (!user) {
-      console.log('User not found:', req.user._id); // 사용자를 찾지 못했을 때 로깅
+      console.log('User not found:', req.user._id);
       return res.status(404).send();
     }
 
-    updates.forEach(update => user[update] = req.body[update]);
-    await user.save();
+    // 비밀번호 변경 요청인 경우
+    if (req.user.role === 'student') {
+      const { currentPassword, password: newPassword } = req.body;
 
+      // 현재 비밀번호 확인
+      const isMatch = await bcrypt.compare(currentPassword, user.password);
+      if (!isMatch) {
+        return res.status(401).send({ error: 'Current password is incorrect' });
+      }
+
+      // 새 비밀번호로 설정
+      user.password = newPassword;
+    }
+
+    updates.forEach(update => {
+      if (update !== 'password') {
+        user[update] = req.body[update];
+      }
+    });
+
+    await user.save();
     res.send(user);
   } catch (error) {
-    console.error('Error updating profile:', error); // 업데이트 에러 로깅
+    console.error('Error updating profile:', error);
     res.status(400).send(error);
   }
 };

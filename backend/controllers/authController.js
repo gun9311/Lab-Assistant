@@ -1,16 +1,16 @@
-const { OAuth2Client } = require('google-auth-library');
+const { OAuth2Client } = require("google-auth-library");
 const Admin = require("../models/Admin");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
 const redisClient = require("../utils/redisClient");
-const Teacher = require('../models/Teacher');
-const Student = require('../models/Student');
-const { SESClient, SendEmailCommand } = require('@aws-sdk/client-ses');
+const Teacher = require("../models/Teacher");
+const Student = require("../models/Student");
+const { SESClient, SendEmailCommand } = require("@aws-sdk/client-ses");
 
 const googleClient = new OAuth2Client(
   process.env.GOOGLE_CLIENT_ID,
   process.env.GOOGLE_CLIENT_SECRET,
-  process.env.GOOGLE_REDIRECT_URI,
+  process.env.GOOGLE_REDIRECT_URI
 );
 
 const googleLogin = async (req, res) => {
@@ -29,26 +29,51 @@ const googleLogin = async (req, res) => {
     let teacher = await Teacher.findOne({ email });
 
     if (!teacher) {
-      return res.send({ message: 'Google authentication successful, please complete registration.', email });
+      return res.send({
+        message:
+          "Google authentication successful, please complete registration.",
+        email,
+      });
     }
 
     // FCM 토큰을 tokens 필드에 추가
     if (fcmToken) {
-      const tokenExists = teacher.tokens.some(tokenObj => tokenObj.token === fcmToken);
+      const tokenExists = teacher.tokens.some(
+        (tokenObj) => tokenObj.token === fcmToken
+      );
       if (!tokenExists) {
         teacher.tokens.push({ token: fcmToken });
         await teacher.save();
       }
     }
 
-    const accessToken = jwt.sign({ _id: teacher._id, role: teacher.role }, process.env.JWT_SECRET, { expiresIn: '15m' });
-    const refreshToken = jwt.sign({ _id: teacher._id, role: teacher.role }, process.env.JWT_REFRESH_SECRET, { expiresIn: '7d' });
+    const accessToken = jwt.sign(
+      { _id: teacher._id, role: teacher.role },
+      process.env.JWT_SECRET,
+      { expiresIn: "15m" }
+    );
+    const refreshToken = jwt.sign(
+      { _id: teacher._id, role: teacher.role },
+      process.env.JWT_REFRESH_SECRET,
+      { expiresIn: "7d" }
+    );
 
-    await redisClient.set(teacher._id.toString(), refreshToken, "EX", 7 * 24 * 60 * 60);
+    await redisClient.set(
+      teacher._id.toString(),
+      refreshToken,
+      "EX",
+      7 * 24 * 60 * 60
+    );
 
-    res.send({ accessToken, refreshToken, userId: teacher._id, role: teacher.role, school: teacher.school });
+    res.send({
+      accessToken,
+      refreshToken,
+      userId: teacher._id,
+      role: teacher.role,
+      school: teacher.school,
+    });
   } catch (error) {
-    res.status(400).send({ error: 'Google login failed' });
+    res.status(400).send({ error: "Google login failed" });
   }
 };
 
@@ -56,10 +81,10 @@ const googleLogin = async (req, res) => {
 const completeRegistration = async (req, res) => {
   const { name, school, authCode, fcmToken, email } = req.body;
 
-  const VALID_AUTH_CODE = '교사';  // 하드코딩된 인증코드
+  const VALID_AUTH_CODE = "교사"; // 하드코딩된 인증코드
 
   if (authCode !== VALID_AUTH_CODE) {
-    return res.status(400).send({ error: 'Invalid authentication code' });
+    return res.status(400).send({ error: "Invalid authentication code" });
   }
 
   try {
@@ -73,15 +98,37 @@ const completeRegistration = async (req, res) => {
     await teacher.save();
 
     // 가입 후 로그인 처리
-    const accessToken = jwt.sign({ _id: teacher._id, role: teacher.role }, process.env.JWT_SECRET, { expiresIn: '15m' });
-    const refreshToken = jwt.sign({ _id: teacher._id, role: teacher.role }, process.env.JWT_REFRESH_SECRET, { expiresIn: '7d' });
+    const accessToken = jwt.sign(
+      { _id: teacher._id, role: teacher.role },
+      process.env.JWT_SECRET,
+      { expiresIn: "15m" }
+    );
+    const refreshToken = jwt.sign(
+      { _id: teacher._id, role: teacher.role },
+      process.env.JWT_REFRESH_SECRET,
+      { expiresIn: "7d" }
+    );
 
     // Redis에 리프레시 토큰 저장
-    await redisClient.set(teacher._id.toString(), refreshToken, "EX", 7 * 24 * 60 * 60);
+    await redisClient.set(
+      teacher._id.toString(),
+      refreshToken,
+      "EX",
+      7 * 24 * 60 * 60
+    );
 
-    res.status(201).send({ message: 'Registration complete', accessToken, refreshToken, userId: teacher._id, role: teacher.role, school: teacher.school });
+    res
+      .status(201)
+      .send({
+        message: "Registration complete",
+        accessToken,
+        refreshToken,
+        userId: teacher._id,
+        role: teacher.role,
+        school: teacher.school,
+      });
   } catch (error) {
-    res.status(400).send({ error: 'Failed to complete registration' });
+    res.status(400).send({ error: "Failed to complete registration" });
   }
 };
 
@@ -90,11 +137,11 @@ const login = async (req, res) => {
 
   try {
     let user;
-    if (role === 'admin') {
+    if (role === "admin") {
       user = await Admin.findOne({ name: loginData.name });
-    } else if (role === 'teacher') {
+    } else if (role === "teacher") {
       user = await Teacher.findOne({ email: loginData.email });
-    } else if (role === 'student') {
+    } else if (role === "student") {
       user = await Student.findOne({
         loginId: loginData.loginId,
       });
@@ -107,7 +154,9 @@ const login = async (req, res) => {
 
     // FCM 토큰을 tokens 필드에 추가
     if (fcmToken) {
-      const tokenExists = user.tokens.some(tokenObj => tokenObj.token === fcmToken);
+      const tokenExists = user.tokens.some(
+        (tokenObj) => tokenObj.token === fcmToken
+      );
       if (!tokenExists) {
         user.tokens.push({ token: fcmToken });
         await user.save();
@@ -136,14 +185,14 @@ const login = async (req, res) => {
       accessToken,
       refreshToken,
       userId: user._id,
-      role: user.role
+      role: user.role,
     };
 
-    if (role !== 'admin') {
+    if (role !== "admin") {
       response.school = user.school; // 학교명을 응답에 추가
     }
 
-    if (role == 'student') {
+    if (role == "student") {
       response.grade = user.grade; // 학년을 응답에 추가
     }
 
@@ -190,10 +239,10 @@ const refreshAccessToken = async (req, res) => {
 const registerTeacher = async (req, res) => {
   const { email, password, name, school, authCode } = req.body;
 
-  const VALID_AUTH_CODE = '교사';  // 하드코딩된 인증코드
+  const VALID_AUTH_CODE = "교사"; // 하드코딩된 인증코드
 
   if (authCode !== VALID_AUTH_CODE) {
-    return res.status(400).send({ error: 'Invalid authentication code' });
+    return res.status(400).send({ error: "Invalid authentication code" });
   }
 
   try {
@@ -201,21 +250,43 @@ const registerTeacher = async (req, res) => {
     await teacher.save();
     res.status(201).send(teacher);
   } catch (error) {
-    res.status(400).send({ error: 'Failed to create teacher' });
+    res.status(400).send({ error: "Failed to create teacher" });
   }
 };
 
 const registerStudent = async (req, res) => {
-  const { loginId, studentId, name, password, grade, class: studentClass, school } = req.body;
+  const {
+    loginId,
+    studentId,
+    name,
+    password,
+    grade,
+    class: studentClass,
+    school,
+  } = req.body;
   try {
-    const student = new Student({ loginId, studentId, name, password, grade, class: studentClass, school });
+    const student = new Student({
+      loginId,
+      studentId,
+      name,
+      password,
+      grade,
+      class: studentClass,
+      school,
+    });
     await student.save();
     res.status(201).send(student);
   } catch (error) {
-    if (error.code === 11000) { // 중복된 key 에러
-      res.status(400).send({ error: 'Student with the same school, grade, class, and studentId already exists' });
+    if (error.code === 11000) {
+      // 중복된 key 에러
+      res
+        .status(400)
+        .send({
+          error:
+            "Student with the same school, grade, class, and studentId already exists",
+        });
     } else {
-      res.status(400).send({ error: 'Failed to create student' });
+      res.status(400).send({ error: "Failed to create student" });
     }
   }
 };
@@ -227,10 +298,13 @@ const registerAdmin = async (req, res) => {
     await admin.save();
     res.status(201).send(admin);
   } catch (error) {
-    if (error.code === 11000) { // 중복된 key 에러
-      res.status(400).send({ error: 'Admin with the same name already exists' });
+    if (error.code === 11000) {
+      // 중복된 key 에러
+      res
+        .status(400)
+        .send({ error: "Admin with the same name already exists" });
     } else {
-      res.status(400).send({ error: 'Failed to create admin' });
+      res.status(400).send({ error: "Failed to create admin" });
     }
   }
 };
@@ -239,26 +313,62 @@ const registerStudentByTeacher = async (req, res) => {
   const students = req.body; // 배열로 전송된 학생 데이터
   const results = {
     success: [],
-    failed: []
+    failed: [],
   };
 
   for (const studentData of students) {
     // 필수 필드 검증
-    if (!studentData.loginId || !studentData.studentId || !studentData.name || !studentData.password || !studentData.grade || !studentData.studentClass || !studentData.school) {
-      results.failed.push({ studentData, error: '필수 필드가 누락되었습니다.' });
+    if (
+      !studentData.loginId ||
+      !studentData.studentId ||
+      !studentData.name ||
+      !studentData.password ||
+      !studentData.grade ||
+      !studentData.studentClass ||
+      !studentData.school
+    ) {
+      results.failed.push({
+        studentData,
+        error: "필수 필드가 누락되었습니다.",
+      });
       continue;
     }
     try {
-      const { loginId, studentId, name, password, grade, studentClass, school } = studentData;
-      const student = new Student({ loginId, studentId, name, password, grade, class: studentClass, school });
+      const {
+        loginId,
+        studentId,
+        name,
+        password,
+        grade,
+        studentClass,
+        school,
+      } = studentData;
+      const student = new Student({
+        loginId,
+        studentId,
+        name,
+        password,
+        grade,
+        class: studentClass,
+        school,
+      });
       await student.save();
       results.success.push(student);
     } catch (error) {
-      if (error.code === 11000) { // 중복된 key 에러
-        const duplicateField = error.keyPattern.loginId ? '로그인 ID' : '학교의 학년, 반, 출석번호';
-        results.failed.push({ studentData, error: `이미 동일한 ${duplicateField}가 존재합니다.` });
+      if (error.code === 11000) {
+        // 중복된 key 에러
+        const duplicateField = error.keyPattern.loginId
+          ? "로그인 ID"
+          : "학교의 학년, 반, 출석번호";
+        results.failed.push({
+          studentData,
+          error: `이미 동일한 ${duplicateField}가 존재합니다.`,
+        });
       } else {
-        results.failed.push({ studentData, error: '학생 생성에 실패했습니다.' });
+        results.failed.push({
+          studentData,
+          error: "학생 생성에 실패했습니다.",
+        });
       }
     }
   }
@@ -275,17 +385,19 @@ const forgotPassword = async (req, res) => {
       accessKeyId: process.env.AWS_ACCESS_KEY_ID,
       secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
     },
-  });  
+  });
 
   try {
     // 1. 이메일 확인
     const teacher = await Teacher.findOne({ email });
     if (!teacher) {
-      return res.status(400).send({ error: '등록되지 않은 이메일입니다.' });
+      return res.status(400).send({ error: "등록되지 않은 이메일입니다." });
     }
 
     // 2. 재설정 토큰 생성
-    const resetToken = jwt.sign({ _id: teacher._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
+    const resetToken = jwt.sign({ _id: teacher._id }, process.env.JWT_SECRET, {
+      expiresIn: "1h",
+    });
 
     // 3. 재설정 링크 생성
     const resetLink = `${process.env.CLIENT_URL}/reset-password?token=${resetToken}`;
@@ -298,7 +410,7 @@ const forgotPassword = async (req, res) => {
       },
       Message: {
         Subject: {
-          Data: '비밀번호 재설정 요청',
+          Data: "비밀번호 재설정 요청",
         },
         Body: {
           Text: {
@@ -316,10 +428,12 @@ const forgotPassword = async (req, res) => {
     await sesClient.send(command);
 
     // 6. 성공 응답
-    res.status(200).send({ message: '비밀번호 재설정 이메일이 전송되었습니다.' });
+    res
+      .status(200)
+      .send({ message: "비밀번호 재설정 이메일이 전송되었습니다." });
   } catch (error) {
-    console.error('이메일 전송 중 오류:', error);
-    res.status(500).send({ error: '이메일 전송 중 오류가 발생했습니다.' });
+    console.error("이메일 전송 중 오류:", error);
+    res.status(500).send({ error: "이메일 전송 중 오류가 발생했습니다." });
   }
 };
 
@@ -331,15 +445,15 @@ const resetPassword = async (req, res) => {
     const teacher = await Teacher.findById(decoded._id);
 
     if (!teacher) {
-      return res.status(400).send({ error: '유효하지 않은 토큰입니다.' });
+      return res.status(400).send({ error: "유효하지 않은 토큰입니다." });
     }
 
     teacher.password = password;
     await teacher.save();
 
-    res.send({ message: '비밀번호가 성공적으로 재설정되었습니다.' });
+    res.send({ message: "비밀번호가 성공적으로 재설정되었습니다." });
   } catch (error) {
-    res.status(400).send({ error: '비밀번호 재설정에 실패했습니다.' });
+    res.status(400).send({ error: "비밀번호 재설정에 실패했습니다." });
   }
 };
 
@@ -352,20 +466,24 @@ const forgotStudentPassword = async (req, res) => {
       accessKeyId: process.env.AWS_ACCESS_KEY_ID,
       secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
     },
-  });  
+  });
 
   try {
     const student = await Student.findOne({ loginId: studentId });
     if (!student) {
-      return res.status(400).send({ error: '등록되지 않은 학생 아이디입니다.' });
+      return res
+        .status(400)
+        .send({ error: "등록되지 않은 학생 아이디입니다." });
     }
 
-    const resetToken = jwt.sign({ _id: student._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
+    const resetToken = jwt.sign({ _id: student._id }, process.env.JWT_SECRET, {
+      expiresIn: "1h",
+    });
     const resetLink = `${process.env.CLIENT_URL}/reset-student-password?token=${resetToken}`;
 
     const teacher = await Teacher.findOne({ _id: req.user._id }); // 교사 이메일로 발송
     if (!teacher) {
-      return res.status(400).send({ error: '교사 정보를 찾을 수 없습니다.' });
+      return res.status(400).send({ error: "교사 정보를 찾을 수 없습니다." });
     }
 
     const params = {
@@ -375,7 +493,7 @@ const forgotStudentPassword = async (req, res) => {
       },
       Message: {
         Subject: {
-          Data: '학생 비밀번호 재설정 요청',
+          Data: "학생 비밀번호 재설정 요청",
         },
         Body: {
           Text: {
@@ -391,10 +509,12 @@ const forgotStudentPassword = async (req, res) => {
     const command = new SendEmailCommand(params);
     await sesClient.send(command);
 
-    res.status(200).send({ message: '비밀번호 재설정 이메일이 발송되었습니다.' });
+    res
+      .status(200)
+      .send({ message: "비밀번호 재설정 이메일이 발송되었습니다." });
   } catch (error) {
-    console.error('학생 비밀번호 재설정 중 오류:', error);
-    res.status(500).send({ error: '비밀번호 재설정 중 오류가 발생했습니다.' });
+    console.error("학생 비밀번호 재설정 중 오류:", error);
+    res.status(500).send({ error: "비밀번호 재설정 중 오류가 발생했습니다." });
   }
 };
 
@@ -406,16 +526,30 @@ const resetStudentPassword = async (req, res) => {
     const student = await Student.findById(decoded._id);
 
     if (!student) {
-      return res.status(400).send({ error: '유효하지 않은 토큰입니다.' });
+      return res.status(400).send({ error: "유효하지 않은 토큰입니다." });
     }
 
     student.password = password;
     await student.save();
 
-    res.send({ message: '비밀번호가 성공적으로 재설정되었습니다.' });
+    res.send({ message: "비밀번호가 성공적으로 재설정되었습니다." });
   } catch (error) {
-    res.status(400).send({ error: '비밀번호 재설정에 실패했습니다.' });
+    res.status(400).send({ error: "비밀번호 재설정에 실패했습니다." });
   }
 };
 
-module.exports = { googleLogin, completeRegistration, login, logout, refreshAccessToken, registerTeacher, registerStudent, registerAdmin, registerStudentByTeacher, forgotPassword, resetPassword, forgotStudentPassword,resetStudentPassword };
+module.exports = {
+  googleLogin,
+  completeRegistration,
+  login,
+  logout,
+  refreshAccessToken,
+  registerTeacher,
+  registerStudent,
+  registerAdmin,
+  registerStudentByTeacher,
+  forgotPassword,
+  resetPassword,
+  forgotStudentPassword,
+  resetStudentPassword,
+};
