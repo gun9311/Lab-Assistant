@@ -60,6 +60,14 @@ const updateProfile = async (req, res) => {
       return res.status(404).send();
     }
 
+    // 이메일 중복 체크
+    if (req.body.email) {
+      const emailExists = await Teacher.findOne({ email: req.body.email });
+      if (emailExists && emailExists._id.toString() !== req.user._id.toString()) {
+        return res.status(400).send({ error: 'Email already in use' });
+      }
+    }
+
     // 비밀번호 변경 요청인 경우
     if (req.user.role === 'student') {
       const { currentPassword, password: newPassword } = req.body;
