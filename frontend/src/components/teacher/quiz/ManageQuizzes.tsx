@@ -25,7 +25,8 @@ import QuizFilter from "./components/QuizFilter";
 import CloseIcon from "@mui/icons-material/Close";
 import AddIcon from "@mui/icons-material/Add"; // 추가된 아이콘
 import api from "../../../utils/api";
-import background from '../../../../src/assets/background-logo.webp';
+// import background from '../../../../src/assets/background-logo.webp';
+import background from '../../../../src/assets/nudge-background2-edit.png';
 import { Quiz } from "./types";
 import QuizContainer from "../quiz/QuizContainer";
 import { getUserId } from "../../../utils/auth";
@@ -180,6 +181,7 @@ const ManageQuizzesPage: React.FC = () => {
         elevation={3}
         sx={{
           padding: "2rem",
+          paddingTop: "1.2rem",
           paddingBottom: "0",
           marginBottom: "2rem",
           borderRadius: "16px",
@@ -188,7 +190,7 @@ const ManageQuizzesPage: React.FC = () => {
           backgroundSize: "cover",
           backgroundPosition: "center",
           position: "relative",
-          minHeight: "280px",
+          minHeight: "300px",
           display: "flex",
           flexDirection: "column",
           justifyContent: "space-between",

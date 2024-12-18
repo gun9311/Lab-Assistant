@@ -160,9 +160,13 @@ const ProfilePage = () => {
       setEditMode(false);
       setDialogOpen(false);
       setSuccessMessage("프로필 업데이트에 성공했습니다.");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error updating profile:", error);
-      setError("프로필 업데이트에 실패했습니다.");
+      if (error.response && error.response.data.error === 'Email already in use') {
+        setError("이미 사용 중인 이메일입니다.");
+      } else {
+        setError("프로필 업데이트에 실패했습니다.");
+      }
     }
   };
 

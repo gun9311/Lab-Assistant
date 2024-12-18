@@ -10,7 +10,7 @@ interface WaitingScreenComponentProps {
   isWaitingForQuizStart: boolean;
   isPreparingNextQuestion: boolean;
   isLastQuestion: boolean;
-  handleReady: () => void;
+  // handleReady: () => void;
 }
 
 const WaitingScreenComponent: React.FC<WaitingScreenComponentProps> = ({
@@ -19,11 +19,11 @@ const WaitingScreenComponent: React.FC<WaitingScreenComponentProps> = ({
   isWaitingForQuizStart,
   isPreparingNextQuestion,
   isLastQuestion,
-  handleReady,
+  // handleReady,
 }) => {
   return (
     <Box textAlign="center" sx={{ padding: 3 }}>
-      {/* 준비 완료 버튼 */}
+      {/* 준비 완료 버튼
       {!isReady && !isQuizStarting && !isWaitingForQuizStart && !isPreparingNextQuestion && (
         <Button
           variant="contained"
@@ -40,7 +40,7 @@ const WaitingScreenComponent: React.FC<WaitingScreenComponentProps> = ({
         >
           준비 완료
         </Button>
-      )}
+      )} */}
 
       {/* 퀴즈 시작 대기 중 상태 */}
       {isWaitingForQuizStart && (

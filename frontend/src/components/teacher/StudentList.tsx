@@ -21,6 +21,7 @@ type StudentListProps = {
   grade: number | null;
   classNumber: string;
   students: Student[];
+  uniqueIdentifier: string;
 };
 
 const StudentList: React.FC<StudentListProps> = ({
@@ -28,6 +29,7 @@ const StudentList: React.FC<StudentListProps> = ({
   grade,
   classNumber,
   students,
+  uniqueIdentifier,
 }) => {
   const theme = useTheme();
   const [expandedSections, setExpandedSections] = useState<{ [key: number]: string }>({});
@@ -52,11 +54,11 @@ const StudentList: React.FC<StudentListProps> = ({
     setSelectedQuiz(null);
   };
 
-  if (!grade || !classNumber) {
+  if (!grade || !classNumber || !uniqueIdentifier) {
     return (
       <Paper elevation={3} sx={{ padding: theme.spacing(2), marginTop: theme.spacing(2), backgroundColor: theme.palette.background.paper }}>
         <Typography variant="h5" gutterBottom align="center" sx={{ color: theme.palette.primary.main }}>
-          학년과 반을 선택해주세요.
+          식별코드, 학년, 반을 입력해주세요.
         </Typography>
       </Paper>
     );
@@ -66,7 +68,7 @@ const StudentList: React.FC<StudentListProps> = ({
     return (
       <Paper elevation={3} sx={{ padding: theme.spacing(2), marginTop: theme.spacing(2), backgroundColor: theme.palette.background.paper }}>
         <Typography variant="h5" gutterBottom align="center" sx={{ color: theme.palette.primary.main }}>
-          선택한 학년과 반에 학생이 없습니다.
+          입력하신 식별코드, 학년, 반에 대한 학생이 없습니다.
         </Typography>
       </Paper>
     );
@@ -89,7 +91,7 @@ const StudentList: React.FC<StudentListProps> = ({
             label="학기"
           >
             <MenuItem value="All">전체</MenuItem>
-            <MenuItem value="1학기">1학기</MenuItem>
+            <MenuItem value="1���기">1학기</MenuItem>
             <MenuItem value="2학기">2학기</MenuItem>
             {/* 필요에 따라 학기를 더 추가 */}
           </Select>

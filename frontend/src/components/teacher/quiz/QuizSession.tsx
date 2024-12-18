@@ -96,18 +96,20 @@ const QuizSessionPage = () => {
           { 
             id: message.studentId, 
             name: message.name, 
-            isReady: false, 
+            isReady: message.isReady, 
             character: message.character
           },
         ]);
         setTotalStudents((prevCount) => prevCount + 1);
-      } else if (message.type === 'studentReady') {
-        setStudents((prevStudents) =>
-          prevStudents.map((student) =>
-            student.id === message.studentId ? { ...student, isReady: true } : student
-          )
-        );
-      } else if (message.type === 'quizStartingSoon') {
+      } 
+      // else if (message.type === 'studentReady') {
+      //   setStudents((prevStudents) =>
+      //     prevStudents.map((student) =>
+      //       student.id === message.studentId ? { ...student, isReady: true } : student
+      //     )
+      //   );
+      // } 
+      else if (message.type === 'quizStartingSoon') {
         setIsQuizStarting(true);
       } else if (message.type === 'quizStarted') {
         setIsQuizStarting(false);

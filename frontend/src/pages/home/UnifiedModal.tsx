@@ -267,9 +267,8 @@ const UnifiedModal: React.FC<UnifiedModalProps> = ({
                               variant="body1"
                               sx={{ fontSize: "1rem" }}
                             >
-                              학생 계정에 대한 정확한 식별을 목적으로 하며,
-                              아이디의 앞부분으로 설정됩니다. 문자나 숫자, 기호
-                              모두 가능합니다.
+                              임의의 식별코드(문자, 숫자, 기호)를 입력해주세요.
+                              학생 계정의 식별을 목적으로 하며, 아이디의 앞부분으로 설정됩니다. 
                             </Typography>
                           }
                         >

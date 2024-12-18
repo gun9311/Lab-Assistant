@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Container, Paper, Box, Typography, Button, CircularProgress, Tooltip } from '@mui/material';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { getToken } from '../../../utils/auth';
@@ -67,6 +67,12 @@ const StudentQuizSessionPage: React.FC = () => {
   const [isFeedbackReceived, setIsFeedbackReceived] = useState<boolean>(false);  // 피드백 상태 추가
   const [selectedCharacter, setSelectedCharacter] = useState<number | string | null>(null); // 캐릭터 선택 상태
   const [takenCharacters, setTakenCharacters] = useState<Set<number>>(new Set());
+  const [isCharacterConfirmed, setIsCharacterConfirmed] = useState<boolean>(false); // 캐릭터 선택 완료 상태 추가
+  const selectedCharacterRef = useRef<number | string | null>(selectedCharacter);
+
+  useEffect(() => {
+    selectedCharacterRef.current = selectedCharacter;
+  }, [selectedCharacter]);
   
   // 웹소켓 연결 설정
   useEffect(() => {
@@ -130,12 +136,17 @@ const StudentQuizSessionPage: React.FC = () => {
         setWaitingForFeedback(false); 
         setIsFeedbackReceived(true);  
       }
-      // else if (parsedData.type === 'characterAcknowledged') {
-      //   setSelectedCharacter(parsedData.character);
       else if (parsedData.error === 'Character already taken') {
         alert('이미 선택된 캐릭터입니다. 다른 캐릭터를 선택하세요.');
       } else if (parsedData.type === 'characterSelected') {
-        setTakenCharacters(prev => new Set(prev).add(parseInt(parsedData.character.replace('character', '')) - 1));
+        const characterIndex = parseInt(parsedData.character.replace('character', '')) - 1;
+        setTakenCharacters(prev => new Set(prev).add(characterIndex));
+        // 현재 선택된 캐릭터가 비활성화된 캐릭터라면 선택 해제
+        console.log(selectedCharacterRef.current, characterIndex);
+        if (selectedCharacterRef.current === characterIndex) {
+          console.log('selectedCharacter same');
+          setSelectedCharacter(null);
+      }
       }
       else if (parsedData.type === 'quizCompleted') {
         navigate(`/quiz-result/${pin}`);
@@ -163,15 +174,6 @@ const StudentQuizSessionPage: React.FC = () => {
       }
     };
   }, [pin, userToken, navigate]);
-
-  // 캐릭터 선택 시 메시지 전송
-  const sendCharacterSelection = (characterIndex: number) => {
-    if (webSocket && webSocket.readyState === WebSocket.OPEN && !takenCharacters.has(characterIndex)) {
-      const message = JSON.stringify({ type: 'characterSelected', character: `character${characterIndex + 1}` });
-      webSocket.send(message);
-      console.log(`캐릭터 선택 메시지 전송: ${message}`);
-    }
-  };
 
   const arrayBufferToString = (buffer: ArrayBuffer): Promise<string> => {
     return new Promise((resolve) => {
@@ -220,14 +222,17 @@ const StudentQuizSessionPage: React.FC = () => {
 
   const handleCharacterSelect = (index: number) => {
     setSelectedCharacter(index);
-    sendCharacterSelection(index);
   };
 
-  const handleReady = () => {
-    if (webSocket && !isReady) {
-      webSocket.send(JSON.stringify({ type: 'ready' }));
-      setIsReady(true);
-      setIsWaitingForQuizStart(true);  
+  const confirmCharacterSelection = () => {
+    if (webSocket && webSocket.readyState === WebSocket.OPEN && selectedCharacter !== null) {
+        const characterIndex = typeof selectedCharacter === 'number' ? selectedCharacter : parseInt(selectedCharacter);
+        const message = JSON.stringify({ type: 'characterSelected', character: `character${characterIndex + 1}` });
+        webSocket.send(message);
+        console.log(`캐릭터 선택 메시지 전송: ${message}`);
+        setIsCharacterConfirmed(true); // 캐릭터 선택 완료 상태 설정
+        setIsReady(true); // 준비 완료 상태 설정
+        setIsWaitingForQuizStart(true); // 퀴즈 시작 대기 상태 설정
     }
   };
 
@@ -256,14 +261,14 @@ const StudentQuizSessionPage: React.FC = () => {
   return (
     <Container component="main" maxWidth="md" sx={{ mt: 8 }}>
       <Paper elevation={3} sx={{ padding: 4, borderRadius: '16px' }}>
-        {!selectedCharacter ? (
+        {!isCharacterConfirmed ? ( // 캐릭터 선택 완료 상태에 따라 화면 전환
           <Box sx={{ textAlign: 'center', mt: 4 }}>
             <Typography variant="h6">캐릭터를 선택하세요:</Typography>
             <Box sx={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', mt: 2, gap: 2 }}>
               {characterImages.map((characterImage, index) => (
                 <Tooltip
                   key={index}
-                  title={takenCharacters.has(index) ? "이미 선택된 캐릭터입니다" : ""}
+                  title={takenCharacters.has(index) ? "이미 선택된 캐���터입니다" : ""}
                   arrow
                 >
                   <Button
@@ -273,6 +278,7 @@ const StudentQuizSessionPage: React.FC = () => {
                       filter: takenCharacters.has(index) ? 'grayscale(100%)' : 'none',
                       opacity: takenCharacters.has(index) ? 0.5 : 1,
                       cursor: takenCharacters.has(index) ? 'not-allowed' : 'pointer',
+                      border: selectedCharacter === index ? '2px solid #4caf50' : 'none',
                     }}
                     disabled={takenCharacters.has(index)}
                   >
@@ -281,6 +287,15 @@ const StudentQuizSessionPage: React.FC = () => {
                 </Tooltip>
               ))}
             </Box>
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={confirmCharacterSelection}
+              sx={{ mt: 2 }}
+              disabled={selectedCharacter === null}
+            >
+              준비 완료
+            </Button>
           </Box>
         ) : (
           <>
@@ -290,7 +305,6 @@ const StudentQuizSessionPage: React.FC = () => {
               isWaitingForQuizStart={isWaitingForQuizStart}
               isPreparingNextQuestion={isPreparingNextQuestion}
               isLastQuestion={isLastQuestion}
-              handleReady={handleReady}
             />
 
             {currentQuestion && !isFeedbackReceived && (

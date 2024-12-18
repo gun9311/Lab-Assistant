@@ -246,7 +246,7 @@ const TeacherHomePage: React.FC = () => {
                       <Tooltip
                         title={
                           <Typography variant="body1" sx={{ fontSize: "1rem" }}>
-                            학생 계정 생성에서 설정했던 식별코드를 입력하세요.
+                            학생 계정 생성 시 설정했던 식별코드를 입력하세요.
                           </Typography>
                         }
                       >
@@ -302,7 +302,7 @@ const TeacherHomePage: React.FC = () => {
               variant="contained"
               color="primary"
               onClick={handleShowReportGeneration}
-              disabled={!grade || !classNumber}
+              disabled={!grade || !classNumber || !uniqueIdentifier}
               sx={{
                 padding: "10px 24px",
                 borderRadius: 4,
@@ -338,6 +338,7 @@ const TeacherHomePage: React.FC = () => {
             grade={grade}
             classNumber={classNumber}
             students={students}
+            uniqueIdentifier={uniqueIdentifier}
           />
         )}
 
