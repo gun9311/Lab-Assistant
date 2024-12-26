@@ -78,6 +78,16 @@ const TeacherLoginPage = () => {
         >
           로그인
         </Button>
+
+        <Typography variant="body2" sx={{ mt: 4, color: 'text.secondary', fontSize: '0.9rem' }}>
+          계정이 없으신가요? <Link href="/teacher-register" sx={{ color: '#1976d2', textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}>가입하기</Link>
+        </Typography>
+        <Typography variant="body2" sx={{ mt: 2, color: 'text.secondary', fontSize: '0.9rem' }}>
+          <Link href="/forgot-password" sx={{ color: '#1976d2', textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}>
+            비밀번호를 잊으셨나요?
+          </Link>
+        </Typography>
+
         <Box sx={{ display: 'flex', alignItems: 'center', mt: 3, mb: 3 }}>
           <Divider sx={{ flexGrow: 1 }} />
           <Typography variant="body2" sx={{ mx: 2, color: 'text.secondary', fontSize: '0.9rem' }}>
@@ -85,6 +95,7 @@ const TeacherLoginPage = () => {
           </Typography>
           <Divider sx={{ flexGrow: 1 }} />
         </Box>
+
         <Button
           fullWidth
           variant="contained"
@@ -109,15 +120,28 @@ const TeacherLoginPage = () => {
           <img src={GoogleIcon} alt="Google" style={{ marginRight: 8, width: 20, height: 20 }} />
           Google로 로그인
         </Button>
-        <Typography variant="body2" sx={{ mt: 4, color: 'text.secondary', fontSize: '0.9rem' }}>
-          계정이 없으신가요? <Link href="/teacher-register" sx={{ color: '#1976d2', textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}>가입하기</Link>
-        </Typography>
-        <Typography variant="body2" sx={{ mt: 2, color: 'text.secondary', fontSize: '0.9rem' }}>
-          <Link href="/forgot-password" sx={{ color: '#1976d2', textDecoration: 'none', '&:hover': { textDecoration: 'underline' } }}>
-            비밀번호를 잊으셨나요?
+
+        {error && <Typography color="error" sx={{ mt: 2, fontSize: '0.9rem' }}>{error}</Typography>}
+
+        <Typography
+          variant="body2"
+          sx={{
+            mt: 4,
+            color: "text.secondary",
+            fontSize: "0.9rem",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <Link
+            href="https://gun9311.github.io/Lab-Assistant/"
+            color="inherit"
+            sx={{ marginLeft: 1 }}
+          >
+            개인정보처리방침
           </Link>
         </Typography>
-        {error && <Typography color="error" sx={{ mt: 2, fontSize: '0.9rem' }}>{error}</Typography>}
       </Paper>
     </Container>
   );

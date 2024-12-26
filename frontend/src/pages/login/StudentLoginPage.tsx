@@ -19,7 +19,9 @@ import {
   InputLabel,
   FormControl,
   InputAdornment,
+  Link as MuiLink,
 } from "@mui/material";
+import { Link } from "react-router-dom";
 import Autocomplete from "@mui/material/Autocomplete";
 import { educationOffices } from "../../educationOffices";
 import apiNoAuth from "../../utils/apiNoAuth";
@@ -189,6 +191,26 @@ const StudentLoginPage = () => {
             {error}
           </Typography>
         )}
+
+        <Typography
+          variant="body2"
+          sx={{
+            mt: 4,
+            color: "text.secondary",
+            fontSize: "0.9rem",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <MuiLink
+            href="https://gun9311.github.io/Lab-Assistant/"
+            color="inherit"
+            sx={{ marginLeft: 1 }}
+          >
+            개인정보처리방침
+          </MuiLink>
+        </Typography>
       </Paper>
     </Container>
   );

@@ -215,7 +215,7 @@ const QuizResults: React.FC<QuizResultsProps> = ({
                               <TableHead>
                                 <TableRow>
                                   <TableCell>문제</TableCell>
-                                  <TableCell>예시답안</TableCell>
+                                  <TableCell>정답</TableCell>
                                   <TableCell>내 답변</TableCell>
                                   {!isStudentView && <TableCell>정답 여부</TableCell>}
                                 </TableRow>

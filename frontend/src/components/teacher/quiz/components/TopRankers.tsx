@@ -1,5 +1,30 @@
-import React, { useEffect, useState } from 'react';
-import { Box, Typography } from '@mui/material';
+import React, { useEffect, useState } from "react";
+import { Box, Typography } from "@mui/material";
+
+// 타입 정의 추가
+declare const require: {
+  context: (
+    path: string,
+    deep?: boolean,
+    filter?: RegExp
+  ) => {
+    keys: () => string[];
+    (key: string): string;
+  };
+};
+
+// 이미지 디렉토리에서 모든 이미지를 가져와 배열로 관리
+const images = require.context("../../../../assets/character", false, /\.png$/);
+
+// 파일 이름을 기준으로 정렬하여 배열 생성
+const characterImages = images
+  .keys()
+  .sort((a: string, b: string) => {
+    const numA = parseInt(a.match(/\d+/)![0], 10);
+    const numB = parseInt(b.match(/\d+/)![0], 10);
+    return numA - numB;
+  })
+  .map((key: string) => images(key));
 
 type TopRankersProps = {
   topRankers: {
@@ -12,16 +37,28 @@ type TopRankersProps = {
 };
 
 const TopRankers: React.FC<TopRankersProps> = ({ topRankers }) => {
-  const [positions, setPositions] = useState<{ [id: string]: { top: string; left: string } }>({});
+  const [positions, setPositions] = useState<{
+    [id: string]: { top: string; left: string };
+  }>({});
 
   useEffect(() => {
-    // 포디움의 위치를 순위에 따라 업데이트
-    const updatedPositions: { [id: string]: { top: string; left: string } } = {};
+    const updatedPositions: { [id: string]: { top: string; left: string } } =
+      {};
     topRankers.forEach((student, index) => {
-      updatedPositions[student.id] = {
-        top: index === 0 ? '12%' : index === 1 ? '42%' : '45%',
-        left: index === 0 ? '53%' : index === 1 ? '30%' : '76%',
-      };
+      if (index < 3) {
+        // 1~3등 위치 설정
+        updatedPositions[student.id] = {
+          top: index === 0 ? "5%" : index === 1 ? "37%" : "40%",
+          left: index === 0 ? "49%" : index === 1 ? "35%" : "63%",
+        };
+      } else {
+        // 4~10등 위치 설정
+        const leftPosition = 30 + (index - 3) * 5; // 4등부터 10등까지 간격 설정
+        updatedPositions[student.id] = {
+          top: "70%", // 아래쪽 단상 위치
+          left: `${leftPosition}%`,
+        };
+      }
     });
     setPositions(updatedPositions);
   }, [topRankers]);
@@ -29,42 +66,44 @@ const TopRankers: React.FC<TopRankersProps> = ({ topRankers }) => {
   return (
     <>
       {topRankers.map((student, index) => {
-        const imageSize = index === 0 ? '100%' : index === 1 ? '90%' : '80%'; // 등수에 따라 이미지 크기 조정
+        const characterIndex =
+          parseInt(student.character.replace("character", "")) - 1;
+        const imageSize = index < 3 ? (index === 0 ? "55%" : "55%") : "30%"; // 4등부터는 크기 조정
         return (
           <Box
             key={student.id}
             sx={{
-              position: 'absolute',
-              top: positions[student.id]?.top || '0%',
-              left: positions[student.id]?.left || '0%',
-              transform: 'translate(-50%, -100%)',
-              transition: 'top 0.5s ease-in-out, left 0.5s ease-in-out',
-              textAlign: 'center',
-              width: '250px', // 모든 div의 넓이를 동일하게 설정
-              height: 'auto', // 높이는 자동으로 설정하여 비율 유지
+              position: "absolute",
+              top: positions[student.id]?.top || "0%",
+              left: positions[student.id]?.left || "0%",
+              transform: "translate(-50%, -100%)",
+              textAlign: "center",
+              width: "20%",
+              height: "auto",
             }}
           >
             <Typography
               sx={{
-                position: 'absolute',
-                top: '-30px',
-                left: '50%',
-                transform: 'translateX(-50%)',
-                backgroundColor: 'rgba(0, 0, 0, 0.5)',
-                color: '#fff',
-                borderRadius: '4px',
-                padding: '0.2rem 0.5rem',
-                fontWeight: 'bold',
+                position: "absolute",
+                top: "-30px",
+                left: "50%",
+                transform: "translateX(-50%)",
+                backgroundColor: "rgba(0, 0, 0, 0.5)",
+                color: "#fff",
+                borderRadius: "4px",
+                padding: "0.2rem 0.5rem",
+                fontWeight: "bold",
+                fontSize: "100%",
               }}
             >
               {student.name}
             </Typography>
             <img
-              src={`/assets/character/${student.character}.png`}
+              src={characterImages[characterIndex]}
               alt={`${student.name}'s character`}
               style={{
-                width: imageSize, // 등수에 따라 이미지 크기 조정
-                height: 'auto', // 비율을 유지하면서 크기 조정
+                width: imageSize,
+                height: "auto",
               }}
             />
           </Box>

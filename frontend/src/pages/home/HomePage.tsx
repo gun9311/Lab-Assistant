@@ -116,7 +116,7 @@ const HomePage = () => {
               },
             }}
           >
-            NUDGE 시작하기
+            시작하기
           </Button>
           <Typography
             variant="body2"
@@ -128,13 +128,6 @@ const HomePage = () => {
             }}
           >
             NUDGE에 오신 것을 환영합니다!
-            <MuiLink
-              href="https://gun9311.github.io/Lab-Assistant/"
-              color="inherit"
-              sx={{ marginLeft: 1 }}
-            >
-              개인정보처리방침
-            </MuiLink>
           </Typography>
         </Stack>
         <Box sx={{ position: "absolute", top: 16, right: 16 }}>
