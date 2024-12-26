@@ -1,14 +1,14 @@
 {
-  "short_name": "EduApp",
-  "name": "Education App",
+  "short_name": "넛지EDU",
+  "name": "넛지EDU",
   "icons": [
     {
-      "src": "icon.png",
+      "src": "nudge-logo.png",
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "large-icon.png",
+      "src": "nudge-logo.png",
       "sizes": "512x512",
       "type": "image/png"
     }

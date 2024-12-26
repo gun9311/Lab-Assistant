@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   Modal,
   Box,
@@ -21,21 +21,14 @@ import {
   Tab,
   Snackbar,
   Alert,
-} from '@mui/material';
-import ErrorIcon from '@mui/icons-material/Error';
-
-// type UnifiedModalProps = {
-//   open: boolean;
-//   onClose: () => void;
-//   onSubmitCreate: (studentData: any) => void;
-//   onSubmitReset: (studentId: string) => void;
-//   school: string | null;
-// };
+  Tooltip,
+} from "@mui/material";
+import ErrorIcon from "@mui/icons-material/Error";
+import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
 
 // 타입 정의
 type CreateResult = {
   success: boolean;
-  // message?: string;
   message: string;
   missingNameIndexes?: number[];
 };
@@ -52,6 +45,7 @@ type FieldErrors = {
   grade: boolean;
   class: boolean;
   names: boolean[];
+  uniqueIdentifier: boolean;
 };
 
 const UnifiedModal: React.FC<UnifiedModalProps> = ({
@@ -62,40 +56,42 @@ const UnifiedModal: React.FC<UnifiedModalProps> = ({
   school,
 }) => {
   const [activeTab, setActiveTab] = useState(0); // 0: 계정 생성, 1: 비밀번호 재설정
-  const [commonGrade, setCommonGrade] = useState('');
-  const [commonClass, setCommonClass] = useState('');
-  const [studentId, setStudentId] = useState('');
+  const [commonGrade, setCommonGrade] = useState("");
+  const [commonClass, setCommonClass] = useState("");
+  const [studentId, setStudentId] = useState("");
+  const [uniqueIdentifier, setUniqueIdentifier] = useState(""); // 고유 식별자 상태 추가
   const initialStudents = Array(10)
-    .fill({ name: '', studentId: '', loginId: '', password: '' })
+    .fill({ name: "", studentId: "", loginId: "", password: "" })
     .map((student, index) => ({
       ...student,
       studentId: (index + 1).toString(),
     }));
   const [students, setStudents] = useState(initialStudents);
-  const [error, setError] = useState<string>('');
+  const [error, setError] = useState<string>("");
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({
     grade: false,
     class: false,
-    names: Array(10).fill(false)
+    names: Array(10).fill(false),
+    uniqueIdentifier: false,
   });
-  const [snackbarMessage, setSnackbarMessage] = useState('');
+  const [snackbarMessage, setSnackbarMessage] = useState("");
   const [snackbarOpen, setSnackbarOpen] = useState(false);
 
-  const schoolPrefix = school ? school.split('초등학교')[0] : 'school';
+  const schoolPrefix = school ? school.split("초등학교")[0] : "school";
 
   useEffect(() => {
     setStudents(
       initialStudents.map((student, index) => {
-        const paddedStudentId = (index + 1).toString().padStart(2, '0');
+        const paddedStudentId = (index + 1).toString().padStart(2, "0");
         return {
           ...student,
           studentId: (index + 1).toString(),
-          loginId: `${schoolPrefix}${commonGrade}${commonClass}${paddedStudentId}`,
-          password: '123',
+          loginId: `${uniqueIdentifier}${schoolPrefix}${commonGrade}${commonClass}${paddedStudentId}`, // 고유 식별자 추가
+          password: "123",
         };
       })
     );
-  }, [commonGrade, commonClass, schoolPrefix]);
+  }, [commonGrade, commonClass, schoolPrefix, uniqueIdentifier]); // uniqueIdentifier 추가
 
   const handleStudentChange = (index: number, field: string, value: string) => {
     const updatedStudents = [...students];
@@ -105,15 +101,15 @@ const UnifiedModal: React.FC<UnifiedModalProps> = ({
 
   const handleAddStudent = () => {
     const maxId = Math.max(
-      ...students.map((student) => parseInt(student.studentId || '0', 10))
+      ...students.map((student) => parseInt(student.studentId || "0", 10))
     );
     const newStudentId = (maxId + 1).toString();
-    const paddedStudentId = newStudentId.padStart(2, '0');
+    const paddedStudentId = newStudentId.padStart(2, "0");
     const newStudent = {
-      name: '',
+      name: "",
       studentId: newStudentId,
       loginId: `${schoolPrefix}${commonGrade}${commonClass}${paddedStudentId}`,
-      password: '123',
+      password: "123",
     };
     setStudents([...students, newStudent]);
   };
@@ -124,14 +120,15 @@ const UnifiedModal: React.FC<UnifiedModalProps> = ({
   };
 
   const handleSubmitCreate = async () => {
-    // 학년과 반이 선택되지 않았을 경우 검증
-    if (!commonGrade || !commonClass) {
-      setFieldErrors(prev => ({
+    // 학년, 반, 식별코드가 선택되지 않았을 경우 검증
+    if (!commonGrade || !commonClass || !uniqueIdentifier) {
+      setFieldErrors((prev) => ({
         ...prev,
         grade: !commonGrade,
-        class: !commonClass
+        class: !commonClass,
+        uniqueIdentifier: !uniqueIdentifier,
       }));
-      setSnackbarMessage('학년과 반을 선택해주세요.');
+      setSnackbarMessage("식별코드, 학년, 반을 모두 입력해주세요.");
       setSnackbarOpen(true);
       return;
     }
@@ -144,17 +141,17 @@ const UnifiedModal: React.FC<UnifiedModalProps> = ({
     }));
 
     const result = await onSubmitCreate(studentData);
-    
+
     if (!result.success) {
       if (result.missingNameIndexes) {
         // 이름 필드 오류 표시
         const newNameErrors = Array(students.length).fill(false);
-        result.missingNameIndexes.forEach(index => {
+        result.missingNameIndexes.forEach((index) => {
           newNameErrors[index - 1] = true;
         });
-        setFieldErrors(prev => ({
+        setFieldErrors((prev) => ({
           ...prev,
-          names: newNameErrors
+          names: newNameErrors,
         }));
       }
       setSnackbarMessage(result.message);
@@ -172,23 +169,53 @@ const UnifiedModal: React.FC<UnifiedModalProps> = ({
 
   const handleResetStudents = () => {
     setStudents(initialStudents);
-    setCommonGrade('');
-    setCommonClass('');
+    setCommonGrade("");
+    setCommonClass("");
+    setUniqueIdentifier("");
+    setFieldErrors({
+      grade: false,
+      class: false,
+      names: Array(10).fill(false),
+      uniqueIdentifier: false,
+    });
+  };
+
+  // 학년 변경 시 오류 상태 초기화
+  const handleGradeChange = (value: string) => {
+    setCommonGrade(value);
+    setFieldErrors({
+      grade: false,
+      class: false,
+      names: Array(10).fill(false),
+      uniqueIdentifier: false,
+    });
+  };
+
+  // 반 변경 시 오류 상태 초기화
+  const handleClassChange = (value: string) => {
+    setCommonClass(value);
+    setFieldErrors({
+      grade: false,
+      class: false,
+      names: Array(10).fill(false),
+      uniqueIdentifier: false,
+    });
   };
 
   return (
     <Modal open={open} onClose={onClose}>
       <Box
         sx={{
-          position: 'absolute',
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
+          position: "absolute",
+          top: "50%",
+          left: "50%",
+          transform: "translate(-50%, -50%)",
           padding: 4,
-          backgroundColor: 'white',
-          maxWidth: 800,
-          maxHeight: '80vh',
-          overflowY: 'auto',
+          backgroundColor: "white",
+          width: "60%", // 가로 넓이를 80%로 설정
+          maxWidth: 1200,
+          maxHeight: "80vh",
+          overflowY: "auto",
           borderRadius: 2,
           boxShadow: 3,
         }}
@@ -207,21 +234,55 @@ const UnifiedModal: React.FC<UnifiedModalProps> = ({
 
         {activeTab === 0 && (
           <Box>
-            <Box sx={{ 
-              display: 'flex', 
-              justifyContent: 'space-between', 
-              alignItems: 'center', 
-              marginBottom: 2 
-            }}>
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <FormControl sx={{ minWidth: 120, marginRight: 2 }}>
+            <Box
+              sx={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: 2,
+              }}
+            >
+              <Box sx={{ display: "flex", alignItems: "center" }}>
+                <TextField
+                  label="식별코드"
+                  value={uniqueIdentifier}
+                  onChange={(e) => {
+                    setUniqueIdentifier(e.target.value);
+                    if (fieldErrors.uniqueIdentifier) {
+                      setFieldErrors((prev) => ({
+                        ...prev,
+                        uniqueIdentifier: false,
+                      }));
+                    }
+                  }}
+                  error={fieldErrors.uniqueIdentifier}
+                  placeholder="예: 숫자"
+                  sx={{ width: 120, marginRight: 2 }}
+                  InputProps={{
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <Tooltip
+                          title={
+                            <Typography
+                              variant="body1"
+                              sx={{ fontSize: "1rem" }}
+                            >
+                              임의의 식별코드(문자, 숫자, 기호)를 입력해주세요.
+                              학생 계정의 식별을 목적으로 하며, 아이디의 앞부분으로 설정됩니다. 
+                            </Typography>
+                          }
+                        >
+                          <HelpOutlineIcon />
+                        </Tooltip>
+                      </InputAdornment>
+                    ),
+                  }}
+                />
+                <FormControl sx={{ minWidth: 100, marginRight: 2 }}>
                   <InputLabel error={fieldErrors.grade}>학년</InputLabel>
                   <Select
                     value={commonGrade}
-                    onChange={(e) => {
-                      setCommonGrade(e.target.value);
-                      setFieldErrors(prev => ({ ...prev, grade: false }));
-                    }}
+                    onChange={(e) => handleGradeChange(e.target.value)}
                     label="학년"
                     error={fieldErrors.grade}
                   >
@@ -231,44 +292,46 @@ const UnifiedModal: React.FC<UnifiedModalProps> = ({
                     <MenuItem value={6}>6</MenuItem>
                   </Select>
                 </FormControl>
-                <TextField
-                  value={commonClass}
-                  onChange={(e) => {
-                    setCommonClass(e.target.value);
-                    setFieldErrors(prev => ({ ...prev, class: false }));
-                  }}
-                  error={fieldErrors.class}
-                  sx={{ width: 100 }}
-                  InputProps={{
-                    endAdornment: (
-                      <>
-                        {fieldErrors.class && <ErrorIcon color="error" sx={{ mr: 1 }} />}
+                <Box sx={{ display: "flex", alignItems: "center" }}>
+                  <TextField
+                    value={commonClass}
+                    onChange={(e) => handleClassChange(e.target.value)}
+                    error={fieldErrors.class}
+                    sx={{ width: 100 }}
+                    InputProps={{
+                      endAdornment: (
                         <InputAdornment position="end">반</InputAdornment>
-                      </>
-                    ),
-                  }}
-                />
+                      ),
+                    }}
+                  />
+                  {fieldErrors.class && (
+                    <ErrorIcon color="error" sx={{ ml: 1 }} />
+                  )}
+                </Box>
               </Box>
               <Box>
-                <Button 
-                  onClick={handleSubmitCreate} 
-                  variant="contained" 
-                  color="success" 
+                <Button
+                  onClick={handleSubmitCreate}
+                  variant="contained"
+                  color="success"
                   sx={{ marginLeft: 2 }}
                 >
                   저장
                 </Button>
-                <Button 
-                  onClick={handleResetStudents} 
-                  variant="outlined" 
-                  color="secondary" 
+                <Button
+                  onClick={handleResetStudents}
+                  variant="outlined"
+                  color="secondary"
                   sx={{ marginLeft: 2 }}
                 >
                   초기화
                 </Button>
               </Box>
             </Box>
-            <TableContainer component={Paper} sx={{ maxHeight: 400, overflowY: 'auto', marginBottom: 2 }}>
+            <TableContainer
+              component={Paper}
+              sx={{ maxHeight: 400, overflowY: "auto", marginBottom: 2 }}
+            >
               <Table stickyHeader>
                 <TableHead>
                   <TableRow>
@@ -287,14 +350,14 @@ const UnifiedModal: React.FC<UnifiedModalProps> = ({
                         <TextField
                           value={student.name}
                           onChange={(e) => {
-                            handleStudentChange(index, 'name', e.target.value);
+                            handleStudentChange(index, "name", e.target.value);
                             // 입력 시 해당 필드의 오류 상태 제거
                             if (fieldErrors.names[index]) {
                               const newNameErrors = [...fieldErrors.names];
                               newNameErrors[index] = false;
-                              setFieldErrors(prev => ({
+                              setFieldErrors((prev) => ({
                                 ...prev,
-                                names: newNameErrors
+                                names: newNameErrors,
                               }));
                             }
                           }}
@@ -318,22 +381,22 @@ const UnifiedModal: React.FC<UnifiedModalProps> = ({
                       </TableCell>
                     </TableRow>
                   ))}
-                  <TableRow 
-                    hover 
+                  <TableRow
+                    hover
                     onClick={handleAddStudent}
-                    sx={{ 
-                      cursor: 'pointer',
-                      '&:hover': { 
-                        backgroundColor: 'rgba(0, 0, 0, 0.04)'
-                      }
+                    sx={{
+                      cursor: "pointer",
+                      "&:hover": {
+                        backgroundColor: "rgba(0, 0, 0, 0.04)",
+                      },
                     }}
                   >
                     <TableCell colSpan={5} align="center">
-                      <Button 
-                        fullWidth 
-                        sx={{ 
-                          color: 'text.secondary',
-                          '&:hover': { backgroundColor: 'transparent' }
+                      <Button
+                        fullWidth
+                        sx={{
+                          color: "text.secondary",
+                          "&:hover": { backgroundColor: "transparent" },
                         }}
                       >
                         + 학생 추가
@@ -348,8 +411,8 @@ const UnifiedModal: React.FC<UnifiedModalProps> = ({
 
         {activeTab === 1 && (
           <Box>
-            <Typography variant="h6" gutterBottom>
-              교사의 이메일로 재설정 링크가 전송됩니다.
+            <Typography variant="body1" gutterBottom>
+              학생 계정의 아이디를 입력하세요. 교사의 이메일로 재설정 링크가 전송됩니다.
             </Typography>
             <TextField
               fullWidth
@@ -358,22 +421,28 @@ const UnifiedModal: React.FC<UnifiedModalProps> = ({
               onChange={(e) => setStudentId(e.target.value)}
               sx={{ marginBottom: 2 }}
             />
-            <Button onClick={handleSubmitReset} variant="contained" color="primary">
-              재설정
-            </Button>
+            <Box display="flex" justifyContent="center">
+              <Button
+                onClick={handleSubmitReset}
+                variant="contained"
+                color="primary"
+              >
+                재설정
+              </Button>
+            </Box>
           </Box>
         )}
 
         {error && (
-          <Typography 
-            color="error" 
-            sx={{ 
-              mt: 2, 
-              mb: 2, 
-              padding: 2, 
-              backgroundColor: '#ffebee',
+          <Typography
+            color="error"
+            sx={{
+              mt: 2,
+              mb: 2,
+              padding: 2,
+              backgroundColor: "#ffebee",
               borderRadius: 1,
-              textAlign: 'center'
+              textAlign: "center",
             }}
           >
             {error}
@@ -383,12 +452,12 @@ const UnifiedModal: React.FC<UnifiedModalProps> = ({
           open={snackbarOpen}
           autoHideDuration={6000}
           onClose={() => setSnackbarOpen(false)}
-          anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+          anchorOrigin={{ vertical: "top", horizontal: "center" }}
         >
-          <Alert 
-            onClose={() => setSnackbarOpen(false)} 
-            severity="error" 
-            sx={{ width: '100%' }}
+          <Alert
+            onClose={() => setSnackbarOpen(false)}
+            severity="error"
+            sx={{ width: "100%" }}
           >
             {snackbarMessage}
           </Alert>

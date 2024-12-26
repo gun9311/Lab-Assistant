@@ -19,13 +19,20 @@ import {
 import QuizIcon from "@mui/icons-material/Quiz"; // 전체 퀴즈 아이콘
 import PersonIcon from "@mui/icons-material/Person"; // 내 퀴즈 아이콘
 import { useNavigate } from "react-router-dom";
-import { getQuizzes, deleteQuiz, getQuizById, getUnits, duplicateQuiz } from "../../../utils/quizApi";
+import {
+  getQuizzes,
+  deleteQuiz,
+  getQuizById,
+  getUnits,
+  duplicateQuiz,
+} from "../../../utils/quizApi";
 import QuizCard from "./components/QuizCard";
 import QuizFilter from "./components/QuizFilter";
 import CloseIcon from "@mui/icons-material/Close";
 import AddIcon from "@mui/icons-material/Add"; // 추가된 아이콘
 import api from "../../../utils/api";
-import background from '../../../../src/assets/background-logo.webp';
+// import background from '../../../../src/assets/background-logo.webp';
+import background from "../../../../src/assets/nudge-background2-edit.png";
 import { Quiz } from "./types";
 import QuizContainer from "../quiz/QuizContainer";
 import { getUserId } from "../../../utils/auth";
@@ -80,7 +87,15 @@ const ManageQuizzesPage: React.FC = () => {
       }
     };
     fetchQuizzes();
-  }, [page, gradeFilter, semesterFilter, subjectFilter, unitFilter, sortBy, isMyQuizzes]);
+  }, [
+    page,
+    gradeFilter,
+    semesterFilter,
+    subjectFilter,
+    unitFilter,
+    sortBy,
+    isMyQuizzes,
+  ]);
 
   useEffect(() => {
     setPage(1);
@@ -90,7 +105,11 @@ const ManageQuizzesPage: React.FC = () => {
     if (gradeFilter && semesterFilter && subjectFilter) {
       const fetchUnits = async () => {
         try {
-          const { units } = await getUnits(gradeFilter.toString(), semesterFilter, subjectFilter);
+          const { units } = await getUnits(
+            gradeFilter.toString(),
+            semesterFilter,
+            subjectFilter
+          );
           setUnits(units);
         } catch (err) {
           setError("단원 목록을 가져오는 중 오류가 발생했습니다.");
@@ -114,10 +133,14 @@ const ManageQuizzesPage: React.FC = () => {
     if (selectedQuiz.createdBy === userId) {
       navigate(`/edit-quiz/${selectedQuiz._id}`);
     } else {
-      const confirmClone = window.confirm("수정하려면 퀴즈를 복제해야 합니다. 복제하시겠습니까?");
+      const confirmClone = window.confirm(
+        "수정하려면 퀴즈를 복제해야 합니다. 복제하시겠습니까?"
+      );
       if (confirmClone) {
         try {
-          const { quizId: duplicatedQuizId } = await duplicateQuiz(selectedQuiz._id);
+          const { quizId: duplicatedQuizId } = await duplicateQuiz(
+            selectedQuiz._id
+          );
           alert("복제된 퀴즈는 '내 퀴즈'에서 확인할 수 있습니다.");
           navigate(`/edit-quiz/${duplicatedQuizId}`);
         } catch (error) {
@@ -175,11 +198,12 @@ const ManageQuizzesPage: React.FC = () => {
   };
 
   return (
-    <Box sx={{ padding: "2rem", backgroundColor: "#ffffff", minHeight: "100vh" }}>
+    <Box sx={{ maxWidth: "1200px", margin: "0 auto", padding: "2rem" }}>
       <Paper
         elevation={3}
         sx={{
           padding: "2rem",
+          paddingTop: "1.2rem",
           paddingBottom: "0",
           marginBottom: "2rem",
           borderRadius: "16px",
@@ -188,14 +212,19 @@ const ManageQuizzesPage: React.FC = () => {
           backgroundSize: "cover",
           backgroundPosition: "center",
           position: "relative",
-          minHeight: "280px",
+          minHeight: "300px",
           display: "flex",
           flexDirection: "column",
           justifyContent: "space-between",
         }}
       >
         {/* 탭 형식으로 변경 */}
-        <Box display="flex" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+        <Box
+          display="flex"
+          justifyContent="space-between"
+          alignItems="center"
+          sx={{ mb: 2 }}
+        >
           <Tabs
             value={isMyQuizzes ? 1 : 0}
             onChange={(event, newValue) => {
@@ -277,9 +306,17 @@ const ManageQuizzesPage: React.FC = () => {
       </Paper>
 
       {/* 기존 코드 유지 */}
-      <Paper elevation={3} sx={{ p: 3, borderRadius: "16px", backgroundColor: "#ffffff" }}>
+      <Paper
+        elevation={3}
+        sx={{ p: 3, borderRadius: "16px", backgroundColor: "#ffffff" }}
+      >
         {loading ? (
-          <Box display="flex" justifyContent="center" alignItems="center" height="50vh">
+          <Box
+            display="flex"
+            justifyContent="center"
+            alignItems="center"
+            height="50vh"
+          >
             <CircularProgress color="primary" />
           </Box>
         ) : (
@@ -313,27 +350,40 @@ const ManageQuizzesPage: React.FC = () => {
         sx={{ display: "flex", justifyContent: "center", marginTop: "2rem" }}
       />
 
-      <Snackbar open={!!error || !!successMessage} autoHideDuration={6000} onClose={handleCloseSnackbar}>
-        <Alert onClose={handleCloseSnackbar} severity={error ? "error" : "success"} sx={{ width: "100%" }}>
+      <Snackbar
+        open={!!error || !!successMessage}
+        autoHideDuration={6000}
+        onClose={handleCloseSnackbar}
+      >
+        <Alert
+          onClose={handleCloseSnackbar}
+          severity={error ? "error" : "success"}
+          sx={{ width: "100%" }}
+        >
           {error || successMessage}
         </Alert>
       </Snackbar>
 
-      <Dialog open={isModalOpen} onClose={handleCloseModal} maxWidth="md" fullWidth>
+      <Dialog
+        open={isModalOpen}
+        onClose={handleCloseModal}
+        maxWidth="md"
+        fullWidth
+      >
         {/* <DialogTitle>
           퀴즈 확인 */}
-          <IconButton
-            aria-label="close"
-            onClick={handleCloseModal}
-            sx={{
-              position: "absolute",
-              right: 8,
-              top: 8,
-              color: (theme) => theme.palette.grey[500],
-            }}
-          >
-            <CloseIcon />
-          </IconButton>
+        <IconButton
+          aria-label="close"
+          onClick={handleCloseModal}
+          sx={{
+            position: "absolute",
+            right: 8,
+            top: 8,
+            color: (theme) => theme.palette.grey[500],
+          }}
+        >
+          <CloseIcon />
+        </IconButton>
         {/* </DialogTitle> */}
         <DialogContent>
           {selectedQuiz && (
