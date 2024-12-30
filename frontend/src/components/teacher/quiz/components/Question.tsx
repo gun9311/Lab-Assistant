@@ -3,6 +3,7 @@ import { Box, Typography, LinearProgress } from "@mui/material";
 import TimerIcon from "@mui/icons-material/Timer"; // 시계 모양 타이머 아이콘
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import CancelIcon from "@mui/icons-material/Cancel";
+import DonutChartComponent from "./DonutChartComponent";
 
 interface Question {
   _id: string;
@@ -64,7 +65,7 @@ const QuestionComponent: React.FC<QuestionComponentProps> = ({
     <Box
       sx={{
         width: "100%",
-        maxWidth: "90%",
+        maxWidth: "95%",
         textAlign: "center",
         color: "#fff",
         padding: "2vh 1vw",
@@ -77,7 +78,7 @@ const QuestionComponent: React.FC<QuestionComponentProps> = ({
           alt="문제 이미지"
           style={{
             maxWidth: "100%",
-            maxHeight: "50vh",
+            maxHeight: "40vh",
             marginBottom: "2vh",
             borderRadius: "8px",
           }}
@@ -92,6 +93,8 @@ const QuestionComponent: React.FC<QuestionComponentProps> = ({
           alignItems: "center",
           gap: "1vw",
           marginBottom: "2vh",
+          maxHeight: "40vh",
+          overflow: "auto",
         }}
       >
         <Typography
@@ -102,7 +105,7 @@ const QuestionComponent: React.FC<QuestionComponentProps> = ({
             backgroundColor: "rgba(0, 0, 0, 0.7)",
             padding: "1vh 2vw",
             borderRadius: "8px",
-            fontSize: "3vw",
+            fontSize: "5vw",
           }}
         >
           {currentQuestion?.questionText || "현재 출제된 문제가 없습니다."}
@@ -120,7 +123,7 @@ const QuestionComponent: React.FC<QuestionComponentProps> = ({
               variant="h6"
               sx={{
                 color: remainingTime <= 5 ? "red" : "white",
-                fontSize: "2vw",
+                fontSize: "3vw",
               }}
             >
               {`${remainingTime}s`}
@@ -166,6 +169,8 @@ const QuestionComponent: React.FC<QuestionComponentProps> = ({
                   boxShadow: allSubmitted
                     ? "0px 4px 8px rgba(0, 0, 0, 0.2)"
                     : "none",
+                  maxHeight: "15vh",
+                  overflow: "auto",
                 }}
               >
                 {option.imageUrl && (
@@ -222,24 +227,19 @@ const QuestionComponent: React.FC<QuestionComponentProps> = ({
 
       {/* 제출 진행 상황 표시 */}
       {!allSubmitted && (
-        <Box sx={{ marginTop: "2vh" }}>
-          <Typography variant="body1" sx={{ marginBottom: "0.5vh" }}>
-            제출한 학생 수: {submittedCount}/{totalStudents}
+        <Box sx={{ marginTop: "2vh", textAlign: "center" }}>
+          <Typography
+            variant="body1"
+            sx={{ marginBottom: "1vh", fontWeight: "bold", fontSize: "1.5vw" }}
+          >
+            제출 현황: {submittedCount}/{totalStudents}
           </Typography>
-          <LinearProgress
-            variant="determinate"
-            value={submissionProgress}
-            sx={{
-              height: "1vh",
-              borderRadius: "5px",
-              backgroundColor: "#e0e0e0",
-              "& .MuiLinearProgress-bar": {
-                backgroundColor: "#4caf50",
-              },
-              width: "50%",
-              margin: "0 auto",
-            }}
-          />
+          <Box sx={{ width: "10%", margin: "0 auto" }}>
+            <DonutChartComponent
+              submittedCount={submittedCount}
+              totalStudents={totalStudents}
+            />
+          </Box>
         </Box>
       )}
     </Box>

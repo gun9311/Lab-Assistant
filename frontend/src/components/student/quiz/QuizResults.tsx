@@ -91,12 +91,12 @@ const QuizResults: React.FC<QuizResultsProps> = ({
 
   useEffect(() => {
     const fetchQuizResults = async () => {
-      console.log(studentId);
+      // console.log(studentId);
       if (studentId) {
         setLoading(true);
         try {
           const response = await api.get(`/quiz-results/${studentId}`);
-          console.log('API 호출 성공:', response.data);
+          // console.log('API 호출 성공:', response.data);
           setQuizResults(response.data);
           setNoData(response.data.length === 0);
         } catch (err) {
@@ -109,7 +109,7 @@ const QuizResults: React.FC<QuizResultsProps> = ({
       }
     };
     fetchQuizResults();
-    console.log('퀴즈결과 호출');
+    // console.log('퀴즈결과 호출');
   }, [studentId]);
 
   const results = studentId ? quizResults : filteredResults || [];

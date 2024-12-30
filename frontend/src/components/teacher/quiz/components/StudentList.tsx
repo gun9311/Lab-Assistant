@@ -136,7 +136,7 @@ const StudentListComponent: React.FC<StudentListComponentProps> = ({
                     padding: "1vh 2vw",
                   }}
                 >
-                  퀴즈 종료
+                  결과 저장 및 종료
                 </Button>
                 <Button
                   variant="outlined"
