@@ -1,14 +1,28 @@
 // QuizSessionPage.tsx
 
 import React, { useState, useEffect } from "react";
-import { Box, Typography, Button, Chip } from "@mui/material";
+import {
+  Box,
+  Typography,
+  Button,
+  Chip,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
+  IconButton,
+} from "@mui/material";
 import { useNavigate, useLocation } from "react-router-dom";
+import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import { getToken } from "../../../utils/auth";
 import StudentListComponent from "./components/StudentList";
 import QuestionComponent from "./components/Question";
 import ResultComponent from "./components/Result";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
+import FullscreenIcon from "@mui/icons-material/Fullscreen";
 // import backgroundImage from '../../../assets/quiz_show_background.png';
+import "./QuizSession.css";
 const backgroundImages = [
   // require('../../../assets/quiz-theme/quiz_theme1.webp'),
   // require('../../../assets/quiz-theme/quiz_theme2.webp'),
@@ -58,8 +72,13 @@ type Feedback = {
   rank: number;
 };
 
-const QuizSessionPage = () => {
+const QuizSessionPage = ({
+  setIsQuizMode,
+}: {
+  setIsQuizMode: (value: boolean) => void;
+}) => {
   const location = useLocation();
+  const navigate = useNavigate();
   const { pin } = location.state;
   const [students, setStudents] = useState<Student[]>([]);
   const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null);
@@ -80,11 +99,17 @@ const QuizSessionPage = () => {
     backgroundImages[0]
   ); // 초기값 설정
   const [endTime, setEndTime] = useState<number | null>(null);
-  const navigate = useNavigate();
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState<number>(0); // 현재 문제 번호 상태 추가
+  const [totalQuestions, setTotalQuestions] = useState<number>(0); // 총 문제 수 상태 추가
 
   const socketRef = React.useRef<WebSocket | null>(null);
 
+  const [openConfirmDialog, setOpenConfirmDialog] = useState(false);
+  const [confirmMessage, setConfirmMessage] = useState("");
+
   useEffect(() => {
+    setIsQuizMode(true);
+
     const randomImage =
       backgroundImages[Math.floor(Math.random() * backgroundImages.length)];
     setBackgroundImage(randomImage);
@@ -119,6 +144,8 @@ const QuizSessionPage = () => {
         setTotalStudents((prevCount) => prevCount - 1);
         console.log(`Student ${message.name} disconnected`);
       } else if (message.type === "quizStartingSoon") {
+        setTotalQuestions(message.totalQuestions); // 총 문제 수 설정
+        setCurrentQuestionIndex(1); // 첫 번째 문제로 설정
         setIsQuizStarting(true);
       } else if (message.type === "quizStarted") {
         setIsQuizStarting(false);
@@ -127,6 +154,7 @@ const QuizSessionPage = () => {
         setCurrentQuestion(message.currentQuestion);
         setEndTime(message.endTime);
       } else if (message.type === "preparingNextQuestion") {
+        setCurrentQuestionIndex((prevIndex) => prevIndex + 1); // 다음 문제로 인덱스 증가
         setIsPreparingNextQuestion(true);
         setIsLastQuestion(message.isLastQuestion);
         setCurrentQuestion(null);
@@ -179,6 +207,11 @@ const QuizSessionPage = () => {
       } else if (message.type === "detailedResults") {
         setQuizResults(message.results);
         setIsViewingResults(true);
+      } else if (message.type === "sessionEnded") {
+        navigate("/manage-quizzes");
+      } else if (message.type === "noStudentsRemaining") {
+        setConfirmMessage(message.message);
+        setOpenConfirmDialog(true);
       }
     };
 
@@ -188,8 +221,16 @@ const QuizSessionPage = () => {
 
     return () => {
       socket.close();
+      setIsQuizMode(false);
+      if (document.fullscreenElement) {
+        document.exitFullscreen().catch((err) => {
+          console.error(
+            `Error exiting full-screen mode: ${err.message} (${err.name})`
+          );
+        });
+      }
     };
-  }, [pin]);
+  }, [pin, setIsQuizMode]);
 
   useEffect(() => {
     const allReady =
@@ -222,7 +263,7 @@ const QuizSessionPage = () => {
     if (socketRef.current) {
       socketRef.current.send(JSON.stringify({ type: "endQuiz" }));
       setIsSessionActive(false);
-      navigate("/manage-quizzes");
+      // navigate("/manage-quizzes");
     }
   };
 
@@ -232,11 +273,35 @@ const QuizSessionPage = () => {
     }
   };
 
+  const handleConfirmClose = (confirm: boolean) => {
+    setOpenConfirmDialog(false);
+    if (confirm) {
+      if (isLastQuestion && allSubmitted) {
+        handleEndQuiz(); // 마지막 문제를 모두 풀었다면 세션 종료
+      } else {
+        navigate("/manage-quizzes"); // 그렇지 않다면 바로 이동
+      }
+    }
+  };
+
+  const handleFullscreenToggle = () => {
+    const elem = document.documentElement;
+    if (!document.fullscreenElement) {
+      elem.requestFullscreen().catch((err) => {
+        console.error(
+          `Error attempting to enable full-screen mode: ${err.message} (${err.name})`
+        );
+      });
+    } else {
+      document.exitFullscreen();
+    }
+  };
+
   return (
     <Box
       sx={{
-        height: "94vh",
-        width: "85vw",
+        height: "100vh",
+        width: "100%",
         backgroundImage: `url(${backgroundImage})`,
         backgroundSize: "cover",
         backgroundPosition: "center",
@@ -244,10 +309,45 @@ const QuizSessionPage = () => {
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "flex-start",
-        padding: "1rem",
-        margin: "0 auto", // 수평 중앙 정렬
+        padding: "0",
+        margin: "0",
+        boxSizing: "border-box",
       }}
     >
+      <IconButton
+        onClick={() => navigate("/manage-quizzes")}
+        sx={{
+          position: "absolute",
+          top: "2vw",
+          left: "3vw",
+          zIndex: 1000,
+          color: "white",
+          backgroundColor: "rgba(0, 0, 0, 0.5)",
+          "&:hover": {
+            backgroundColor: "rgba(0, 0, 0, 0.7)",
+          },
+        }}
+      >
+        <ArrowBackIcon />
+      </IconButton>
+
+      <IconButton
+        onClick={handleFullscreenToggle}
+        sx={{
+          position: "absolute",
+          top: "2vw",
+          right: "3vw",
+          zIndex: 1000,
+          color: "white",
+          backgroundColor: "rgba(0, 0, 0, 0.5)",
+          "&:hover": {
+            backgroundColor: "rgba(0, 0, 0, 0.7)",
+          },
+        }}
+      >
+        <FullscreenIcon />
+      </IconButton>
+
       {isViewingResults ? (
         <ResultComponent
           quizResults={quizResults}
@@ -274,25 +374,63 @@ const QuizSessionPage = () => {
           )}
 
           {isQuizStarting && (
-            <Box>
+            <Box
+              sx={{
+                position: "absolute",
+                top: "50%",
+                left: "50%",
+                transform: "translate(-50%, -50%)",
+                textAlign: "center",
+                backgroundColor: "rgba(0, 0, 0, 0.7)", // 배경색 추가
+                padding: "1rem 2rem", // 패딩 추가
+                borderRadius: "12px", // 모서리 둥글게
+                border: "2px solid #FFD700", // 테두리 추가
+                animation: "fadeIn 1s ease-in-out", // 애니메이션 추가
+              }}
+            >
               <Typography
-                variant="h5"
-                sx={{ fontWeight: "bold", color: "#f44336" }}
+                variant="h2"
+                sx={{
+                  fontWeight: "bold",
+                  color: "#FFD700", // 밝고 대조적인 색상
+                  fontFamily: "'Fredoka One', cursive", // 활기찬 글씨체
+                  fontSize: "7vw", // 더 큰 글씨 크기
+                  textShadow: "2px 2px 4px #000000", // 그림자 효과
+                  animation: "bounce 1.5s infinite", // 애니메이션 추가
+                }}
               >
-                퀴즈가 곧 시작됩니다...
+                {currentQuestionIndex}/{totalQuestions}
               </Typography>
             </Box>
           )}
 
           {isPreparingNextQuestion && (
-            <Box>
+            <Box
+              sx={{
+                position: "absolute",
+                top: "50%",
+                left: "50%",
+                transform: "translate(-50%, -50%)",
+                textAlign: "center",
+                backgroundColor: "rgba(0, 0, 0, 0.7)", // 배경색 추가
+                padding: "1rem 2rem", // 패딩 추가
+                borderRadius: "12px", // 모서리 둥글게
+                border: "2px solid #FFD700", // 테두리 추가
+                animation: "fadeIn 1s ease-in-out", // 애니메이션 추가
+              }}
+            >
               <Typography
-                variant="h5"
-                sx={{ fontWeight: "bold", color: "#2196f3" }}
+                variant="h2"
+                sx={{
+                  fontWeight: "bold",
+                  color: "#FFD700", // 밝고 대조적인 색상
+                  fontFamily: "'Fredoka One', cursive", // 활기찬 글씨체
+                  fontSize: "7vw", // 큰 글씨 크기
+                  textShadow: "2px 2px 4px #000000", // 그림자 효과
+                  animation: "bounce 1.5s infinite", // 애니메이션 추가
+                }}
               >
-                {isLastQuestion
-                  ? "마지막 문제입니다..."
-                  : "다음 문제가 곧 출제됩니다..."}
+                {currentQuestionIndex}/{totalQuestions}
               </Typography>
             </Box>
           )}
@@ -305,7 +443,7 @@ const QuizSessionPage = () => {
                 top: "50%",
                 left: "50%",
                 transform: "translate(-50%, -50%)",
-                width: "90%",
+                width: "95%",
                 height: "100vh",
                 display: "flex",
                 justifyContent: "center",
@@ -393,6 +531,28 @@ const QuizSessionPage = () => {
           )}
         </>
       )}
+
+      <Dialog
+        open={openConfirmDialog}
+        onClose={() => handleConfirmClose(false)}
+      >
+        <DialogTitle>세션 종료</DialogTitle>
+        <DialogContent>
+          <DialogContentText>{confirmMessage}</DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => handleConfirmClose(false)} color="primary">
+            취소
+          </Button>
+          <Button
+            onClick={() => handleConfirmClose(true)}
+            color="primary"
+            autoFocus
+          >
+            확인
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

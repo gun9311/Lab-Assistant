@@ -30,6 +30,8 @@ const QuizQuestionComponent: React.FC<QuizQuestionComponentProps> = ({
     return 'error'; // 시간이 얼마 안 남았을 때 빨간색
   };
 
+  // console.log(timeLeft);
+
   return (
     <Box>
       {/* 옵션 버튼 */}

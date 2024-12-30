@@ -14,7 +14,7 @@ import {
   DialogContentText,
   DialogActions,
 } from "@mui/material";
-import QuizComponent from "./QuizComponent";
+// import QuizComponent from "./QuizComponent";
 import QuizFilter from "./QuizFilter";
 import QuizResults from "./QuizResults";
 import { getUserId } from "../../../utils/auth";
@@ -87,7 +87,7 @@ const MyQuizzesPage: React.FC<MyQuizzesPageProps> = ({ setIsQuizMode }) => {
   const navigate = useNavigate();
 
   const handleSelectionChange = (newSelection: Selection) => {
-    console.log("Selection 변경:", newSelection);
+    // console.log("Selection 변경:", newSelection);
     setSelection(newSelection);
   };
 
@@ -186,13 +186,13 @@ const MyQuizzesPage: React.FC<MyQuizzesPageProps> = ({ setIsQuizMode }) => {
           handleCloseDetails={handleCloseDetails}
           isStudentView={true}
         />
-        {currentQuiz && (
+        {/* {currentQuiz && (
           <QuizComponent
             quiz={currentQuiz}
             onSubmit={() => {}}
             onAutoSubmit={() => {}}
           />
-        )}
+        )} */}
       </Paper>
 
       <Snackbar open={!!successMessage} autoHideDuration={2000} onClose={() => setSuccessMessage(null)} anchorOrigin={{ vertical: "top", horizontal: "center" }}>

@@ -235,20 +235,20 @@ const StudentQuizSessionPage: React.FC = () => {
   };
 
   useEffect(() => {
-    if (!endTime) return;
-  
+    if (!endTime || isAnswerSubmitted) return; // 답변이 제출되면 타이머 중지
+
     const interval = setInterval(() => {
       const now = Date.now();
       const timeLeft = Math.max(0, Math.floor((endTime - now) / 1000));
       setTimeLeft(timeLeft);
-  
+
       if (timeLeft <= 0) {
         clearInterval(interval);
       }
     }, 1000);
-  
+
     return () => clearInterval(interval);
-  }, [endTime]);
+  }, [endTime, isAnswerSubmitted]); // isAnswerSubmitted 추가
 
   useEffect(() => {
     if (
@@ -312,7 +312,7 @@ const StudentQuizSessionPage: React.FC = () => {
     if (selectedAnswer || isAnswerSubmitted) return;
     setIsAnswerSubmitted(true);
 
-    console.log(index);
+    // console.log(index);
     setSelectedAnswer(index);
 
     if (webSocket && currentQuestion && startTime) {
@@ -328,7 +328,9 @@ const StudentQuizSessionPage: React.FC = () => {
       );
       setWaitingForFeedback(true);
       setIsAnswerSubmitted(true);
-      setTimeLeft(null);
+      if (timeLeft === 0) {
+        setTimeLeft(null);
+      }
     }
   };
 

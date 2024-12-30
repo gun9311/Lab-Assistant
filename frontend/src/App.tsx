@@ -169,7 +169,7 @@ const AppContent: React.FC = () => {
           <Route path="/edit-quiz/:quizId" element={<EditQuizPage />} />
           <Route
             path="/start-quiz-session"
-            element={<QuizSessionPage />}
+            element={<QuizSessionPage setIsQuizMode={setIsQuizMode} />}
           />{" "}
           {/* 퀴즈 세션 페이지 */}
           <Route
