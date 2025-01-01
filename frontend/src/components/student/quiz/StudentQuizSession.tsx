@@ -101,7 +101,7 @@ const StudentQuizSessionPage: React.FC = () => {
     }
 
     const wsUrl = process.env.REACT_APP_WEBSOCKET_URL;
-    const socket = new WebSocket(`${wsUrl}?token=${userToken}&pin=${pin}`);
+    const socket = new WebSocket(`${wsUrl}/?token=${userToken}&pin=${pin}`);
 
     socket.onopen = () => {
       console.log("웹소켓 연결 성공");
