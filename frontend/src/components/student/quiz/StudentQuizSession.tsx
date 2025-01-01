@@ -355,7 +355,7 @@ const StudentQuizSessionPage: React.FC = () => {
         sx={{
           padding: 2,
           borderRadius: "16px",
-          backgroundColor: "rgba(255, 255, 255, 0.3)",
+          backgroundColor: "rgba(255, 255, 255, 0.5)",
         }}
       >
         {!isCharacterConfirmed ? (
@@ -455,6 +455,7 @@ const StudentQuizSessionPage: React.FC = () => {
                 selectedAnswer={selectedAnswer}
                 handleAnswerSelect={handleAnswerSelect}
                 timeLeft={timeLeft}
+                isAnswerSubmitted={isAnswerSubmitted}
               />
             )}
 
@@ -462,6 +463,7 @@ const StudentQuizSessionPage: React.FC = () => {
               <QuizFeedbackComponent
                 feedbackMessage={feedbackMessage}
                 isLastQuestion={isLastQuestion}
+                score={score}
               />
             )}
 
