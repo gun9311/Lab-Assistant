@@ -169,7 +169,7 @@ const StudentLoginPage = () => {
         >
           로그인
         </Button>
-        <Button
+        {/* <Button
           fullWidth
           variant="text"
           color="secondary"
@@ -185,7 +185,7 @@ const StudentLoginPage = () => {
           }}
         >
           회원가입
-        </Button>
+        </Button> */}
         {error && (
           <Typography color="error" sx={{ mt: 2 }}>
             {error}

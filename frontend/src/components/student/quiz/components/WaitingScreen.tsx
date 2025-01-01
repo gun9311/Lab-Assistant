@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
-import { Box, Typography, CircularProgress } from '@mui/material';
-import TimerIcon from '@mui/icons-material/Timer';
+import React, { useEffect, useState } from "react";
+import { Box, Typography, CircularProgress } from "@mui/material";
+import TimerIcon from "@mui/icons-material/Timer";
+import "./WaitingScreen.css";
 
 interface WaitingScreenComponentProps {
   isReady: boolean;
@@ -21,11 +22,11 @@ const WaitingScreenComponent: React.FC<WaitingScreenComponentProps> = ({
   selectedCharacter,
   characterImages,
 }) => {
-  const [dots, setDots] = useState('');
+  const [dots, setDots] = useState("");
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setDots((prev) => (prev.length < 3 ? prev + '.' : ''));
+      setDots((prev) => (prev.length < 3 ? prev + "." : ""));
     }, 500);
 
     return () => clearInterval(interval);
@@ -38,7 +39,7 @@ const WaitingScreenComponent: React.FC<WaitingScreenComponentProps> = ({
           <img
             src={characterImages[Number(selectedCharacter)]}
             alt={`선택된 캐릭터`}
-            style={{ width: 100, height: 100, objectFit: 'contain' }}
+            style={{ width: 100, height: 100, objectFit: "contain" }}
           />
         </Box>
       )}
@@ -48,37 +49,57 @@ const WaitingScreenComponent: React.FC<WaitingScreenComponentProps> = ({
           <Typography
             variant="h5"
             sx={{
-              fontWeight: 'bold',
-              color: '#333333',
-              width: '270px',
-              margin: '0 auto',
-              textAlign: 'center',
-              fontFamily: `'Roboto', 'Helvetica', 'Arial', sans-serif`,
-              // backgroundColor: 'rgba(255, 255, 255, 0.8)',
-              padding: '10px',
-              borderRadius: '8px',
+              fontWeight: "bold",
+              color: "#007B3E",
+              fontSize: "5vw",
+              width: "270px",
+              margin: "0 auto",
+              textAlign: "center",
+              fontFamily: `'Montserrat', sans-serif`,
+              padding: "10px",
+              borderRadius: "8px",
+              animation: "fadeIn 1s ease-in-out",
+              textShadow: "2px 2px 4px rgba(0, 0, 0, 0.5)",
             }}
           >
-            퀴즈가 곧 시작됩니다
-            <span style={{ position: 'absolute' }}>{dots}</span>
+            플레이어 대기 중<span style={{ position: "absolute" }}>{dots}</span>
           </Typography>
         </Box>
       )}
       {/* 퀴즈가 곧 시작될 때 */}
       {isQuizStarting && (
         <Box>
-          <TimerIcon sx={{ fontSize: 50, color: '#f44336', mb: 2 }} />
-          <Typography variant="h5" sx={{ fontWeight: 'bold', color: '#f44336' }}>
-            퀴즈가 곧 시작됩니다...
+          <Typography
+            variant="h4"
+            sx={{
+              fontWeight: "bold",
+              fontSize: "9vw",
+              color: "#E74C3C",
+              fontFamily: "'Poppins', sans-serif",
+              textShadow: "2px 2px 6px #000000",
+            }}
+          >
+            START!
           </Typography>
         </Box>
       )}
       {/* 다음 문제를 준비 중일 때 */}
       {isPreparingNextQuestion && (
         <Box>
-          <CircularProgress sx={{ color: '#2196f3', mb: 2 }} />
-          <Typography variant="h5" sx={{ fontWeight: 'bold', color: '#2196f3' }}>
-            {isLastQuestion ? '마지막 문제입니다...' : '다음 문제가 곧 출제됩니다...'}
+          <CircularProgress sx={{ color: "#00bcd4", mb: 2 }} />
+          <Typography
+            variant="h4"
+            sx={{
+              fontWeight: "bold",
+              color: "#00bcd4",
+              fontSize: "5vw",
+              fontFamily: "'Poppins', sans-serif",
+              textShadow: "2px 2px 6px #000000",
+            }}
+          >
+            {isLastQuestion
+              ? "마지막 문제입니다..."
+              : "다음 문제가 곧 출제됩니다..."}
           </Typography>
         </Box>
       )}

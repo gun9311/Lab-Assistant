@@ -448,7 +448,7 @@ const QuizSessionPage = ({
                 display: "flex",
                 justifyContent: "center",
                 alignItems: "center",
-                opacity: isShowingFeedback ? 0.3 : 1, // 피드백 시 투명도 변화
+                opacity: isShowingFeedback ? 0.1 : 1, // 피드백 시 투명도 변화
                 transition: "opacity 0.5s ease-in-out",
                 pointerEvents: isShowingFeedback ? "none" : "auto", // 피드백 시 클릭 차단
               }}

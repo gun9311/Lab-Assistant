@@ -29,16 +29,11 @@ const getQuizResultsByStudentId = async (req, res) => {
 const getQuizDetails = async (req, res) => {
   try {
     const { quizId } = req.params;
-    const { studentId } = req.params;
-    // console.log(quizId, studentId);
-  
-    
+    const { studentId } = req.params;    
     
     // 퀴즈 결과에서 학생의 답변과 정답 여부 가져오기
     const quizResult = await QuizResult.findOne({ quizId, studentId })
       .select('results');
-    
-    // console.log(quizResult);
 
     if (!quizResult) {
       return res.status(404).json({ error: 'Quiz result not found' });
@@ -48,7 +43,6 @@ const getQuizDetails = async (req, res) => {
     const quizContent = await KahootQuizContent.findById(quizId)
       .select('questions');
 
-    // console.log(quizContent);
 
     if (!quizContent) {
       return res.status(404).json({ error: 'Quiz content not found' });
@@ -61,8 +55,8 @@ const getQuizDetails = async (req, res) => {
       if (!question || !question.options[result.studentAnswer]) {
         return {
           questionText: question ? question.questionText : '문제를 찾을 수 없음',
-          correctAnswer: '정답을 찾을 수 없음',
-          studentAnswer: '답변을 찾을 수 없음',
+          correctAnswer: question ? question.options[question.correctAnswer]?.text : '정답을 찾을 수 없음',
+          studentAnswer: '답변 없음',
           isCorrect: result.isCorrect
         };
       }
