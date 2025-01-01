@@ -116,7 +116,7 @@ const QuizSessionPage = ({
 
     const userToken = getToken();
     const wsUrl = process.env.REACT_APP_WEBSOCKET_URL;
-    const socket = new WebSocket(`${wsUrl}?token=${userToken}&pin=${pin}`);
+    const socket = new WebSocket(`${wsUrl}/?token=${userToken}&pin=${pin}`);
     socketRef.current = socket;
 
     socket.onopen = () => {
