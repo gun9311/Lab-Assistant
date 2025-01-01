@@ -50,7 +50,7 @@ const googleLogin = async (req, res) => {
     const accessToken = jwt.sign(
       { _id: teacher._id, role: teacher.role },
       process.env.JWT_SECRET,
-      { expiresIn: "15m" }
+      { expiresIn: "1h" }
     );
     const refreshToken = jwt.sign(
       { _id: teacher._id, role: teacher.role },
@@ -101,7 +101,7 @@ const completeRegistration = async (req, res) => {
     const accessToken = jwt.sign(
       { _id: teacher._id, role: teacher.role },
       process.env.JWT_SECRET,
-      { expiresIn: "15m" }
+      { expiresIn: "1h" }
     );
     const refreshToken = jwt.sign(
       { _id: teacher._id, role: teacher.role },
@@ -166,7 +166,7 @@ const login = async (req, res) => {
     const accessToken = jwt.sign(
       { _id: user._id, role: user.role },
       process.env.JWT_SECRET,
-      { expiresIn: "15m" }
+      { expiresIn: "1h" }
     );
     const refreshToken = jwt.sign(
       { _id: user._id, role: user.role },
@@ -228,7 +228,7 @@ const refreshAccessToken = async (req, res) => {
     const newAccessToken = jwt.sign(
       { _id: decoded._id, role: decoded.role },
       process.env.JWT_SECRET,
-      { expiresIn: "15m" }
+      { expiresIn: "1h" }
     );
     res.send({ accessToken: newAccessToken });
   } catch (error) {
