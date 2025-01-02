@@ -112,22 +112,57 @@ const QuestionComponent: React.FC<QuestionComponentProps> = ({
         </Typography>
         {/* 시계 모양 타이머 아이콘 */}
         {currentQuestion && (
-          <Box sx={{ display: "flex", alignItems: "center", gap: "0.5vw" }}>
-            <TimerIcon
-              sx={{
-                fontSize: "3vw",
-                color: remainingTime <= 5 ? "red" : "white",
-              }}
-            />
-            <Typography
-              variant="h6"
-              sx={{
-                color: remainingTime <= 5 ? "red" : "white",
-                fontSize: "3vw",
-              }}
-            >
-              {`${remainingTime}s`}
-            </Typography>
+          <Box
+            sx={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: "0.5vw",
+            }}
+          >
+            <Box sx={{ display: "flex", alignItems: "center", gap: "0.5vw" }}>
+              <TimerIcon
+                sx={{
+                  fontSize: "3vw",
+                  color: remainingTime <= 5 ? "red" : "white",
+                }}
+              />
+              <Typography
+                variant="h6"
+                sx={{
+                  color: remainingTime <= 5 ? "red" : "white",
+                  fontSize: "3vw",
+                }}
+              >
+                {`${remainingTime}s`}
+              </Typography>
+            </Box>
+            {/* 제출 현황 차트만 표시 */}
+            {!allSubmitted && (
+              <Box sx={{ width: "50%", margin: "0 auto" }}>
+                <DonutChartComponent
+                  submittedCount={submittedCount}
+                  totalStudents={totalStudents}
+                />
+              </Box>
+            )}
+            {/* 제출 현황 표시 */}
+            {/* {!allSubmitted && (
+              <Box sx={{ textAlign: "center" }}>
+                <Typography
+                  variant="body1"
+                  sx={{ marginBottom: "1vh", fontWeight: "bold", fontSize: "1.5vw" }}
+                >
+                  제출 현황: {submittedCount}/{totalStudents}
+                </Typography>
+                <Box sx={{ width: "5%", margin: "0 auto" }}>
+                  <DonutChartComponent
+                    submittedCount={submittedCount}
+                    totalStudents={totalStudents}
+                  />
+                </Box>
+              </Box>
+            )}     */}
           </Box>
         )}
       </Box>
@@ -222,24 +257,6 @@ const QuestionComponent: React.FC<QuestionComponentProps> = ({
               </Box>
             );
           })}
-        </Box>
-      )}
-
-      {/* 제출 진행 상황 표시 */}
-      {!allSubmitted && (
-        <Box sx={{ marginTop: "2vh", textAlign: "center" }}>
-          <Typography
-            variant="body1"
-            sx={{ marginBottom: "1vh", fontWeight: "bold", fontSize: "1.5vw" }}
-          >
-            제출 현황: {submittedCount}/{totalStudents}
-          </Typography>
-          <Box sx={{ width: "10%", margin: "0 auto" }}>
-            <DonutChartComponent
-              submittedCount={submittedCount}
-              totalStudents={totalStudents}
-            />
-          </Box>
         </Box>
       )}
     </Box>

@@ -9,3 +9,8 @@ declare module '*.webp' {
 }
 
 declare module "react-beautiful-dnd";
+
+declare module 'chartjs-plugin-datalabels' {
+    const ChartDataLabels: any;
+    export default ChartDataLabels;
+}
