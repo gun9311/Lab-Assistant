@@ -420,7 +420,7 @@ const QuizSessionPage = ({
                 top: "50%",
                 left: "50%",
                 transform: "translate(-50%, -50%)",
-                willChange: "transform", // GPU 가속 힌트 
+                willChange: "opacity, transform", // 최적화
                 backfaceVisibility: "hidden", // GPU 가속 추가
                 textAlign: "center",
                 backgroundColor: "rgba(0, 0, 0, 0.7)", // 배경색 추가
