@@ -557,13 +557,81 @@ exports.handleTeacherWebSocketConnection = async (ws, teacherId, pin) => {
     );
   }
 
-  ws.isAlive = true;
+  let currentQuestionIndex = 0; // 현재 문제 인덱스를 저장
+
+  let isAlive = true;
 
   ws.on("pong", () => {
-    ws.isAlive = true;
+    isAlive = true;
   });
 
-  let currentQuestionIndex = 0; // 현재 문제 인덱스를 저장
+  const pingInterval = setInterval(() => {
+    if (ws.readyState === ws.OPEN) {
+      if (!isAlive) {
+        logger.warn(
+          `Teacher connection for pin ${pin} did not respond to ping, terminating connection`
+        );
+        ws.terminate();
+      } else {
+        isAlive = false;
+        ws.ping();
+        logger.info(`Ping sent to teacher for pin ${pin}`);
+      }
+    }
+  }, 60000); // 60초마다 핑 전송
+
+  ws.on("close", async () => {
+    clearInterval(pingInterval);
+
+    if (kahootClients[pin] && kahootClients[pin].students) {
+      Object.values(kahootClients[pin].students).forEach((studentWs) => {
+        if (studentWs.readyState === WebSocket.OPEN) {
+          studentWs.send(JSON.stringify({ type: "sessionEnded" }));
+        }
+      });
+    }
+
+    try {
+      // Redis에서 세션 ID 가져오기
+      const sessionData = await redisClient.get(`session:${pin}`);
+      if (!sessionData) {
+        logger.warn(`No session data found for pin: ${pin}`);
+        return;
+      }
+
+      const { sessionId } = JSON.parse(sessionData);
+
+      delete kahootClients[pin];
+
+      await redisClient.del(`session:${pin}`);
+      const participantKeys = await redisClient.keys(
+        `session:${pin}:participant:*`
+      );
+      await Promise.all(participantKeys.map((key) => redisClient.del(key)));
+
+      try {
+        await KahootQuizSession.findByIdAndDelete(sessionId);
+        logger.info(`Session ${sessionId} deleted from database.`);
+      } catch (error) {
+        logger.error(
+          `Error deleting session ${sessionId} from database:`,
+          error
+        );
+      }
+
+      logger.info(`Session ${pin} closed and all participants disconnected.`);
+    } catch (error) {
+      logger.error(`Error handling session close for pin ${pin}:`, error);
+    }
+  });
+
+  ws.on("error", (error) => {
+    logger.error(
+      `Error occurred on teacher connection for pin ${pin}: ${error}`
+    );
+    clearInterval(pingInterval);
+    // ... 기존 오류 처리 ...
+  });
 
   ws.on("message", async (message) => {
     const parsedMessage = JSON.parse(message);
@@ -797,62 +865,6 @@ exports.handleTeacherWebSocketConnection = async (ws, teacherId, pin) => {
       );
     }
   });
-
-  // WebSocket 연결이 활성 상태인지 확인하기 위한 ping 타이머 설정
-  // const pingInterval = setInterval(() => {
-  //   if (ws.isAlive === false) {
-  //     clearInterval(pingInterval);
-  //     return ws.terminate();
-  //   }
-
-  //   ws.isAlive = false;
-  //   ws.ping(); // ping 메시지 전송
-  // }, 30000); // 30초마다 ping 전송
-
-  ws.on("close", async () => {
-    // clearInterval(pingInterval);
-
-    if (kahootClients[pin] && kahootClients[pin].students) {
-      Object.values(kahootClients[pin].students).forEach((studentWs) => {
-        if (studentWs.readyState === WebSocket.OPEN) {
-          studentWs.send(JSON.stringify({ type: "sessionEnded" }));
-        }
-      });
-    }
-
-    try {
-      // Redis에서 세션 ID 가져오기
-      const sessionData = await redisClient.get(`session:${pin}`);
-      if (!sessionData) {
-        logger.warn(`No session data found for pin: ${pin}`);
-        return;
-      }
-
-      const { sessionId } = JSON.parse(sessionData);
-
-      delete kahootClients[pin];
-
-      await redisClient.del(`session:${pin}`);
-      const participantKeys = await redisClient.keys(
-        `session:${pin}:participant:*`
-      );
-      await Promise.all(participantKeys.map((key) => redisClient.del(key)));
-
-      try {
-        await KahootQuizSession.findByIdAndDelete(sessionId);
-        logger.info(`Session ${sessionId} deleted from database.`);
-      } catch (error) {
-        logger.error(
-          `Error deleting session ${sessionId} from database:`,
-          error
-        );
-      }
-
-      logger.info(`Session ${pin} closed and all participants disconnected.`);
-    } catch (error) {
-      logger.error(`Error handling session close for pin ${pin}:`, error);
-    }
-  });
 };
 
 exports.handleStudentWebSocketConnection = async (ws, studentId, pin) => {
@@ -883,6 +895,71 @@ exports.handleStudentWebSocketConnection = async (ws, studentId, pin) => {
       return;
     }
     questionContent = JSON.parse(questionContent);
+
+    let isAlive = true;
+
+    ws.on("pong", () => {
+      isAlive = true;
+    });
+
+    const pingInterval = setInterval(() => {
+      if (ws.readyState === ws.OPEN) {
+        if (!isAlive) {
+          logger.warn(
+            `Student connection for pin ${pin} did not respond to ping, terminating connection`
+          );
+          ws.terminate();
+        } else {
+          isAlive = false;
+          ws.ping();
+          logger.info(`Ping sent to student for pin ${pin}`);
+        }
+      }
+    }, 60000); // 60초마다 핑 전송
+
+    ws.on("close", async () => {
+      clearInterval(pingInterval);
+      const student = await Student.findById(studentId);
+
+      // 클라이언트 목록에서 제거하기 전에 존재 여부 확인
+      if (kahootClients[pin] && kahootClients[pin].students) {
+        delete kahootClients[pin].students[studentId];
+      }
+
+      // 세션 데이터 업데이트 (예: Redis에서 상태 변경)
+      const participantKey = `session:${pin}:participant:${studentId}`;
+      redisClient.del(participantKey);
+
+      // 남아 있는 학생 수 확인
+      if (kahootClients[pin] && kahootClients[pin].students) {
+        const remainingStudents = Object.keys(
+          kahootClients[pin].students
+        ).length;
+        // 만약 남아 있는 학생이 없다면 알림
+        if (remainingStudents === 0) {
+          broadcastToTeacher(pin, {
+            type: "noStudentsRemaining", // 새로운 메시지 타입 추가
+            message: "모든 학생이 퀴즈를 떠났습니다. 세션을 종료하시겠습니까?",
+          });
+        } else {
+          broadcastToTeacher(pin, {
+            type: "studentDisconnected",
+            studentId: studentId,
+            name: student.name,
+          });
+        }
+      }
+      // 로그 기록
+      logger.info(`Student ${studentId} disconnected from session: ${pin}`);
+    });
+
+    ws.on("error", (error) => {
+      logger.error(
+        `Error occurred on student connection for pin ${pin}: ${error}`
+      );
+      clearInterval(pingInterval);
+      // ... 기존 오류 처리 ...
+    });
 
     ws.on("message", async (message) => {
       const parsedMessage = JSON.parse(message);
@@ -1110,49 +1187,4 @@ exports.handleStudentWebSocketConnection = async (ws, studentId, pin) => {
     );
     ws.close();
   }
-
-  // WebSocket 연결이 활성 상태인지 확인하기 위한 ping 타이머 설정
-  // const pingInterval = setInterval(() => {
-  //   if (ws.isAlive === false) {
-  //     clearInterval(pingInterval);
-  //     return ws.terminate();
-  //   }
-
-  //   ws.isAlive = false;
-  //   ws.ping(); // ping 메시지 전송
-  // }, 30000); // 30초마다 ping 전송
-
-  ws.on("close", async () => {
-    const student = await Student.findById(studentId);
-    // clearInterval(pingInterval); // 연결이 닫히면 ping 타이머 정리
-
-    // 클라이언트 목록에서 제거하기 전에 존재 여부 확인
-    if (kahootClients[pin] && kahootClients[pin].students) {
-      delete kahootClients[pin].students[studentId];
-    }
-    
-    // 세션 데이터 업데이트 (예: Redis에서 상태 변경)
-    const participantKey = `session:${pin}:participant:${studentId}`;
-    redisClient.del(participantKey);
-    
-    // 남아 있는 학생 수 확인
-    if (kahootClients[pin] && kahootClients[pin].students) {
-      const remainingStudents = Object.keys(kahootClients[pin].students).length;
-          // 만약 남아 있는 학생이 없다면 알림
-      if (remainingStudents === 0) {
-        broadcastToTeacher(pin, {
-          type: "noStudentsRemaining", // 새로운 메시지 타입 추가
-          message: "모든 학생이 퀴즈를 떠났습니다. 세션을 종료하시겠습니까?",
-        });
-      } else {
-        broadcastToTeacher(pin, {
-          type: "studentDisconnected",
-          studentId: studentId,
-          name: student.name,
-        });
-      }
-    }
-    // 로그 기록
-    logger.info(`Student ${studentId} disconnected from session: ${pin}`);
-  });
 };
