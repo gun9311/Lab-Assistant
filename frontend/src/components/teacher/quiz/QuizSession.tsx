@@ -385,7 +385,7 @@ const QuizSessionPage = ({
                 padding: "1rem 2rem", // 패딩 추가
                 borderRadius: "12px", // 모서리 둥글게
                 border: "2px solid #FFD700", // 테두리 추가
-                animation: "fadeIn 1s ease-in-out", // 애니메이션 추가
+                // animation: "fadeIn 1s ease-in-out", // 애니메이션 추가
               }}
             >
               <Typography
@@ -396,7 +396,7 @@ const QuizSessionPage = ({
                   fontFamily: "'Fredoka One', cursive", // 활기찬 글씨체
                   fontSize: "7vw", // 더 큰 글씨 크기
                   textShadow: "2px 2px 4px #000000", // 그림자 효과
-                  animation: "bounce 1.5s infinite", // 애니메이션 추가
+                  // animation: "bounce 1.5s infinite", // 애니메이션 추가
                 }}
               >
                 {currentQuestionIndex}/{totalQuestions}
