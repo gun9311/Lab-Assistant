@@ -115,7 +115,7 @@ const StudentListComponent: React.FC<StudentListComponentProps> = ({
                 justifyContent: "center",
                 alignItems: "center",
                 zIndex: 1000,
-                animation: "fadeIn 1s ease-in-out",
+                // animation: "fadeIn 1s ease-in-out",
                 padding: "2rem",
               }}
             >

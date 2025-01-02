@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { Doughnut } from "react-chartjs-2";
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from "chart.js";
 
@@ -33,6 +33,32 @@ const DonutChartComponent: React.FC<DonutChartProps> = ({
       },
     },
   };
+
+  useEffect(() => {
+    const centerTextPlugin = {
+      id: "centerText",
+      beforeDraw: (chart: any) => {
+        const { width, height, ctx } = chart;
+        ctx.restore();
+        const fontSize = (height / 25).toFixed(2); // 숫자 크기 조정
+        ctx.font = `bold ${fontSize}em Arial`; // 글꼴을 두껍게 설정
+        ctx.textBaseline = "middle";
+
+        const text = `${submittedCount}`;
+        const textX = Math.round((width - ctx.measureText(text).width) / 2);
+        const textY = height / 2 + 4;
+
+        ctx.fillText(text, textX, textY);
+        ctx.save();
+      },
+    };
+
+    ChartJS.register(centerTextPlugin);
+
+    return () => {
+      ChartJS.unregister(centerTextPlugin);
+    };
+  }, [submittedCount]);
 
   return <Doughnut data={data} options={options} />;
 };

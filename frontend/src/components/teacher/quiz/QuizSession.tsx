@@ -417,32 +417,39 @@ const QuizSessionPage = ({
             <Box
               sx={{
                 position: "absolute",
-                top: "50%",
-                left: "50%",
-                transform: "translate(-50%, -50%)",
-                willChange: "opacity, transform", // 최적화
-                backfaceVisibility: "hidden", // GPU 가속 추가
-                textAlign: "center",
-                backgroundColor: "rgba(0, 0, 0, 0.7)", // 배경색 추가
-                padding: "1rem 2rem", // 패딩 추가
-                borderRadius: "12px", // 모서리 둥글게
-                border: "2px solid #FFD700", // 테두리 추가
-                animation: "fadeIn 1s ease-in-out", // 애니메이션 추가
+                top: 0,
+                left: 0,
+                width: "100%",
+                height: "100%",
+                display: "flex",
+                justifyContent: "center", // 수평 중앙 정렬
+                alignItems: "center", // 수직 중앙 정렬
               }}
             >
-              <Typography
-                variant="h2"
+              <Box
                 sx={{
-                  fontWeight: "bold",
-                  color: "#FFD700", // 밝고 대조적인 색상
-                  fontFamily: "'Fredoka One', cursive", // 활기찬 글씨체
-                  fontSize: "7vw", // 큰 글씨 크기
-                  textShadow: "2px 2px 4px #000000", // 그림자 효과
-                  animation: "bounce 1.5s infinite", // 애니메이션 추가
+                  textAlign: "center",
+                  backgroundColor: "rgba(0, 0, 0, 0.7)", // 배경색 추가
+                  padding: "1rem 2rem", // 패딩 추가
+                  borderRadius: "12px", // 모서리 둥글게
+                  border: "2px solid #FFD700", // 테두리 추가
+                  animation: "fadeIn 1s ease-in-out", // 애니메이션 추가
                 }}
               >
-                {currentQuestionIndex}/{totalQuestions}
-              </Typography>
+                <Typography
+                  variant="h2"
+                  sx={{
+                    fontWeight: "bold",
+                    color: "#FFD700", // 밝고 대조적인 색상
+                    fontFamily: "'Fredoka One', cursive", // 활기찬 글씨체
+                    fontSize: "7vw", // 더 큰 글씨 크기
+                    textShadow: "2px 2px 4px #000000", // 그림자 효과
+                    animation: "bounce 1.5s infinite", // 애니메이션 추가
+                  }}
+                >
+                  {currentQuestionIndex}/{totalQuestions}
+                </Typography>
+              </Box>
             </Box>
           )}
 

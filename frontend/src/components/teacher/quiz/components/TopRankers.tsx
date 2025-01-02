@@ -113,8 +113,7 @@ const TopRankers: React.FC<TopRankersProps> = ({
               textAlign: "center",
               width: "20%",
               height: "auto",
-              animation: "fadeIn 1s ease-in-out",
-              visibility: imagesLoaded[student.id] ? "visible" : "hidden", // 이미지 로드 상태에 따라 표시
+              visibility: imagesLoaded[student.id] ? "visible" : "hidden",
             }}
           >
             {(index < 3 || isLastQuestion) && (
@@ -130,6 +129,8 @@ const TopRankers: React.FC<TopRankersProps> = ({
                   padding: "0.2rem 0.5rem",
                   fontWeight: "bold",
                   fontSize: index < 3 ? "2vw" : "1.3vw",
+                  animation: "fadeIn 1s ease-in-out", // 이름에 애니메이션 적용
+                  zIndex: 1,
                 }}
               >
                 {student.name}
@@ -141,6 +142,8 @@ const TopRankers: React.FC<TopRankersProps> = ({
               style={{
                 width: imageSize,
                 height: "auto",
+                animation: "fadeIn 1s ease-in-out", // 이미지에 애니메이션 적용
+                zIndex: 0,
               }}
               onLoad={() =>
                 setImagesLoaded((prev) => ({ ...prev, [student.id]: true }))
