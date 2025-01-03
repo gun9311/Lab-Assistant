@@ -117,24 +117,33 @@ const TopRankers: React.FC<TopRankersProps> = ({
             }}
           >
             {(index < 3 || isLastQuestion) && (
-              <Typography
+              <Box
                 sx={{
                   position: "absolute",
                   top: "-30px",
                   left: "50%",
                   transform: "translateX(-50%)",
-                  backgroundColor: "rgba(0, 0, 0, 0.5)",
-                  color: "#fff",
-                  borderRadius: "4px",
-                  padding: "0.2rem 0.5rem",
-                  fontWeight: "bold",
-                  fontSize: index < 3 ? "2vw" : "1.3vw",
-                  animation: "fadeIn 1s ease-in-out", // 이름에 애니메이션 적용
+                  display: "flex",
+                  justifyContent: "center",
+                  width: "100%",
                   zIndex: 1,
                 }}
               >
-                {student.name}
-              </Typography>
+                <Typography
+                  sx={{
+                    backgroundColor: "rgba(0, 0, 0, 0.5)",
+                    color: "#fff",
+                    borderRadius: "4px",
+                    padding: "0.2rem 0.5rem",
+                    fontWeight: "bold",
+                    fontSize: index < 3 ? "2vw" : "1.3vw",
+                    animation: "fadeIn 1s ease-in-out",
+                    zIndex: 1,
+                  }}
+                >
+                  {student.name}
+                </Typography>
+              </Box>
             )}
             <img
               src={characterImages[characterIndex]}
@@ -142,7 +151,7 @@ const TopRankers: React.FC<TopRankersProps> = ({
               style={{
                 width: imageSize,
                 height: "auto",
-                animation: "fadeIn 1s ease-in-out", // 이미지에 애니메이션 적용
+                animation: "fadeIn 1s ease-in-out",
                 zIndex: 0,
               }}
               onLoad={() =>
