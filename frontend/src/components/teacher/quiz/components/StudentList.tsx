@@ -20,8 +20,8 @@ type Student = {
 
 interface StudentListComponentProps {
   students: Student[];
-  allStudentsReady: boolean;
-  handleStartQuiz: () => void;
+  // allStudentsReady: boolean;
+  // handleStartQuiz: () => void;
   quizStarted: boolean;
   isShowingFeedback: boolean;
   isLastQuestion: boolean;
@@ -32,8 +32,8 @@ interface StudentListComponentProps {
 
 const StudentListComponent: React.FC<StudentListComponentProps> = ({
   students,
-  allStudentsReady,
-  handleStartQuiz,
+  // allStudentsReady,
+  // handleStartQuiz,
   quizStarted,
   isShowingFeedback,
   isLastQuestion,

@@ -83,7 +83,7 @@ const QuizSessionPage = ({
   const [students, setStudents] = useState<Student[]>([]);
   const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null);
   const [isSessionActive, setIsSessionActive] = useState(false);
-  const [allStudentsReady, setAllStudentsReady] = useState(false);
+  // const [allStudentsReady, setAllStudentsReady] = useState(false);
   const [submittedCount, setSubmittedCount] = useState(0);
   const [isQuizStarting, setIsQuizStarting] = useState(false);
   const [isPreparingNextQuestion, setIsPreparingNextQuestion] = useState(false);
@@ -232,11 +232,11 @@ const QuizSessionPage = ({
     };
   }, [pin, setIsQuizMode]);
 
-  useEffect(() => {
-    const allReady =
-      students.length > 0 && students.every((student) => student.isReady);
-    setAllStudentsReady(allReady);
-  }, [students]);
+  // useEffect(() => {
+  //   const allReady =
+  //     students.length > 0 && students.every((student) => student.isReady);
+  //   setAllStudentsReady(allReady);
+  // }, [students]);
 
   const handleStartQuiz = () => {
     setQuizStarted(true);
@@ -499,8 +499,8 @@ const QuizSessionPage = ({
             >
               <StudentListComponent
                 students={students}
-                allStudentsReady={allStudentsReady}
-                handleStartQuiz={handleStartQuiz}
+                // allStudentsReady={allStudentsReady}
+                // handleStartQuiz={handleStartQuiz}
                 quizStarted={quizStarted}
                 isShowingFeedback={isShowingFeedback}
                 isLastQuestion={isLastQuestion}
@@ -512,7 +512,7 @@ const QuizSessionPage = ({
           )}
 
           {/* 퀴즈 시작 버튼을 하단에 추가 */}
-          {!quizStarted && allStudentsReady && (
+          {!quizStarted && (
             <Box
               sx={{
                 position: "absolute",
