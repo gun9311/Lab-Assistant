@@ -423,6 +423,7 @@ exports.startQuizSession = async (req, res) => {
         isTeamMode,
         pin,
         sessionId: newSession._id,
+        currentQuestionId: null, // 초기에는 null로 설정
       }),
       {
         EX: 3600, // 세션 데이터는 1시간 동안 캐시됨
@@ -461,6 +462,7 @@ exports.joinQuizSession = async (req, res) => {
         score: 0,
         responses: [],
         status: "joined",
+        hasSubmitted: false, // 제출 여부 초기값 설정
       };
 
       await redisClient.set(participantKey, JSON.stringify(participantData), {
@@ -586,7 +588,7 @@ exports.handleTeacherWebSocketConnection = async (ws, teacherId, pin) => {
             );
             ws.terminate();
           }
-        }, 5000); // 5초 타임아웃
+        }, 7000); // 7초 타임아웃
       }
     }
   }, 10000); // 10초마다 핑 전송
@@ -657,6 +659,10 @@ exports.handleTeacherWebSocketConnection = async (ws, teacherId, pin) => {
         totalQuestions: questionContent.questions.length,
       };
 
+      // currentQuestionId 업데이트
+      session.currentQuestionId = questionContent.questions[0]._id.toString();
+      await redisClient.set(`session:${pin}`, JSON.stringify(session));
+
       // 교사와 학생들에게 준비 중 메시지를 전송
       ws.send(JSON.stringify(readyMessage)); // 교사에게 전송
       broadcastToStudents(pin, readyMessage); // 학생들에게 전송
@@ -712,6 +718,10 @@ exports.handleTeacherWebSocketConnection = async (ws, teacherId, pin) => {
       await redisClient.expire(`questionContent:${session.quizContent}`, 3600);
 
       const nextQuestion = questionContent.questions[currentQuestionIndex];
+
+      // currentQuestionId 업데이트
+      session.currentQuestionId = nextQuestion._id.toString();
+      await redisClient.set(`session:${pin}`, JSON.stringify(session));
 
       if (nextQuestion) {
         // 1. 먼저 준비 화면 전송
@@ -934,7 +944,7 @@ exports.handleStudentWebSocketConnection = async (ws, studentId, pin) => {
               );
               ws.terminate();
             }
-          }, 5000); // 5초 타임아웃
+          }, 7000); // 7초 타임아웃
         }
       }
     }, 10000); // 10초마다 핑 전송
@@ -985,6 +995,13 @@ exports.handleStudentWebSocketConnection = async (ws, studentId, pin) => {
         `session:${pin}:participant:*`
       );
 
+      const questionId = session.currentQuestionId;
+
+      // questionId가 null이면 아직 퀴즈가 시작되지 않았으므로 아래 로직을 건너뜁니다.
+      if (!questionId) {
+        return;
+      }
+
       const currentQuestion = questionContent.questions.find(
         (q) => q._id.toString() === questionId
       );
@@ -1003,7 +1020,7 @@ exports.handleStudentWebSocketConnection = async (ws, studentId, pin) => {
       const allSubmitted = allParticipants.every((p) => p.hasSubmitted);
 
       if (allSubmitted) {
-        allParticipants.forEach((participant) => {
+        allParticipants.forEach(async (participant) => {
           const studentWs = kahootClients[pin].students[participant.student];
           if (studentWs && studentWs.readyState === WebSocket.OPEN) {
             const response = participant.responses.find(
@@ -1019,11 +1036,17 @@ exports.handleStudentWebSocketConnection = async (ws, studentId, pin) => {
               })
             );
           }
+
+          // 피드백을 보낸 후 제출 여부를 false로 설정
+          participant.hasSubmitted = false;
+          const participantKey = `session:${pin}:participant:${participant.student}`;
+          await redisClient.set(participantKey, JSON.stringify(participant), {
+            EX: 3600,
+          });
         });
 
         broadcastToTeacher(pin, {
           type: "allStudentsSubmitted",
-          // feedback: session.participants
           feedback: allParticipants
             .sort((a, b) => b.score - a.score)
             .map((p, index) => ({
@@ -1195,7 +1218,7 @@ exports.handleStudentWebSocketConnection = async (ws, studentId, pin) => {
             const allSubmitted = allParticipants.every((p) => p.hasSubmitted);
 
             if (allSubmitted) {
-              allParticipants.forEach((participant) => {
+              allParticipants.forEach(async (participant) => {
                 const studentWs =
                   kahootClients[pin].students[participant.student];
                 if (studentWs && studentWs.readyState === WebSocket.OPEN) {
@@ -1213,11 +1236,17 @@ exports.handleStudentWebSocketConnection = async (ws, studentId, pin) => {
                     })
                   );
                 }
+
+                // 피드백을 보낸 후 제출 여부를 false로 설정
+                participant.hasSubmitted = false;
+                const participantKey = `session:${pin}:participant:${participant.student}`;
+                await redisClient.set(participantKey, JSON.stringify(participant), {
+                  EX: 3600,
+                });
               });
 
               broadcastToTeacher(pin, {
                 type: "allStudentsSubmitted",
-                // feedback: session.participants
                 feedback: allParticipants
                   .sort((a, b) => b.score - a.score)
                   .map((p, index) => ({
