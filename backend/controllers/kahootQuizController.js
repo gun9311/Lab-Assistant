@@ -563,6 +563,7 @@ exports.handleTeacherWebSocketConnection = async (ws, teacherId, pin) => {
 
   ws.on("pong", () => {
     isAlive = true;
+    clearTimeout(pongTimeout); // 퐁 응답이 오면 타임아웃을 취소
   });
 
   const pingInterval = setInterval(() => {
@@ -576,9 +577,19 @@ exports.handleTeacherWebSocketConnection = async (ws, teacherId, pin) => {
         isAlive = false;
         ws.ping();
         logger.info(`Ping sent to teacher for pin ${pin}`);
+
+        // 퐁 응답 타임아웃 설정
+        pongTimeout = setTimeout(() => {
+          if (!isAlive) {
+            logger.warn(
+              `Teacher connection for pin ${pin} did not respond to pong within 5 seconds, terminating connection`
+            );
+            ws.terminate();
+          }
+        }, 5000); // 5초 타임아웃
       }
     }
-  }, 60000); // 60초마다 핑 전송
+  }, 10000); // 10초마다 핑 전송
 
   ws.on("close", async () => {
     clearInterval(pingInterval);
@@ -900,6 +911,7 @@ exports.handleStudentWebSocketConnection = async (ws, studentId, pin) => {
 
     ws.on("pong", () => {
       isAlive = true;
+      clearTimeout(pongTimeout); // 퐁 응답이 오면 타임아웃을 취소
     });
 
     const pingInterval = setInterval(() => {
@@ -913,9 +925,19 @@ exports.handleStudentWebSocketConnection = async (ws, studentId, pin) => {
           isAlive = false;
           ws.ping();
           logger.info(`Ping sent to student for pin ${pin}`);
+
+          // 퐁 응답 타임아웃 설정
+          pongTimeout = setTimeout(() => {
+            if (!isAlive) {
+              logger.warn(
+                `Student connection for pin ${pin} did not respond to pong within 5 seconds, terminating connection`
+              );
+              ws.terminate();
+            }
+          }, 5000); // 5초 타임아웃
         }
       }
-    }, 60000); // 60초마다 핑 전송
+    }, 10000); // 10초마다 핑 전송
 
     ws.on("close", async () => {
       clearInterval(pingInterval);
@@ -951,6 +973,53 @@ exports.handleStudentWebSocketConnection = async (ws, studentId, pin) => {
       }
       // 로그 기록
       logger.info(`Student ${studentId} disconnected from session: ${pin}`);
+
+      // 모든 학생이 제출했는지 확인
+      const participantKeys = await redisClient.keys(
+        `session:${pin}:participant:*`
+      );
+      const allParticipants = await Promise.all(
+        participantKeys.map(async (key) => {
+          const data = await redisClient.get(key);
+          return JSON.parse(data);
+        })
+      );
+
+      const allSubmitted = allParticipants.every((p) => p.hasSubmitted);
+
+      if (allSubmitted) {
+        allParticipants.forEach((participant) => {
+          const studentWs = kahootClients[pin].students[participant.student];
+          if (studentWs && studentWs.readyState === WebSocket.OPEN) {
+            const response = participant.responses.find(
+              (r) => r.question.toString() === currentQuestion._id.toString()
+            );
+
+            studentWs.send(
+              JSON.stringify({
+                type: "feedback",
+                correct: response.isCorrect,
+                score: participant.score,
+                teamScore: session.isTeamMode ? team.teamScore : null,
+              })
+            );
+          }
+        });
+
+        broadcastToTeacher(pin, {
+          type: "allStudentsSubmitted",
+          // feedback: session.participants
+          feedback: allParticipants
+            .sort((a, b) => b.score - a.score)
+            .map((p, index) => ({
+              studentId: p.student,
+              name: p.name,
+              score: p.score,
+              isCorrect: p.responses[p.responses.length - 1].isCorrect,
+              rank: index + 1,
+            })),
+        });
+      }
     });
 
     ws.on("error", (error) => {

@@ -1,0 +1,29 @@
+config:
+  target: "ws://t-bot.site"  # ws 프로토콜 사용
+  phases:
+    - duration: 30
+      arrivalRate: 10  # 초당 10명의 사용자가 30초 동안 접속 시도
+scenarios:
+  - engine: "ws"
+    flow:
+      - function: "generateUrlWithParams"
+      - connect:
+          url: "{{ wsUrl }}"  # WebSocket 연결을 생성
+      - think: 2
+      - send:
+          text: '{"grade":"6","semester":"1","subject":"과학","unit":"2.생물과 환경","topic":"생물","userMessage":"What is the next step?"}'
+      - think: 5
+      - send:
+          text: '{"grade":"6","semester":"1","subject":"과학","unit":"2.생물과 환경","topic":"생물","userMessage":"Thank you!"}'
+      - think: 5
+      - close: 1000  # 연결 종료
+
+functions:
+  generateUrlWithParams: |
+    function(userContext, events, done) {
+      const token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJfaWQiOiI2NmI1OTJjNGNkNWQzODMxNjJhZmVhYWYiLCJyb2xlIjoic3R1ZGVudCIsImlhdCI6MTcyMzk4ODU2MCwiZXhwIjoxNzIzOTg5NDYwfQ.zCYxr1382hECn32LIHlDmZPCdOyCiS_uLPHYNtMvkq0";  // JWT 토큰
+      const subject = "과학";  // 테스트할 과목명
+      const wsUrl = `/ws?token=${token}&subject=${subject}`;  // WebSocket 경로 생성
+      userContext.vars.wsUrl = wsUrl;  // 생성된 URL을 변수에 저장
+      return done();
+    }
