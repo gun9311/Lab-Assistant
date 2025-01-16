@@ -588,7 +588,7 @@ exports.handleTeacherWebSocketConnection = async (ws, teacherId, pin) => {
             );
             ws.terminate();
           }
-        }, 7000); // 7초 타임아웃
+        }, 5000); // 7초 타임아웃
       }
     }
   }, 10000); // 10초마다 핑 전송
@@ -661,6 +661,7 @@ exports.handleTeacherWebSocketConnection = async (ws, teacherId, pin) => {
 
       // currentQuestionId 업데이트
       session.currentQuestionId = questionContent.questions[0]._id.toString();
+      console.log("session.currentQuestionId", session.currentQuestionId);
       await redisClient.set(`session:${pin}`, JSON.stringify(session));
 
       // 교사와 학생들에게 준비 중 메시지를 전송
@@ -944,7 +945,7 @@ exports.handleStudentWebSocketConnection = async (ws, studentId, pin) => {
               );
               ws.terminate();
             }
-          }, 7000); // 7초 타임아웃
+          }, 5000); // 7초 타임아웃
         }
       }
     }, 10000); // 10초마다 핑 전송
@@ -993,8 +994,10 @@ exports.handleStudentWebSocketConnection = async (ws, studentId, pin) => {
       // 모든 학생이 제출했는지 확인
       const participantKeys = await redisClient.keys(
         `session:${pin}:participant:*`
-      );
-
+      );  
+      
+      const sessionData = await redisClient.get(`session:${pin}`);
+      const session = JSON.parse(sessionData);
       const questionId = session.currentQuestionId;
 
       // questionId가 null이면 아직 퀴즈가 시작되지 않았으므로 아래 로직을 건너뜁니다.
@@ -1240,9 +1243,13 @@ exports.handleStudentWebSocketConnection = async (ws, studentId, pin) => {
                 // 피드백을 보낸 후 제출 여부를 false로 설정
                 participant.hasSubmitted = false;
                 const participantKey = `session:${pin}:participant:${participant.student}`;
-                await redisClient.set(participantKey, JSON.stringify(participant), {
-                  EX: 3600,
-                });
+                await redisClient.set(
+                  participantKey,
+                  JSON.stringify(participant),
+                  {
+                    EX: 3600,
+                  }
+                );
               });
 
               broadcastToTeacher(pin, {
