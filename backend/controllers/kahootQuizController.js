@@ -960,9 +960,15 @@ exports.handleStudentWebSocketConnection = async (ws, studentId, pin) => {
         // 만약 남아 있는 학생이 없다면 알림
         if (remainingStudents === 0) {
           broadcastToTeacher(pin, {
+            type: "studentDisconnected",
+            studentId: studentId,
+            name: student.name,
+          });
+          broadcastToTeacher(pin, {
             type: "noStudentsRemaining", // 새로운 메시지 타입 추가
             message: "모든 학생이 퀴즈를 떠났습니다. 세션을 종료하시겠습니까?",
           });
+          return; // 남아 있는 학생이 없으므로 아래 로직을 건너뜁니다.
         } else {
           broadcastToTeacher(pin, {
             type: "studentDisconnected",
@@ -978,6 +984,15 @@ exports.handleStudentWebSocketConnection = async (ws, studentId, pin) => {
       const participantKeys = await redisClient.keys(
         `session:${pin}:participant:*`
       );
+
+      const currentQuestion = questionContent.questions.find(
+        (q) => q._id.toString() === questionId
+      );
+      if (!currentQuestion) {
+        ws.send(JSON.stringify({ error: "Invalid question ID" }));
+        return;
+      }
+
       const allParticipants = await Promise.all(
         participantKeys.map(async (key) => {
           const data = await redisClient.get(key);
