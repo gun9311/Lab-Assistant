@@ -661,7 +661,7 @@ exports.handleTeacherWebSocketConnection = async (ws, teacherId, pin) => {
 
       // currentQuestionId 업데이트
       session.currentQuestionId = questionContent.questions[0]._id.toString();
-      console.log("session.currentQuestionId", session.currentQuestionId);
+      logger.info("session.currentQuestionId", session.currentQuestionId);
       await redisClient.set(`session:${pin}`, JSON.stringify(session));
 
       // 교사와 학생들에게 준비 중 메시지를 전송
@@ -999,7 +999,7 @@ exports.handleStudentWebSocketConnection = async (ws, studentId, pin) => {
       const sessionData = await redisClient.get(`session:${pin}`);
       const session = JSON.parse(sessionData);
       const questionId = session.currentQuestionId;
-      console.log("questionId", questionId);
+      logger.info("questionId", questionId);
 
       // questionId가 null이면 아직 퀴즈가 시작되지 않았으므로 아래 로직을 건너뜁니다.
       if (!questionId) {
@@ -1015,6 +1015,7 @@ exports.handleStudentWebSocketConnection = async (ws, studentId, pin) => {
       }
 
       // console.log("currentQuestion", currentQuestion);
+      // logger.info("currentQuestion", currentQuestion);
 
       const allParticipants = await Promise.all(
         participantKeys.map(async (key) => {
@@ -1024,6 +1025,7 @@ exports.handleStudentWebSocketConnection = async (ws, studentId, pin) => {
       );
 
       // console.log("allParticipants", allParticipants);
+      logger.info("allParticipants", allParticipants);
 
       const allSubmitted = allParticipants.every((p) => p.hasSubmitted);
 
