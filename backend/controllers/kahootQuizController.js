@@ -783,7 +783,6 @@ exports.handleTeacherWebSocketConnection = async (ws, teacherId, pin) => {
     // 교사가 'endQuiz' 메시지를 보낼 때 세션 종료 처리
     if (parsedMessage.type === "endQuiz") {
       try {
-        // 1. 퀴즈 결과 저장
         const quizResults = [];
         const participantKeys = await redisClient.keys(
           `session:${pin}:participant:*`
@@ -799,28 +798,30 @@ exports.handleTeacherWebSocketConnection = async (ws, teacherId, pin) => {
             (r) => r.isCorrect
           ).length;
           const totalQuestions = participant.responses.length;
-          const totalScore = (correctAnswers / totalQuestions) * 100; // 100점 만점 기준
+          const totalScore = (correctAnswers / totalQuestions) * 100;
 
-          // KahootQuizContent에서 과목, 학기, 단원 정보 가져오기
           const quizContent = await KahootQuizContent.findById(
             session.quizContent
           ).select("subject semester unit");
 
-          // QuizResult 스키마에 결과 저장
-          const quizResult = new QuizResult({
-            studentId: participant.student,
-            quizId: session.quizContent,
-            subject: quizContent.subject,
-            semester: quizContent.semester,
-            unit: quizContent.unit,
-            results: participant.responses.map((r) => ({
-              questionId: r.question,
-              studentAnswer: r.answer,
-              isCorrect: r.isCorrect,
-            })),
-            score: totalScore,
-          });
-          await quizResult.save();
+          // studentId와 quizId의 조합으로 결과 저장 또는 업데이트
+          const quizResult = await QuizResult.findOneAndUpdate(
+            { studentId: participant.student, quizId: session.quizContent },
+            {
+              studentId: participant.student,
+              quizId: session.quizContent,
+              subject: quizContent.subject,
+              semester: quizContent.semester,
+              unit: quizContent.unit,
+              results: participant.responses.map((r) => ({
+                questionId: r.question,
+                studentAnswer: r.answer,
+                isCorrect: r.isCorrect,
+              })),
+              score: totalScore,
+            },
+            { upsert: true, new: true } // upsert 옵션으로 존재하지 않으면 생성
+          );
           quizResults.push(quizResult);
         }
 
@@ -994,9 +995,12 @@ exports.handleStudentWebSocketConnection = async (ws, studentId, pin) => {
       // 모든 학생이 제출했는지 확인
       const participantKeys = await redisClient.keys(
         `session:${pin}:participant:*`
-      );  
-      
+      );
+
       const sessionData = await redisClient.get(`session:${pin}`);
+      if (!sessionData) {
+        return;
+      }
       const session = JSON.parse(sessionData);
       const questionId = session.currentQuestionId;
       logger.info("questionId", questionId);
