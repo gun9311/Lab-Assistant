@@ -154,11 +154,13 @@ const StudentQuizSessionPage: React.FC = () => {
         setIsQuizStarting(true);
         setIsWaitingForQuizStart(false);
       } else if (parsedData.type === "preparingNextQuestion") {
+        setIsWaitingForQuizStart(false);
         setIsPreparingNextQuestion(true);
         setIsLastQuestion(parsedData.isLastQuestion);
         setIsFeedbackReceived(false);
         setCurrentQuestion(null);
       } else if (parsedData.type === "newQuestionOptions") {
+        setIsWaitingForQuizStart(false);
         setIsQuizStarting(false);
         setIsPreparingNextQuestion(false);
         setCurrentQuestion(parsedData);
