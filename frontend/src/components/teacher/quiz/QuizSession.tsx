@@ -512,7 +512,7 @@ const QuizSessionPage = ({
           )}
 
           {/* 퀴즈 시작 버튼을 하단에 추가 */}
-          {!quizStarted && (
+          {!quizStarted && students.length > 0 && (
             <Box
               sx={{
                 position: "absolute",
