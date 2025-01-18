@@ -58,7 +58,7 @@ const DonutChartComponent: React.FC<DonutChartProps> = ({
     return () => {
       ChartJS.unregister(centerTextPlugin);
     };
-  }, [submittedCount]);
+  }, [submittedCount, totalStudents]);
 
   return <Doughnut data={data} options={options} />;
 };
