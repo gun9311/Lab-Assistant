@@ -24,8 +24,9 @@ import {
 import { Cancel, Save, Delete, Logout, Edit } from "@mui/icons-material";
 import { educationOffices } from "../educationOffices";
 import api from "../utils/api";
-import { clearAuth } from "../utils/auth";
+import { clearAuth, getUserId } from "../utils/auth";
 import { SelectChangeEvent } from "@mui/material/Select";
+import apiNoAuth from "../utils/apiNoAuth";
 
 interface School {
   label: string;
@@ -180,9 +181,15 @@ const ProfilePage = () => {
     }
   };
 
-  const handleLogout = () => {
-    clearAuth();
-    window.location.href = "/home";
+  const handleLogout = async () => {
+    try {
+      const userId = getUserId();
+      await apiNoAuth.post("/auth/logout", { userId });
+      clearAuth();
+      window.location.href = "/home";
+    } catch (error) {
+      console.error("Failed to log out:", error);
+    }
   };
 
   const openDialog = (action: () => void, message: string) => {
@@ -209,7 +216,7 @@ const ProfilePage = () => {
 
   return (
     <Container component="main" maxWidth="sm">
-      <Paper elevation={3} sx={{ padding: 4, marginTop: 2 }}>
+      <Paper elevation={3} sx={{ padding: 4, marginTop: 6 }}>
         <Box
           sx={{
             display: "flex",
@@ -218,13 +225,13 @@ const ProfilePage = () => {
           }}
         >
           <Typography variant="h4" gutterBottom>
-            내 정보
+            내 프로필
           </Typography>
           <IconButton
             sx={{
               color: "#333",
             }}
-            onClick={() => openDialog(handleLogout, "로그아웃하시겠습니까?")}
+            onClick={() => openDialog(handleLogout, "로그아웃 하시겠습니까?")}
           >
             <Logout />
           </IconButton>

@@ -9,8 +9,8 @@ const Layout: React.FC<{ isQuizMode: boolean }> = ({ isQuizMode }) => {
 
   return (
     <Container component="main" maxWidth={false}>
-      <Outlet />
       {!isQuizMode && <Navbar role={role} isQuizMode={isQuizMode} />}
+      <Outlet />
     </Container>
   );
 };

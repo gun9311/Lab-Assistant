@@ -83,7 +83,7 @@ const StudentHomePage: React.FC = () => {
   return (
     <Container 
       component="main" 
-      maxWidth={isChatbotActive ? 'lg' : 'md'} 
+      maxWidth={isChatbotActive ? 'lg' : 'lg'} 
       sx={{ mt: 8, fontFamily: 'Roboto, sans-serif' }}
     >
       <Paper elevation={3} sx={{ padding: 4 }}>

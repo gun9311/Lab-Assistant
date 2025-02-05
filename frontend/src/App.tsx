@@ -8,14 +8,20 @@ import AdminRegisterPage from "./pages/register/AdminRegisterPage";
 import ProfilePage from "./pages/ProfilePage";
 import NotificationsPage from "./pages/NotificationsPage";
 import MyQuizzesPage from "./components/student/quiz/MyQuizzesPage";
-import { getToken, getRole, clearAuth } from "./utils/auth";
+import {
+  getToken,
+  getRole,
+  clearAuth,
+  getRefreshToken,
+  setToken,
+} from "./utils/auth";
 import { jwtDecode, JwtPayload } from "jwt-decode";
 import StudentHomePage from "./pages/home/StudentHomePage";
 import TeacherHomePage from "./pages/home/TeacherHomePage";
 import AdminHomePage from "./pages/home/AdminHomePage";
 import AdminLoginPage from "./pages/login/AdminLoginPage";
 import TeacherLoginPage from "./pages/login/TeacherLoginPage";
-import GoogleCallback from './pages/login/GoogleCallback';
+import GoogleCallback from "./pages/login/GoogleCallback";
 import StudentLoginPage from "./pages/login/StudentLoginPage";
 import theme from "./theme";
 import Layout from "./components/Layout";
@@ -31,9 +37,10 @@ import CreateQuizPage from "./components/teacher/quiz/CreateQuiz";
 import EditQuizPage from "./components/teacher/quiz/EditQuiz";
 import QuizSessionPage from "./components/teacher/quiz/QuizSession";
 import StudentQuizSessionPage from "./components/student/quiz/StudentQuizSession";
-import ForgotPasswordPage from './pages/login/ForgotPasswordPage';
-import ResetPasswordPage from './pages/login/ResetPasswordPage';
+import ForgotPasswordPage from "./pages/login/ForgotPasswordPage";
+import ResetPasswordPage from "./pages/login/ResetPasswordPage";
 import ResetStudentPasswordPage from "./pages/login/ResetStudentPasswordPage";
+import axios from "axios";
 
 // NotificationPayload 타입 정의
 type NotificationPayload = {
@@ -61,13 +68,34 @@ type PrivateRouteProps = {
 };
 
 const PrivateRoute: React.FC<PrivateRouteProps> = ({ element, roles }) => {
-  const role = getRole();
-  const token = getToken();
-  if (token && !isTokenValid(token)) {
-    clearAuth();
-    return <Navigate to="/home" />;
+  const [isTokenChecked, setIsTokenChecked] = useState(false);
+  const [currentToken, setCurrentToken] = useState(getToken());
+
+  useEffect(() => {
+    const checkToken = async () => {
+      if (currentToken && !isTokenValid(currentToken)) {
+        const newToken = await refreshAccessToken();
+        setCurrentToken(newToken);
+      }
+      setIsTokenChecked(true);
+    };
+    checkToken();
+  }, [currentToken]);
+
+  if (!isTokenChecked) {
+    return null; // 로딩 상태를 표시할 수 있습니다.
   }
-  return role && roles.includes(role) ? element : <Navigate to="/home" />;
+
+  const role = getRole();
+  return role && roles.includes(role) ? element : <RedirectToHome />;
+};
+
+const RedirectToHome: React.FC = () => {
+  useEffect(() => {
+    window.location.href = "/";
+  }, []);
+
+  return null;
 };
 
 const AppContent: React.FC = () => {
@@ -128,7 +156,7 @@ const AppContent: React.FC = () => {
         )}
         <Route path="/" element={<Navigate to={`/${role}`} />} />
         <Route path="/home" element={<Navigate to={`/${role}`} />} />
-        
+
         <Route element={<Layout isQuizMode={isQuizMode} />}>
           {/* isQuizMode 전달 */}
           <Route
@@ -180,10 +208,15 @@ const AppContent: React.FC = () => {
           <Route
             path="/reset-student-password"
             element={
-              <PrivateRoute roles={["teacher"]} element={<ResetStudentPasswordPage />} />
+              <PrivateRoute
+                roles={["teacher"]}
+                element={<ResetStudentPasswordPage />}
+              />
             }
           />
         </Route>
+        {/* 모든 다른 경로를 /로 리다이렉트 */}
+        <Route path="*" element={<RedirectToHome />} />
       </Routes>
 
       {notification && (
@@ -222,18 +255,39 @@ const AppContent: React.FC = () => {
   );
 };
 
+const refreshAccessToken = async () => {
+  const refreshToken = getRefreshToken();
+  try {
+    const { data } = await axios.post(
+      `${process.env.REACT_APP_API_URL}/auth/refresh-token`,
+      { refreshToken }
+    );
+    setToken(data.accessToken);
+    return data.accessToken;
+  } catch (error) {
+    clearAuth();
+    return null;
+  }
+};
+
 const App: React.FC = () => {
   const [isTokenFound, setTokenFound] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   useEffect(() => {
     console.log("firebase 권한 확인 및 요청");
     requestPermissionAndGetToken(setTokenFound);
-  }, []);
 
-  const token = getToken();
-  console.log(token);
-  const isLoggedIn = token ? isTokenValid(token) : false;
-  console.log(isLoggedIn);
+    const checkToken = async () => {
+      let token = getToken();
+      if (token && !isTokenValid(token)) {
+        token = await refreshAccessToken();
+      }
+      setIsLoggedIn(token ? isTokenValid(token) : false);
+    };
+
+    checkToken();
+  }, []);
 
   return (
     <ThemeProvider theme={theme}>
@@ -257,6 +311,8 @@ const App: React.FC = () => {
           <Route path="/auth/google/callback" element={<GoogleCallback />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
+          {/* 모든 다른 경로를 /로 리다이렉트 */}
+          <Route path="*" element={<RedirectToHome />} />
         </Routes>
       )}
     </ThemeProvider>

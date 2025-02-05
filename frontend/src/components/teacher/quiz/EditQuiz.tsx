@@ -41,7 +41,7 @@ const EditQuizPage: React.FC = () => {
         borderRadius: "16px",
         boxShadow: "0px 6px 20px rgba(0, 0, 0, 0.1)",
         backgroundColor: "#ffffff",
-        maxWidth: "90vw",
+        maxWidth: "lg",
         width: "100%",
         margin: "40px auto",
       }}

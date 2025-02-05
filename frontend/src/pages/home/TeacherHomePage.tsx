@@ -168,7 +168,7 @@ const TeacherHomePage: React.FC = () => {
   };
 
   return (
-    <Container component="main" maxWidth="md" sx={{ mt: 8, mb: 4 }}>
+    <Container component="main" maxWidth="lg" sx={{ mt: 6, mb: 4 }}>
       <Paper elevation={3} sx={{ padding: 4, borderRadius: 2 }}>
         <Box
           display="flex"
