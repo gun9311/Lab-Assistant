@@ -27,7 +27,7 @@ export const ChatbotProvider: React.FC<ChatbotProviderProps> = ({ children }) =>
         anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
       >
         <Alert onClose={() => setAlertOpen(false)} severity="warning" sx={{ width: '100%' }}>
-          챗봇을 종료해주세요!
+          대화를 종료해주세요!
         </Alert>
       </Snackbar>
     </ChatbotContext.Provider>

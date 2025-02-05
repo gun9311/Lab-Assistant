@@ -129,7 +129,7 @@ const MyQuizzesPage: React.FC<MyQuizzesPageProps> = ({ setIsQuizMode }) => {
   };
 
   return (
-    <Container component="main" maxWidth="md" sx={{ mt: 6 }}>
+    <Container component="main" maxWidth="lg" sx={{ mt: 6 }}>
       <Paper
         elevation={3}
         sx={{

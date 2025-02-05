@@ -198,7 +198,7 @@ const ManageQuizzesPage: React.FC = () => {
   };
 
   return (
-    <Box sx={{ maxWidth: "1200px", margin: "0 auto", padding: "2rem" }}>
+    <Box sx={{ maxWidth: "lg", margin: "0 auto", padding: "2rem", mt: 2 }}>
       <Paper
         elevation={3}
         sx={{

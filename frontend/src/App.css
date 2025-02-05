@@ -6,7 +6,7 @@
 
 /* 네비게이션 바 스타일 */
 .navbar {
-  background-color: #4CAF50;
+  background-color: #4caf50;
   padding: 10px;
   color: white;
   display: flex;
@@ -17,8 +17,8 @@
 @media (min-width: 768px) {
   /* 태블릿 이상 크기 */
   .navbar {
-      flex-direction: row;
-      justify-content: space-around;
+    flex-direction: row;
+    justify-content: space-around;
   }
 }
 
@@ -41,20 +41,20 @@
 
 @media (min-width: 768px) {
   .page-container {
-      max-width: 750px;
-      margin: 0 auto;
+    max-width: 750px;
+    margin: 0 auto;
   }
 }
 
 @media (min-width: 1200px) {
   .page-container {
-      max-width: 1000px;
+    max-width: 1000px;
   }
 }
 
 /* 버튼 스타일 */
 button {
-  background-color: #4CAF50;
+  background-color: #4caf50;
   border: none;
   color: white;
   padding: 10px 20px;
@@ -71,7 +71,8 @@ button:hover {
 }
 
 /* 입력 필드 스타일 */
-input[type="text"], textarea {
+input[type="text"],
+textarea {
   width: 100%;
   padding: 12px 20px;
   margin: 8px 0;
@@ -94,13 +95,13 @@ input[type="text"], textarea {
 /* 반응형 챗봇 스타일 */
 @media (min-width: 768px) {
   .chatbot-container {
-      max-width: 600px;
+    max-width: 600px;
   }
 }
 
 @media (min-width: 1200px) {
   .chatbot-container {
-      max-width: 800px;
+    max-width: 800px;
   }
 }
 
@@ -126,4 +127,32 @@ input[type="text"], textarea {
 
 .quiz-generator-container li:last-child {
   border-bottom: none;
+}
+
+/* 데스크탑 환경에서의 네비게이션 바 스타일 */
+@media (min-width: 1200px) {
+  .navbar {
+    position: fixed;
+    top: 0;
+    width: 100%;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 20px;
+    background-color: #4caf50;
+    z-index: 1000;
+  }
+
+  .navbar a {
+    color: white;
+    padding: 10px 15px;
+    text-decoration: none;
+    font-size: 16px;
+  }
+
+  .navbar a:hover {
+    background-color: #3e8e41;
+    border-radius: 4px;
+  }
 }

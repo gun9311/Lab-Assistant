@@ -12,7 +12,8 @@ import {
   Link as MuiLink,
 } from "@mui/material";
 import { Link } from "react-router-dom";
-import background from "../../assets/nudge-background-logo4.png";
+import backgroundLogo4 from "../../assets/nudge-background-logo4.png";
+import background3 from "../../assets/nudge-desktop-background.png";
 import adminIcon from "../../assets/admin-icon.png";
 import studentIcon from "../../assets/student-icon.png";
 import teacherIcon from "../../assets/teacher-icon.png";
@@ -44,11 +45,18 @@ const HomePage = () => {
         minHeight: "100vh",
         display: "flex",
         alignItems: "flex-end",
-        justifyContent: "center",
-        backgroundImage: `url(${background})`,
+        justifyContent: {
+          xs: "center",
+          sm: "center",
+          md: "center",
+          lg: "flex-start",
+        },
+        backgroundImage: {
+          xs: `url(${backgroundLogo4})`,
+          md: `url(${background3})`,
+        },
         backgroundSize: "cover",
         backgroundPosition: "center center",
-        textAlign: "center",
         paddingBottom: 4,
         paddingTop: {
           xs: 2,
@@ -56,8 +64,8 @@ const HomePage = () => {
           md: 0,
         },
         "@media (max-width: 600px)": {
-          backgroundSize: "auto 100%", // 배경 이미지를 화면 높이에 맞추어 비율 유지
-          backgroundPosition: "center center", // 좌우 중심으로 배경 위치 조정
+          backgroundSize: "auto 100%",
+          backgroundPosition: "center center",
         },
         "@media (min-width: 960px) and (max-width: 1199px)": {
           padding: "16px",
@@ -65,7 +73,8 @@ const HomePage = () => {
         },
         "@media (min-width: 1200px)": {
           padding: "20px",
-          maxWidth: "750px",
+          maxWidth: "2000px",
+          backgroundSize: "cover",
         },
         color: "white",
         textShadow: "2px 2px 4px rgba(0, 0, 0, 0.7)",
@@ -76,7 +85,7 @@ const HomePage = () => {
       <Box
         sx={{
           zIndex: 1,
-          width: "100%",
+          width: "auto",
           maxWidth: {
             xs: "100%",
             sm: "580px",
@@ -85,6 +94,10 @@ const HomePage = () => {
           },
           animation: "fadeIn 2s ease-in-out",
           mb: 3,
+          "@media (min-width: 960px)": {
+            marginBottom: "8vh",
+            marginLeft: "3vw",
+          },
         }}
       >
         <Stack spacing={2} sx={{ alignItems: "center" }}>
@@ -101,18 +114,23 @@ const HomePage = () => {
               },
               transition: "all 0.3s ease-in-out",
               boxShadow: "0px 5px 15px rgba(0,0,0,0.3)",
-              width: "70%",
+              width: {
+                xs: "50vw",
+                sm: "50vw",
+                md: "50vw",
+                lg: "30vw",
+              },
               margin: "0 auto",
               fontSize: {
                 xs: "1rem",
                 sm: "1.1rem",
                 md: "1rem",
-                lg: "1.1rem",
+                lg: "1.2rem",
               },
               padding: {
                 xs: "8px 16px",
                 md: "10px 20px",
-                lg: "10px 20px",
+                lg: "12px 24px",
               },
             }}
           >

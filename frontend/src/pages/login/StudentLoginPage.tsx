@@ -113,7 +113,8 @@ const StudentLoginPage = () => {
     <Container
       component="main"
       maxWidth="xs"
-      sx={{ marginTop: { xs: 4, sm: 8 } }}
+      // sx={{ marginTop: { xs: 4, sm: 8 } }}
+      sx={{ marginY: { xs: 4, sm: 15, xl: 15 } }}
     >
       <Paper
         elevation={3}

@@ -5,7 +5,9 @@ body {
   background-color: #f5f5f5;
 }
 
-h1, h2, h3 {
+h1,
+h2,
+h3 {
   color: #333;
 }
 
@@ -22,14 +24,16 @@ h1, h2, h3 {
 @media (min-width: 768px) {
   /* 태블릿 이상 크기 */
   .chatbot-container {
-      max-width: 600px;
-      margin: 20px auto;
+    max-width: 600px;
+    margin: 20px auto;
   }
 }
 
 @media (min-width: 1200px) {
-  /* 데스크탑 크기 */
+  body {
+    font-size: 18px; /* 데스크탑에서 기본 폰트 크기 증가 */
+  }
   .chatbot-container {
-      max-width: 800px;
+    max-width: 1000px; /* 데스크탑에서 더 넓은 컨테이너 */
   }
 }

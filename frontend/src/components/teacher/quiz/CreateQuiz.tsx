@@ -10,7 +10,7 @@ const CreateQuizPage: React.FC = () => {
         borderRadius: "16px",
         boxShadow: "0px 6px 20px rgba(0, 0, 0, 0.1)",
         backgroundColor: "#ffffff",
-        maxWidth: "90vw",                         // 전체 화면의 90% 너비 사용
+        maxWidth: "lg",                         // 전체 화면의 90% 너비 사용
         width: "100%",
         margin: "40px auto",
       }}
