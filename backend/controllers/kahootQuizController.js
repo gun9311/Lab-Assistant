@@ -17,7 +17,7 @@ const logger = winston.createLogger({
   ),
   transports: [
     new winston.transports.Console(),
-    new winston.transports.File({ filename: "/app/logs/kahootWebsocket.log" }),
+    // new winston.transports.File({ filename: "/app/logs/kahootWebsocket.log" }),
   ],
 });
 
