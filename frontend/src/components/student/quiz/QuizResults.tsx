@@ -191,7 +191,7 @@ const QuizResults: React.FC<QuizResultsProps> = ({
                 <TableCell>날짜</TableCell>
                 {!isMobile && <TableCell>학기</TableCell>}
                 <TableCell>과목</TableCell>
-                {!isMobile && <TableCell>단원</TableCell>}
+                {!isMobile && <TableCell>단원(영역)</TableCell>}
                 <TableCell>점수</TableCell>
                 <TableCell align="center">상세보기</TableCell>
               </TableRow>

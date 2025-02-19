@@ -148,7 +148,7 @@ const HomePage = () => {
             NUDGE에 오신 것을 환영합니다!
           </Typography>
         </Stack>
-        {/* <Box sx={{ position: "absolute", top: 16, right: 16 }}>
+        <Box sx={{ position: "absolute", top: 16, right: 16 }}>
           <Link to="/admin-login" style={{ textDecoration: "none" }}>
             <Button
               variant="text"
@@ -159,7 +159,7 @@ const HomePage = () => {
               }
             ></Button>
           </Link>
-        </Box> */}
+        </Box>
       </Box>
 
       {/* 로그인 선택 다이얼로그 */}

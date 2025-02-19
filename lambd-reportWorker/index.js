@@ -5,6 +5,7 @@ require("dotenv").config();
 
 // 기존 스키마 유지
 const studentSchema = new mongoose.Schema({
+  loginId: { type: String, required: true, unique: true },
   studentId: { type: String, required: true },
   name: { type: String, required: true },
   password: { type: String, required: true },
@@ -29,14 +30,22 @@ const StudentReport = mongoose.model("StudentReport", studentReportSchema);
 
 // 개별 문제의 결과 스키마
 const resultSchema = new mongoose.Schema({
-  questionId: { type: Schema.Types.ObjectId, ref: 'KahootQuizContent.questions', required: true }, // 퀴즈 문제 ID
+  questionId: {
+    type: Schema.Types.ObjectId,
+    ref: "KahootQuizContent.questions",
+    required: true,
+  }, // 퀴즈 문제 ID
   studentAnswer: { type: Number, required: false }, // 학생의 답변
-  isCorrect: { type: Boolean, required: true } // 정답 여부 (True/False)
+  isCorrect: { type: Boolean, required: true }, // 정답 여부 (True/False)
 });
 
 const quizResultSchema = new mongoose.Schema({
   studentId: { type: Schema.Types.ObjectId, ref: "Student", required: true },
-  quizId: { type: Schema.Types.ObjectId, ref: 'KahootQuizContent', required: true },
+  quizId: {
+    type: Schema.Types.ObjectId,
+    ref: "KahootQuizContent",
+    required: true,
+  },
   subject: { type: String, required: true },
   semester: { type: String, required: true },
   unit: { type: String, required: true },
@@ -98,6 +107,41 @@ const sendNotificationToTeacher = async (teacherId, reportDetails) => {
   }
 };
 
+// 랜덤 평어 생성 함수 수정
+const getRandomComment = async (
+  subject,
+  grade,
+  semester,
+  unit,
+  usedUnits = []
+) => {
+  const subjectData = await Subject.findOne({ name: subject, grade, semester });
+  if (!subjectData) return null;
+
+  const availableUnits = unit
+    ? [subjectData.units.find((u) => u.name === unit)]
+    : subjectData.units.filter((u) => !usedUnits.includes(u.name));
+
+  if (availableUnits.length === 0) return null;
+
+  const unitData = unit
+    ? availableUnits[0]
+    : availableUnits[Math.floor(Math.random() * availableUnits.length)];
+
+  const ratingLevels = ["상", "중", "하"];
+  const randomLevel =
+    ratingLevels[Math.floor(Math.random() * ratingLevels.length)];
+  const ratingData = unitData.ratings.find((r) => r.level === randomLevel);
+
+  return {
+    unit: unitData.name,
+    comment:
+      ratingData.comments[
+        Math.floor(Math.random() * ratingData.comments.length)
+      ],
+  };
+};
+
 const processMessage = async (message) => {
   console.log("Received message:", message);
   if (!message || !message.body) {
@@ -126,10 +170,10 @@ const processMessage = async (message) => {
 
   try {
     if (generationMethod === "line_based") {
-      console.log('Generation method: Line-based');
+      console.log("Generation method: Line-based");
       for (const studentId of selectedStudents) {
         console.log(`Processing student: ${studentId}`);
-        const student = await Student.findOne({ '_id': studentId });
+        const student = await Student.findOne({ _id: studentId });
         if (!student) {
           console.error(`Student not found: ${studentId}`);
           continue;
@@ -140,10 +184,13 @@ const processMessage = async (message) => {
           console.log(`Processing semester: ${semester}`);
           for (const subject of selectedSubjects) {
             console.log(`Processing subject: ${subject}`);
-            const quizResults = await QuizResult.find({ studentId, semester, subject })
-            //   .sort({ score: -1 })
-            //   .limit(reportLines);
-            // 단원별로 그룹화하여 최고 점수 선택
+            const quizResults = await QuizResult.find({
+              studentId,
+              semester,
+              subject,
+            });
+
+            // 단원별 최고 점수 결과
             const bestResultsByUnit = quizResults.reduce((acc, result) => {
               const unit = result.unit;
               if (!acc[unit] || acc[unit].score < result.score) {
@@ -152,50 +199,63 @@ const processMessage = async (message) => {
               return acc;
             }, {});
 
-            // 단원별 최고 점수 결과를 배열로 변환하고, reportLines 수만큼 제한
             const selectedResults = Object.values(bestResultsByUnit)
-              .sort((a, b) => b.score - a.score) // 점수 내림차순 정렬
-              .slice(0, reportLines); // 결과 제한
+              .sort((a, b) => b.score - a.score)
+              .slice(0, reportLines);
 
             let comments = [];
-            if (selectedResults.length === 0) {
-              console.warn(`No quiz results found for student ${studentId}, semester ${semester}, subject ${subject}`);
-              await StudentReport.findOneAndUpdate(
-                { studentId, subject, semester },
-                { comment: "해당 과목에 대한 퀴즈 결과가 없습니다." },
-                { upsert: true }
-              );
-              continue;
-            }
 
+            // 실제 결과 기반 평어 생성
             for (const result of selectedResults) {
-              const unit = result.unit;
-              const score = result.score;
-              console.log(`Processing result: ${result._id}, Score: ${score}, Unit: ${unit}`);
+              const subjectData = await Subject.findOne({
+                name: subject,
+                grade,
+                semester,
+              });
+              if (!subjectData) continue;
 
-              const subjectData = await Subject.findOne({ name: subject, grade, semester });
-              if (!subjectData) {
-                console.error(`Subject data not found for name: ${subject}, grade: ${grade}, semester: ${semester}`);
-                continue;
-              }
+              const unitData = subjectData.units.find(
+                (u) => u.name === result.unit
+              );
+              if (!unitData) continue;
 
-              const unitData = subjectData.units.find(u => u.name === unit);
-              if (!unitData) {
-                console.error(`Unit data not found for unit: ${unit} in subject: ${subject}`);
-                continue;
-              }
-
-              const ratingLevel = score >= 75 ? '상' : score >= 55 ? '중' : '하';
-              const ratingData = unitData.ratings.find(r => r.level === ratingLevel);
+              const ratingLevel =
+                result.score >= 75 ? "상" : result.score >= 55 ? "중" : "하";
+              const ratingData = unitData.ratings.find(
+                (r) => r.level === ratingLevel
+              );
               if (ratingData) {
-                const comment = ratingData.comments[Math.floor(Math.random() * ratingData.comments.length)];
-                console.log(`Selected comment: ${comment}`);
-                comments.push(comment);
+                comments.push(
+                  ratingData.comments[
+                    Math.floor(Math.random() * ratingData.comments.length)
+                  ]
+                );
               }
             }
 
-            const reportComment = comments.join(' ');
-            console.log(`Generated report comment for student ${studentId}, subject ${subject}, semester ${semester}: ${reportComment}`);
+            // 실제 결과가 있는 단원들 추적
+            const usedUnits = selectedResults.map((result) => result.unit);
+
+            // 부족한 줄 수만큼 랜덤 평어 추가 (중복 제외)
+            const remainingLines = reportLines - comments.length;
+            for (let i = 0; i < remainingLines; i++) {
+              const randomResult = await getRandomComment(
+                subject,
+                grade,
+                semester,
+                null,
+                usedUnits
+              );
+              if (randomResult) {
+                comments.push(randomResult.comment);
+                usedUnits.push(randomResult.unit);
+              }
+            }
+
+            const reportComment = comments.join(" ");
+            console.log(
+              `Generated report comment for student ${studentId}, subject ${subject}, semester ${semester}: ${reportComment}`
+            );
 
             await StudentReport.findOneAndUpdate(
               { studentId, subject, semester },
@@ -206,60 +266,67 @@ const processMessage = async (message) => {
         }
       }
     } else if (generationMethod === "unit_based") {
-      console.log('Generation method: Unit-based');
+      console.log("Generation method: Unit-based");
       for (const studentId of selectedStudents) {
         console.log(`Processing student: ${studentId}`);
         for (const subject of selectedSubjects) {
           const unitsForSubject = selectedUnits[subject] || [];
           for (const semester of selectedSemesters) {
             let comments = [];
-            let hasQuizResult = false; // 단원에 대한 퀴즈 결과 존재 여부 확인
+
             for (const unit of unitsForSubject) {
               const quizResults = await QuizResult.find({
                 studentId,
                 subject,
                 semester,
-                unit
+                unit,
               })
-              .sort({ score: -1 }) // 점수 내림차순 정렬
-              .limit(1); // 최고 점수 하나만 선택
+                .sort({ score: -1 })
+                .limit(1);
 
-              if (quizResults.length === 0) {
-                console.warn(`No quiz results found for student ${studentId}, unit ${unit}`);
-                continue;
-              }
-
-              hasQuizResult = true; // 퀴즈 결과가 있는 경우
-
-              for (const result of quizResults) {
-                const subjectData = await Subject.findOne({ name: subject, semester, "units.name": unit });
+              if (quizResults.length > 0) {
+                // 퀴즈 결과가 있는 경우 실제 결과 기반 평어
+                const result = quizResults[0];
+                const subjectData = await Subject.findOne({
+                  name: subject,
+                  grade,
+                  semester,
+                });
                 if (!subjectData) continue;
 
-                const unitData = subjectData.units.find(u => u.name === unit);
+                const unitData = subjectData.units.find((u) => u.name === unit);
                 if (!unitData) continue;
 
-                const ratingLevel = result.score >= 75 ? "상" : result.score >= 55 ? "중" : "하";
-                const ratingData = unitData.ratings.find(r => r.level === ratingLevel);
-
+                const ratingLevel =
+                  result.score >= 75 ? "상" : result.score >= 55 ? "중" : "하";
+                const ratingData = unitData.ratings.find(
+                  (r) => r.level === ratingLevel
+                );
                 if (ratingData) {
-                  const comment = ratingData.comments[Math.floor(Math.random() * ratingData.comments.length)];
-                  console.log(`Selected comment: ${comment}`);
+                  const comment =
+                    ratingData.comments[
+                      Math.floor(Math.random() * ratingData.comments.length)
+                    ];
                   comments.push(comment);
+                }
+              } else {
+                // 해당 단원에 대해서만 랜덤 평어 생성 (다른 단원 고려할 필요 없음)
+                const randomResult = await getRandomComment(
+                  subject,
+                  grade,
+                  semester,
+                  unit
+                );
+                if (randomResult) {
+                  comments.push(randomResult.comment);
                 }
               }
             }
 
-            if (!hasQuizResult) {
-              await StudentReport.findOneAndUpdate(
-                { studentId, subject, semester },
-                { comment: "해당 과목에 대한 퀴즈 결과가 없습니다." },
-                { upsert: true }
-              );
-              continue;
-            }
-
             const reportComment = comments.join(" ");
-            console.log(`Generated report comment for student ${studentId}, subject ${subject}, semester ${semester}: ${reportComment}`);
+            console.log(
+              `Generated report comment for student ${studentId}, subject ${subject}, semester ${semester}: ${reportComment}`
+            );
 
             await StudentReport.findOneAndUpdate(
               { studentId, subject, semester },
@@ -271,7 +338,7 @@ const processMessage = async (message) => {
       }
     }
 
-    console.log('Report generated successfully.');
+    console.log("Report generated successfully.");
 
     await sendNotificationToTeacher(teacherId, {
       grade,

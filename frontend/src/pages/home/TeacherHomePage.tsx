@@ -84,8 +84,9 @@ const TeacherHomePage: React.FC = () => {
           const res = await api.get("/users/teacher/students", {
             params: { school, grade, class: classNumber, uniqueIdentifier },
           });
-          const sortedStudents = res.data.sort((a: Student, b: Student) =>
-            a.studentId.localeCompare(b.studentId)
+          const sortedStudents = res.data.sort(
+            (a: Student, b: Student) =>
+              parseInt(a.studentId) - parseInt(b.studentId)
           );
           setStudents(sortedStudents);
         } catch (error) {

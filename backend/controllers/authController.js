@@ -362,7 +362,7 @@ const registerStudentByTeacher = async (req, res) => {
           : "학교의 학년, 반, 출석번호";
         results.failed.push({
           studentData,
-          error: `이미 동일한 ${duplicateField}가 존재합니다.`,
+          error: `동일한 ${duplicateField}가 존재합니다. 식별코드를 변경하세요.`,
         });
       } else {
         results.failed.push({

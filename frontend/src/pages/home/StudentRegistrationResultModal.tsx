@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   Modal,
   Box,
@@ -12,19 +12,21 @@ import {
   TableHead,
   TableRow,
   Paper,
-  Button
-} from '@mui/material';
+  Button,
+} from "@mui/material";
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import CancelIcon from "@mui/icons-material/Cancel";
 
 type Student = {
-    _id: number;
-    name: string;
-    grade: number;
-    class: string;
-    loginId: string;
-    password: string;
-    studentId: string;
-    studentClass: string;
-    school: string;
+  _id: number;
+  name: string;
+  grade: number;
+  class: string;
+  loginId: string;
+  password: string;
+  studentId: string;
+  studentClass: string;
+  school: string;
 };
 
 interface FailedStudent {
@@ -45,7 +47,12 @@ interface Props {
   failed: FailedStudent[];
 }
 
-const StudentRegistrationResultModal: React.FC<Props> = ({ open, onClose, success, failed }) => {
+const StudentRegistrationResultModal: React.FC<Props> = ({
+  open,
+  onClose,
+  success,
+  failed,
+}) => {
   const [currentTab, setCurrentTab] = useState(0);
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
@@ -54,26 +61,54 @@ const StudentRegistrationResultModal: React.FC<Props> = ({ open, onClose, succes
 
   return (
     <Modal open={open} onClose={onClose}>
-      <Box sx={{
-        position: 'absolute',
-        top: '50%',
-        left: '50%',
-        transform: 'translate(-50%, -50%)',
-        width: '80%',
-        maxWidth: 800,
-        bgcolor: 'background.paper',
-        boxShadow: 24,
-        p: 4,
-        maxHeight: '90vh',
-        overflow: 'auto'
-      }}>
+      <Box
+        sx={{
+          position: "absolute",
+          top: "50%",
+          left: "50%",
+          transform: "translate(-50%, -50%)",
+          width: "80%",
+          maxWidth: 800,
+          bgcolor: "background.paper",
+          boxShadow: 24,
+          p: 4,
+          maxHeight: "90vh",
+          overflow: "auto",
+        }}
+      >
         <Typography variant="h6" component="h2" gutterBottom>
           학생 계정 생성 결과
         </Typography>
 
         <Tabs value={currentTab} onChange={handleTabChange}>
-          <Tab label={`성공 (${success.length})`} />
-          <Tab label={`실패 (${failed.length})`} />
+          <Tab
+            label={
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                {success.length > 0 && (
+                  <CheckCircleIcon fontSize="small" color="success" />
+                )}
+                <Typography
+                  color={success.length > 0 ? "success.main" : "inherit"}
+                >
+                  성공 ({success.length})
+                </Typography>
+              </Box>
+            }
+          />
+          <Tab
+            label={
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                {failed.length > 0 && (
+                  <CancelIcon fontSize="small" color="error" />
+                )}
+                <Typography
+                  color={failed.length > 0 ? "error.main" : "inherit"}
+                >
+                  실패 ({failed.length})
+                </Typography>
+              </Box>
+            }
+          />
         </Tabs>
 
         {currentTab === 0 && (
@@ -83,7 +118,7 @@ const StudentRegistrationResultModal: React.FC<Props> = ({ open, onClose, succes
                 <TableRow>
                   <TableCell>이름</TableCell>
                   <TableCell>학년/반</TableCell>
-                  <TableCell>출석번호</TableCell>
+                  <TableCell>번호</TableCell>
                   <TableCell>로그인 ID</TableCell>
                   <TableCell>초기 비밀번호</TableCell>
                 </TableRow>
@@ -110,7 +145,7 @@ const StudentRegistrationResultModal: React.FC<Props> = ({ open, onClose, succes
                 <TableRow>
                   <TableCell>이름</TableCell>
                   <TableCell>학년/반</TableCell>
-                  <TableCell>출석번호</TableCell>
+                  <TableCell>번호</TableCell>
                   <TableCell>실패 사유</TableCell>
                 </TableRow>
               </TableHead>
@@ -128,7 +163,7 @@ const StudentRegistrationResultModal: React.FC<Props> = ({ open, onClose, succes
           </TableContainer>
         )}
 
-        <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
+        <Box sx={{ mt: 2, display: "flex", justifyContent: "flex-end" }}>
           <Button onClick={onClose} variant="contained">
             닫기
           </Button>

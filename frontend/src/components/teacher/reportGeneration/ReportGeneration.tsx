@@ -110,7 +110,7 @@ const ReportGeneration: React.FC<ReportGenerationProps> = ({
         selectedUnits
       };
 
-      const response = await api.post("/report/generate", payload);
+      await api.post("/report/generate", payload);
 
       setSnackbarMessage("보고서 생성 요청이 성공적으로 접수되었습니다. 생성이 완료되면 알림을 받게 됩니다.");
       setSnackbarSeverity("success");
@@ -196,7 +196,7 @@ const ReportGeneration: React.FC<ReportGenerationProps> = ({
         <SubjectSelect 
           selectedSubjects={selectedSubjects}
           handleSubjectChange={(e: SelectChangeEvent<string[]>) => setSelectedSubjects(e.target.value as string[])}
-          handleSelectAllSubjects={() => setSelectedSubjects(["국어", "수학", "사회", "과학", "영어"])}
+          handleSelectAllSubjects={() => setSelectedSubjects(["국어", "도덕", "수학", "과학", "사회", "영어", "음악", "미술", "체육", "실과"])}
           handleDeselectAllSubjects={() => setSelectedSubjects([])}
           sx={{ marginBottom: 2 }} // 여백 추가
         />

@@ -91,7 +91,7 @@ const StudentList: React.FC<StudentListProps> = ({
             label="학기"
           >
             <MenuItem value="All">전체</MenuItem>
-            <MenuItem value="1���기">1학기</MenuItem>
+            <MenuItem value="1학기">1학기</MenuItem>
             <MenuItem value="2학기">2학기</MenuItem>
             {/* 필요에 따라 학기를 더 추가 */}
           </Select>
@@ -107,10 +107,15 @@ const StudentList: React.FC<StudentListProps> = ({
           >
             <MenuItem value="All">전체</MenuItem>
             <MenuItem value="국어">국어</MenuItem>
+            <MenuItem value="도덕">도덕</MenuItem>
             <MenuItem value="수학">수학</MenuItem>
-            <MenuItem value="사회">사회</MenuItem>
             <MenuItem value="과학">과학</MenuItem>
+            <MenuItem value="사회">사회</MenuItem>
             <MenuItem value="영어">영어</MenuItem>
+            <MenuItem value="음악">음악</MenuItem>
+            <MenuItem value="미술">미술</MenuItem>
+            <MenuItem value="체육">체육</MenuItem>
+            <MenuItem value="실과">실과</MenuItem>
             {/* 필요에 따라 과목을 더 추가 */}
           </Select>
         </FormControl>
