@@ -57,7 +57,7 @@ const StudentSelect: React.FC<StudentSelectProps> = ({
           ))
         ) : (
           <Typography variant="body2" color="textSecondary" align="center">
-            선택한 학년과 반에 등록된 학생이 없습니다.
+            입력한 식별코드, 학년, 반에 대한 학생이 없습니다.
           </Typography>
         )}
       </Paper>

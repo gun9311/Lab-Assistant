@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { List, ListItem, ListItemText, Paper, Typography, IconButton, Collapse, Box, useTheme, Divider, FormControl, InputLabel, Select, MenuItem } from "@mui/material";
+import { List, ListItem, ListItemText, Paper, Typography, IconButton, Collapse, Box, useTheme, Divider, FormControl, InputLabel, Select, MenuItem, Pagination } from "@mui/material";
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import QuizResults from "../student/quiz/QuizResults";
@@ -36,6 +36,15 @@ const StudentList: React.FC<StudentListProps> = ({
   const [selectedQuiz, setSelectedQuiz] = useState<QuizResult | null>(null);
   const [selectedSemester, setSelectedSemester] = useState<string>('All');
   const [selectedSubject, setSelectedSubject] = useState<string>('All');
+  const [page, setPage] = useState(1);
+  const itemsPerPage = 10;
+  
+  // 클라이언트 사이드에서 페이지네이션 계산
+  const totalPages = Math.ceil(students.length / itemsPerPage);
+  const currentStudents = students.slice(
+    (page - 1) * itemsPerPage,
+    page * itemsPerPage
+  );
 
   const handleToggle = (studentId: number, section: 'quiz' | 'chat' | 'report') => {
     setExpandedSections(prevState => {
@@ -54,11 +63,15 @@ const StudentList: React.FC<StudentListProps> = ({
     setSelectedQuiz(null);
   };
 
+  const handlePageChange = (event: React.ChangeEvent<unknown>, value: number) => {
+    setPage(value);
+  };
+
   if (!grade || !classNumber || !uniqueIdentifier) {
     return (
       <Paper elevation={3} sx={{ padding: theme.spacing(2), marginTop: theme.spacing(2), backgroundColor: theme.palette.background.paper }}>
         <Typography variant="h5" gutterBottom align="center" sx={{ color: theme.palette.primary.main }}>
-          식별코드, 학년, 반을 입력해주세요.
+          조회할 학급의 식별코드, 학년, 반을 입력해주세요.
         </Typography>
       </Paper>
     );
@@ -68,7 +81,7 @@ const StudentList: React.FC<StudentListProps> = ({
     return (
       <Paper elevation={3} sx={{ padding: theme.spacing(2), marginTop: theme.spacing(2), backgroundColor: theme.palette.background.paper }}>
         <Typography variant="h5" gutterBottom align="center" sx={{ color: theme.palette.primary.main }}>
-          입력하신 식별코드, 학년, 반에 대한 학생이 없습니다.
+          입력한 식별코드, 학년, 반에 대한 학생이 없습니다.
         </Typography>
       </Paper>
     );
@@ -77,7 +90,7 @@ const StudentList: React.FC<StudentListProps> = ({
   return (
     <Paper elevation={3} sx={{ padding: theme.spacing(2), marginTop: theme.spacing(2), backgroundColor: theme.palette.background.paper }}>
       <Typography variant="h5" gutterBottom align="center" sx={{ color: theme.palette.primary.main }}>
-        학생 목록
+        대시보드
       </Typography>
       
       {/* 학기와 과목 선택 UI */}
@@ -122,7 +135,7 @@ const StudentList: React.FC<StudentListProps> = ({
       </Box>
 
       <List>
-        {students.map((student) => (
+        {currentStudents.map((student) => (
           <React.Fragment key={student._id}>
             <ListItem sx={{ backgroundColor: theme.palette.grey[100], borderRadius: theme.shape.borderRadius, marginBottom: theme.spacing(1), boxShadow: expandedSections[student._id] ? `0 4px 8px ${theme.palette.primary.main}` : 'none' }}>
               <ListItemText
@@ -192,6 +205,18 @@ const StudentList: React.FC<StudentListProps> = ({
           </React.Fragment>
         ))}
       </List>
+
+      {students.length > itemsPerPage && (
+        <Box display="flex" justifyContent="center" mt={2}>
+          <Pagination 
+            count={totalPages}
+            page={page}
+            onChange={handlePageChange}
+            color="primary"
+            size="large"
+          />
+        </Box>
+      )}
     </Paper>
   );
 };

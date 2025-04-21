@@ -108,10 +108,21 @@ const StudentHomePage: React.FC = () => {
   return (
     <Container
       component="main"
-      maxWidth={isChatbotActive ? "lg" : "lg"}
-      sx={{ mt: 8, fontFamily: "Roboto, sans-serif" }}
+      maxWidth={isChatbotActive ? "lg" : "md"}
+      sx={{
+        mt: { xs: 4, sm: 6, md: 8 },
+        mb: 4,
+        px: { xs: 2, sm: 3 },
+        fontFamily: "Roboto, sans-serif",
+      }}
     >
-      <Paper elevation={3} sx={{ padding: 4 }}>
+      <Paper
+        elevation={3}
+        sx={{
+          padding: { xs: 2, sm: 3, md: 4 },
+          borderRadius: 2,
+        }}
+      >
         {!isChatbotActive && (
           <Typography
             variant="h4"
@@ -122,9 +133,11 @@ const StudentHomePage: React.FC = () => {
               display: "flex",
               justifyContent: "center",
               alignItems: "center",
+              fontWeight: 600,
+              mb: 3,
             }}
           >
-            <Assistant sx={{ mr: 1 }} />
+            <Assistant sx={{ mr: 1.5, fontSize: "2rem" }} />
             T-BOT
           </Typography>
         )}
@@ -137,19 +150,32 @@ const StudentHomePage: React.FC = () => {
         )}
         {/* 시작 버튼 조건 수정 */}
         {canStartChatbot() && !isChatbotActive && (
-          <Box textAlign="center" sx={{ mt: 2 }}>
+          <Box textAlign="center" sx={{ mt: 4 }}>
             <Button
               variant="contained"
               color="primary"
               onClick={handleChatbotStart}
               startIcon={<PlayArrow />}
+              size="large"
+              sx={{ py: 1.5, px: 4, fontSize: "1.1rem" }}
             >
               학습 챗봇 시작하기
             </Button>
           </Box>
         )}
         {isChatbotActive && (
-          <Box textAlign="center" sx={{ mt: 2 }}>
+          <Box
+            textAlign="center"
+            sx={{
+              mt: 2,
+              mb: 3,
+              display: "flex",
+              flexDirection: { xs: "column", sm: "row" },
+              justifyContent: "center",
+              alignItems: "center",
+              gap: 2,
+            }}
+          >
             <Typography
               variant="h6"
               color={
@@ -157,8 +183,9 @@ const StudentHomePage: React.FC = () => {
               }
               sx={{
                 display: "flex",
-                justifyContent: "center",
                 alignItems: "center",
+                fontWeight: 500,
+                fontSize: { xs: "1rem", sm: "1.1rem" },
               }}
             >
               <AccessTime sx={{ mr: 1 }} />
@@ -168,7 +195,10 @@ const StudentHomePage: React.FC = () => {
               variant="outlined"
               color="primary"
               onClick={handleExtendTime}
-              sx={{ mt: 2 }}
+              size="medium"
+              sx={{
+                px: 2,
+              }}
             >
               시간 연장
             </Button>
@@ -182,8 +212,11 @@ const StudentHomePage: React.FC = () => {
             unit={selection.unit}
             topic={selection.topic}
             onChatbotEnd={handleChatbotEnd}
-            onAlertOpen={() => setChatbotEndAlertOpen(true)} // 알림 상태 제어 함수 전달
-            sx={{ height: "70vh" }} // 챗봇의 높이를 크게 설정하여 화면을 더 많이 차지하도록 함
+            onAlertOpen={() => setChatbotEndAlertOpen(true)}
+            sx={{
+              height: { xs: "65vh", sm: "70vh" },
+              mt: 2,
+            }}
           />
         )}
       </Paper>
@@ -192,11 +225,14 @@ const StudentHomePage: React.FC = () => {
         autoHideDuration={3000}
         onClose={() => setSessionEndedAlertOpen(false)}
         anchorOrigin={{ vertical: "top", horizontal: "center" }}
+        sx={{ top: { xs: 70, sm: 80 } }}
       >
         <Alert
           onClose={() => setSessionEndedAlertOpen(false)}
           severity="warning"
-          sx={{ width: "100%" }}
+          sx={{ width: "100%", fontSize: "1rem" }}
+          elevation={6}
+          variant="filled"
         >
           세션이 종료되었습니다. 계속 학습하려면 새로 시작하세요.
         </Alert>
@@ -207,11 +243,14 @@ const StudentHomePage: React.FC = () => {
         autoHideDuration={2000}
         onClose={() => setChatbotEndAlertOpen(false)}
         anchorOrigin={{ vertical: "top", horizontal: "center" }}
+        sx={{ top: { xs: 70, sm: 80 } }}
       >
         <Alert
           onClose={() => setChatbotEndAlertOpen(false)}
           severity="success"
-          sx={{ width: "100%" }}
+          sx={{ width: "100%", fontSize: "1rem" }}
+          elevation={6}
+          variant="filled"
         >
           대화가 종료되었습니다!
         </Alert>

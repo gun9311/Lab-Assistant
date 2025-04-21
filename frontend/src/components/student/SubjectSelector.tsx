@@ -10,6 +10,7 @@ import {
   Select,
   MenuItem,
   ListSubheader,
+  Grid,
 } from "@mui/material";
 import { getGradeStatus } from "../../utils/auth";
 
@@ -42,7 +43,7 @@ const SubjectSelector: React.FC<SubjectSelectorProps> = ({
 
   useEffect(() => {
     const fetchUnits = async () => {
-      if (subject && semester && mainSubjects.includes(subject)) {
+      if (grade && semester && subject && mainSubjects.includes(subject)) {
         try {
           const res = await api.get("/subjects/units", {
             params: { grade, semester, subject },
@@ -54,18 +55,22 @@ const SubjectSelector: React.FC<SubjectSelectorProps> = ({
             return numA - numB;
           });
           setUnits(fetchedUnits);
+          setUnit("");
         } catch (error) {
           console.error("Failed to fetch units:", error);
+          setUnits([]);
+          setUnit("");
         }
       } else {
         setUnits([]);
+        setUnit("");
       }
     };
 
     fetchUnits();
-  }, [grade, semester, subject, mainSubjects]);
+  }, [grade, semester, subject]);
 
-  const handleSelectionChange = () => {
+  useEffect(() => {
     const unitValue = mainSubjects.includes(subject) ? unit : "";
     onSelectionChange({
       grade,
@@ -74,97 +79,118 @@ const SubjectSelector: React.FC<SubjectSelectorProps> = ({
       unit: unitValue,
       topic: topic || "",
     });
-  };
-
-  useEffect(() => {
-    handleSelectionChange();
-  }, [grade, semester, subject, unit, topic]);
+  }, [grade, semester, subject, unit, topic, onSelectionChange]);
 
   return (
-    <Paper elevation={3} sx={{ padding: 4, marginTop: 4 }}>
-      <Typography variant="h5" gutterBottom>
-        과목 선택
+    <Box sx={{ mt: 2 }}>
+      <Typography variant="h6" gutterBottom sx={{ mb: 3 }}>
+        학습 내용 선택
       </Typography>
-      <FormControl fullWidth sx={{ mb: 2 }}>
-        <TextField
-          value={grade + "학년"}
-          variant="outlined"
-          disabled={disabled}
-        />
-      </FormControl>
-      <FormControl fullWidth sx={{ mb: 2 }}>
-        <InputLabel>학기</InputLabel>
-        <Select
-          value={semester}
-          onChange={(e) => {
-            setSemester(e.target.value);
-            setUnit(""); // 학기 변경 시 단원 초기화 추가
-          }} 
-          label="학기"
-          disabled={disabled}
-        >
-          <MenuItem value="1학기">1학기</MenuItem>
-          <MenuItem value="2학기">2학기</MenuItem>
-        </Select>
-      </FormControl>
-      <FormControl fullWidth sx={{ mb: 2 }}>
-        <InputLabel>과목</InputLabel>
-        <Select
-          value={subject}
-          onChange={(e) => {
-            setSubject(e.target.value);
-            setUnit(""); // 이미 있는 단원 초기화
-          }} 
-          label="과목"
-          disabled={disabled}
-        >
-          <MenuItem value="" disabled>
-            과목 선택
-          </MenuItem>
-          {/* <ListSubheader>주요 과목</ListSubheader> */}
-          {mainSubjects.map((sub, index) => (
-            <MenuItem key={`main-${index}`} value={sub}>
-              {sub}
-            </MenuItem>
-          ))}
-          {/* <ListSubheader>기타 과목</ListSubheader> */}
-          {otherSubjects.map((sub, index) => (
-            <MenuItem key={`other-${index}`} value={sub}>
-              {sub}
-            </MenuItem>
-          ))}
-        </Select>
-      </FormControl>
-      {units.length > 0 && mainSubjects.includes(subject) && (
-        <FormControl fullWidth sx={{ mb: 2 }}>
-          <InputLabel>단원</InputLabel>
-          <Select
-            value={unit}
-            onChange={(e) => setUnit(e.target.value)}
-            label="단원"
-            disabled={disabled}
-          >
-            {units.map((unit, index) => (
-              <MenuItem key={index} value={unit}>
-                {unit}
+      <Grid container spacing={2.5}>
+        <Grid item xs={12} sm={6}>
+          <TextField
+            label="학년"
+            value={grade ? `${grade}학년` : ""}
+            variant="outlined"
+            fullWidth
+            disabled
+          />
+        </Grid>
+        <Grid item xs={12} sm={6}>
+          <FormControl fullWidth variant="outlined">
+            <InputLabel>학기</InputLabel>
+            <Select
+              value={semester}
+              onChange={(e) => {
+                setSemester(e.target.value);
+                setUnit("");
+                setTopic("");
+                setUnits([]);
+              }}
+              label="학기"
+              disabled={disabled}
+            >
+              <MenuItem value="" disabled>
+                <em>학기 선택</em>
               </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-      )}
-      {subject && showTopic && (
-        <TextField
-          fullWidth
-          variant="outlined"
-          margin="normal"
-          label="주제"
-          value={topic}
-          onChange={(e) => setTopic(e.target.value)}
-          placeholder="학습 주제를 입력하세요"
-          disabled={disabled}
-        />
-      )}
-    </Paper>
+              <MenuItem value="1학기">1학기</MenuItem>
+              <MenuItem value="2학기">2학기</MenuItem>
+            </Select>
+          </FormControl>
+        </Grid>
+        <Grid item xs={12} sm={6}>
+          <FormControl fullWidth variant="outlined">
+            <InputLabel>과목</InputLabel>
+            <Select
+              value={subject}
+              onChange={(e) => {
+                setSubject(e.target.value);
+                setUnit("");
+                setTopic("");
+                setUnits([]);
+              }}
+              label="과목"
+              disabled={disabled}
+            >
+              <MenuItem value="" disabled>
+                <em>과목 선택</em>
+              </MenuItem>
+              <ListSubheader>주요 과목</ListSubheader>
+              {mainSubjects.map((sub, index) => (
+                <MenuItem key={`main-${index}`} value={sub}>
+                  {sub}
+                </MenuItem>
+              ))}
+              <ListSubheader>기타 과목</ListSubheader>
+              {otherSubjects.map((sub, index) => (
+                <MenuItem key={`other-${index}`} value={sub}>
+                  {sub}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </Grid>
+        {mainSubjects.includes(subject) && units.length > 0 && (
+          <Grid item xs={12} sm={6}>
+            <FormControl fullWidth variant="outlined">
+              <InputLabel>단원</InputLabel>
+              <Select
+                value={unit}
+                onChange={(e) => setUnit(e.target.value)}
+                label="단원"
+                disabled={disabled || !subject || !semester}
+              >
+                <MenuItem value="" disabled>
+                  <em>단원 선택</em>
+                </MenuItem>
+                {units.map((u, index) => (
+                  <MenuItem key={index} value={u}>
+                    {u}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Grid>
+        )}
+        {subject && showTopic && (
+          <Grid item xs={12}>
+            <TextField
+              fullWidth
+              variant="outlined"
+              label="주제"
+              value={topic}
+              onChange={(e) => setTopic(e.target.value)}
+              placeholder="구체적인 학습 주제를 입력하세요 (예: 시의 특징)"
+              disabled={disabled || !subject}
+              required={
+                !mainSubjects.includes(subject) ||
+                (mainSubjects.includes(subject) && !!unit)
+              }
+            />
+          </Grid>
+        )}
+      </Grid>
+    </Box>
   );
 };
 

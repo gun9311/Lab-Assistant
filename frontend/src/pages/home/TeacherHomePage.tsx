@@ -98,11 +98,11 @@ const TeacherHomePage: React.FC = () => {
   }, [school, grade, classNumber, uniqueIdentifier]);
 
   const handleShowReportGeneration = () => {
-    if (grade && classNumber) {
-      setShowReportGeneration(true);
-    } else {
-      alert("학년과 반을 모두 선택해 주세요.");
-    }
+    // if (grade && classNumber) {
+    setShowReportGeneration(true);
+    // } else {
+    // alert("학년과 반을 모두 선택해 주세요.");
+    // }
   };
 
   const handleBackToList = () => {
@@ -298,12 +298,11 @@ const TeacherHomePage: React.FC = () => {
               />
             </FormControl>
           </Box>
-          {!showReportGeneration && (
+          {!showReportGeneration ? (
             <Button
               variant="contained"
               color="primary"
               onClick={handleShowReportGeneration}
-              disabled={!grade || !classNumber || !uniqueIdentifier}
               sx={{
                 padding: "10px 24px",
                 borderRadius: 4,
@@ -317,6 +316,24 @@ const TeacherHomePage: React.FC = () => {
               <AssessmentIcon sx={{ mr: 1, verticalAlign: "middle" }} />
               평어 생성 및 일괄 조회
             </Button>
+          ) : (
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={handleBackToList}
+              sx={{
+                padding: "10px 24px",
+                borderRadius: 4,
+                boxShadow: "none",
+                "&:hover": {
+                  backgroundColor: theme.palette.primary.dark,
+                  boxShadow: "none",
+                },
+              }}
+            >
+              <AssessmentIcon sx={{ mr: 1, verticalAlign: "middle" }} />
+              대시보드
+            </Button>
           )}
         </Box>
         <StudentRegistrationResultModal
@@ -325,23 +342,117 @@ const TeacherHomePage: React.FC = () => {
           success={modalData.success}
           failed={modalData.failed}
         />
-        {showReportGeneration ? (
-          <ReportGeneration
-            onBack={handleBackToList}
-            school={school}
-            grade={grade}
-            classNumber={classNumber}
-            students={students}
-          />
-        ) : (
-          <StudentList
-            school={school}
-            grade={grade}
-            classNumber={classNumber}
-            students={students}
-            uniqueIdentifier={uniqueIdentifier}
-          />
-        )}
+        <Box sx={{ position: "relative" }}>
+          {showReportGeneration ? (
+            <>
+              {grade && classNumber && uniqueIdentifier ? (
+                <ReportGeneration
+                  onBack={handleBackToList}
+                  school={school}
+                  grade={grade}
+                  classNumber={classNumber}
+                  students={students}
+                />
+              ) : (
+                <Box
+                  sx={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "flex-start",
+                    paddingTop: "2vh",
+                    gap: 3,
+                  }}
+                >
+                  <Typography
+                    variant="h5"
+                    sx={{
+                      color: "text.primary",
+                      textAlign: "center",
+                      fontWeight: 600,
+                      maxWidth: "80%",
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    평어 생성 또는 일괄 조회를 위해
+                    <br />
+                    먼저 다음 정보를 입력해주세요
+                  </Typography>
+                  <Box
+                    sx={{
+                      display: "flex",
+                      gap: 3,
+                      alignItems: "center",
+                      padding: "24px 32px",
+                      borderRadius: 3,
+                      background: "rgba(0, 0, 0, 0.03)",
+                      boxShadow: "0 4px 20px rgba(0, 0, 0, 0.05)",
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 1,
+                        padding: "8px 16px",
+                        borderRadius: 2,
+                        backgroundColor: !uniqueIdentifier
+                          ? "error.lighter"
+                          : "success.lighter",
+                        color: !uniqueIdentifier
+                          ? "error.dark"
+                          : "success.dark",
+                        transition: "all 0.2s ease",
+                      }}
+                    >
+                      {!uniqueIdentifier ? "⚠️" : "✓"} 식별코드
+                    </Box>
+                    <Box
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 1,
+                        padding: "8px 16px",
+                        borderRadius: 2,
+                        backgroundColor: !grade
+                          ? "error.lighter"
+                          : "success.lighter",
+                        color: !grade ? "error.dark" : "success.dark",
+                        transition: "all 0.2s ease",
+                      }}
+                    >
+                      {!grade ? "⚠️" : "✓"} 학년
+                    </Box>
+                    <Box
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 1,
+                        padding: "8px 16px",
+                        borderRadius: 2,
+                        backgroundColor: !classNumber
+                          ? "error.lighter"
+                          : "success.lighter",
+                        color: !classNumber ? "error.dark" : "success.dark",
+                        transition: "all 0.2s ease",
+                      }}
+                    >
+                      {!classNumber ? "⚠️" : "✓"} 반
+                    </Box>
+                  </Box>
+                </Box>
+              )}
+            </>
+          ) : (
+            <StudentList
+              school={school}
+              grade={grade}
+              classNumber={classNumber}
+              students={students}
+              uniqueIdentifier={uniqueIdentifier}
+            />
+          )}
+        </Box>
 
         {/* Snackbar: 비밀번호 재설정 성공 */}
         <Snackbar
