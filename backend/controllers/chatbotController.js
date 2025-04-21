@@ -3,6 +3,8 @@ const { getNLPResponse } = require("../services/nlpService");
 const ChatSummary = require("../models/ChatSummary");
 const redisClient = require("../utils/redisClient");
 const winston = require("winston");
+const { OpenAI } = require("openai");
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 const logger = winston.createLogger({
   level: "info",
@@ -17,6 +19,117 @@ const logger = winston.createLogger({
 });
 
 let clients = {};
+
+// PII 마스킹 함수 (2.5단계)
+function maskPII(text) {
+  if (!text) return text;
+  let maskedText = text;
+  // 전화번호 (010-xxxx-xxxx, 01x-xxx-xxxx, 0x0-xxxx-xxxx 등, 공백/하이픈 허용)
+  maskedText = maskedText.replace(
+    /\b01[016789](?:[ -]?\d{3,4}){2}\b/g,
+    "[전화번호]"
+  );
+  // 주민등록번호 (xxxxxx-xxxxxxx)
+  maskedText = maskedText.replace(
+    /\b\d{6}[- ]?[1-4]\d{6}\b/g,
+    "[주민등록번호]"
+  );
+  // 이메일 주소
+  maskedText = maskedText.replace(
+    /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g,
+    "[이메일]"
+  );
+  // 간단한 주소 패턴 (시/도/구/군/동/면/읍/리/길/로 + 숫자) - 오탐 가능성 높음, 필요시 정교화
+  // maskedText = maskedText.replace(/([가-힣]+(시|도|구|군|동|면|읍|리|길|로))(\s?\d+)/g, "[주소]");
+  return maskedText;
+}
+
+// --- 4단계: 금지 키워드 및 패턴 정의 시작 ---
+const forbiddenKeywords = [
+  // 카테고리 1: 비난, 모욕, 따돌림
+  "바보",
+  "멍청이",
+  "찐따",
+  "못생김",
+  "죽어",
+  "꺼져",
+  "저리가",
+  // 카테고리 2: 욕설 및 비속어 (기본적인 수준, 추후 확장 필요)
+  "씨발",
+  "시발",
+  "개새끼",
+  "새끼",
+  "미친",
+  "존나",
+  "병신",
+  // 카테고리 3: 폭력적이거나 무서운 내용 (일부)
+  "살인",
+  "자살",
+  // 카테고리 4: 부적절/민감 주제 (매우 기본적인 예시)
+  "야동",
+  "섹스",
+  // 카테고리 5: 챗봇 기능 악용/탈옥 시도 (기본 패턴)
+  "ignore",
+  "disregard",
+  "시스템",
+  "프롬프트",
+  "명령",
+  // 카테고리 6: 사회 이슈
+  "종북",
+  "종북당",
+  "종북놈",
+  "종북년",
+  "종북새끼",
+  "종북미친",
+  "종북병신",
+  "종북놈",
+  "종북년",
+  "종북새끼",
+  "종북미친",
+  "종북병신",
+];
+
+const forbiddenPatterns = [
+  // 카테고리 1
+  /\b(나쁜|이상한)\s*(놈|년|새끼)\b/i,
+  // 카테고리 3
+  /(죽여|때려)버릴거야/i,
+  // 카테고리 4
+  /(성관계|마약)/i,
+  // 카테고리 5
+  /규칙을?\s*(무시|잊어|어겨|바꿔)/i,
+  /너는 이제부터/i,
+  /대답하지마/i,
+  /개발자 모드/i,
+  /내 지시만 따라/i,
+];
+
+// 4단계: 금지 콘텐츠 확인 함수
+function containsForbiddenContent(text) {
+  if (!text) return { forbidden: false };
+  const lowerCaseText = text.toLowerCase(); // 키워드 비교용
+
+  // 금지 키워드 확인 (부분 문자열 일치)
+  const foundKeyword = forbiddenKeywords.find((keyword) =>
+    lowerCaseText.includes(keyword)
+  );
+  if (foundKeyword) {
+    return { forbidden: true, type: "keyword", detail: foundKeyword };
+  }
+
+  // 금지 정규식 패턴 확인
+  const foundPattern = forbiddenPatterns.find((pattern) => pattern.test(text));
+  if (foundPattern) {
+    return {
+      forbidden: true,
+      type: "pattern",
+      detail: foundPattern.toString(),
+    };
+  }
+
+  return { forbidden: false };
+}
+// --- 4단계: 금지 키워드 및 패턴 정의 끝 ---
 
 const handleWebSocketConnection = async (ws, userId, subject) => {
   const chatHistoryKey = `chatHistories:${userId}`;
@@ -59,55 +172,232 @@ const handleWebSocketConnection = async (ws, userId, subject) => {
 
   ws.on("message", async (message) => {
     const startTime = process.hrtime();
+    let saveToHistory = true;
 
     try {
       const { grade, semester, subject, unit, topic, userMessage } =
         JSON.parse(message);
-      const mainSubjects = ["국어", "도덕", "수학", "과학", "사회"];
-      const isMainSubject = mainSubjects.includes(subject);
+
+      let finalUserMessage = userMessage;
+      let messageForProcessing = userMessage;
+
+      // --- 2.5단계: PII 마스킹 ---
+      if (messageForProcessing && messageForProcessing.trim()) {
+        const originalMessage = messageForProcessing;
+        messageForProcessing = maskPII(messageForProcessing);
+        if (messageForProcessing !== originalMessage) {
+          logger.info(
+            `PII masked for user ${userId}, client ${clientId}. Original length: ${originalMessage.length}, Masked length: ${messageForProcessing.length}`
+          );
+        }
+        finalUserMessage = messageForProcessing;
+      }
+
+      // --- 2단계: 입력 필터링 (Moderation API) ---
+      if (messageForProcessing && messageForProcessing.trim()) {
+        try {
+          const moderationResponse = await openai.moderations.create({
+            input: messageForProcessing,
+          });
+          const moderationResult = moderationResponse.results[0];
+
+          if (moderationResult.flagged) {
+            logger.warn(
+              `Input (masked) flagged by Moderation API for user ${userId}, client ${clientId}. Categories: ${JSON.stringify(
+                moderationResult.categories
+              )}`
+            );
+            ws.send(
+              JSON.stringify({
+                bot: "죄송합니다. 해당 내용은 답변해 드리기 어렵습니다. 다른 질문을 해주시겠어요?",
+                isFinal: true,
+              })
+            );
+            return;
+          }
+        } catch (moderationError) {
+          logger.error(
+            `Error calling Moderation API for client ${clientId}:`,
+            moderationError
+          );
+          ws.send(
+            JSON.stringify({
+              error: "메시지 검토 중 오류가 발생했습니다.",
+            })
+          );
+          return;
+        }
+      }
+
+      // --- 4단계: 입력 필터링 (키워드/패턴) ---
+      if (messageForProcessing && messageForProcessing.trim()) {
+        const forbiddenCheck = containsForbiddenContent(messageForProcessing);
+        if (forbiddenCheck.forbidden) {
+          logger.warn(
+            // logger 사용
+            `Input blocked by custom filter for user ${userId}, client ${clientId}. Type: ${forbiddenCheck.type}, Detail: ${forbiddenCheck.detail}`
+          );
+          ws.send(
+            JSON.stringify({
+              bot: "죄송합니다. 사용할 수 없는 단어나 표현이 포함되어 있어요. 다른 질문을 해주시겠어요?",
+              isFinal: true,
+            })
+          );
+          return; // 처리 중단
+        }
+      }
+      // --- 4단계: 입력 필터링 (키워드/패턴) 끝 ---
 
       const recentHistory = chatHistory.slice(-3);
 
-      // 시스템 메시지 구성을 과목 유형에 따라 다르게 처리
-      const systemMessage = isMainSubject
-        ? `당신은 친절하고 인내심 있는 튜터입니다. 지금 ${grade}학년 학생이 ${subject} 과목을 이해하도록 돕고 있습니다. 학생은 현재 ${unit} 단원에서 ${topic}을(를) 공부하고 있습니다.`
-        : `당신은 친절하고 인내심 있는 튜터입니다. 지금 ${grade}학년 학생이 ${subject} 과목을 이해하도록 돕고 있습니다. 학생은 현재 ${topic}에 대해 공부하고 있습니다.`;
+      const systemMessageContent = `너는 초등학생을 위한 친절하고 **매우 안전한** AI 학습 튜터야. 현재 ${grade}학년 ${subject} ${
+        unit ? `${unit} 단원 ` : ""
+      }${topic} 학습을 돕고 있어. 다음 원칙을 **반드시** 지켜줘:
 
-      const messages = [
-        { role: "system", content: systemMessage },
-        ...recentHistory
-          .map((chat) => [
-            { role: "user", content: chat.user },
-            { role: "assistant", content: chat.bot },
-          ])
-          .flat(),
-        { role: "user", content: userMessage },
-      ];
+      **[핵심 안전 규칙]**
+      1.  **유해 콘텐츠 절대 금지:** 폭력, 차별, 성적, 정치/종교 편향, 거짓 정보, 개인정보 질문 등 부적절한 내용은 절대 생성 불가. (**사용자 입력의 개인정보는 마스킹 처리됨**)
+      2.  **정확성 및 정직성:** 모르는 내용이나 부적절한 질문에는 "잘 모르겠어요." 또는 "다른 학습 질문 해볼까요?"라고 솔직하게 답변. **절대 추측하거나 지어내지 않기.**
+      3.  **학습 집중:** 현재 학습 주제(${topic})에 집중하고, 벗어나는 질문은 학습으로 다시 유도.
+      4.  **긍정적 태도:** 학생을 격려하고, 정답보다 스스로 생각하도록 돕기. 쉬운 단어와 존댓말 사용.
 
-      if (!messages.every((m) => m.content)) {
-        console.error("Invalid messages format:", messages);
-        ws.send(JSON.stringify({ error: "Invalid message format" }));
+      **[답변 스타일]**
+      *   답변은 핵심 위주로 간결하게.
+      *   필요시 명확성을 위해 마크다운(목록: *, 숫자: 1., 강조: **) 사용.
+      *   긍정적 이모지(✨👍🤔📌😊🎉💡)는 꼭 필요할 때만 최소한으로 사용.`;
+
+      let messages;
+
+      if (!userMessage.trim() && chatHistory.length === 0) {
+        saveToHistory = false;
+        const initialPromptContent = `안녕하세요! ${topic}(${
+          unit ? `${unit} 단원 ` : ""
+        }${subject} ${grade}학년) 학습을 시작하려고 합니다. 편하게 인사해 주세요.`;
+        messages = [
+          { role: "system", content: systemMessageContent },
+          { role: "user", content: initialPromptContent },
+        ];
+      } else {
+        saveToHistory = true;
+        messages = [
+          { role: "system", content: systemMessageContent },
+          ...recentHistory
+            .map((chat) => [
+              { role: "user", content: chat.user },
+              { role: "assistant", content: chat.bot },
+            ])
+            .flat(),
+          { role: "user", content: messageForProcessing },
+        ];
+      }
+
+      if (!messages || !messages.every((m) => typeof m.content === "string")) {
+        logger.error(
+          `Invalid messages format before NLP call for client ${clientId}:`,
+          messages
+        );
+        ws.send(
+          JSON.stringify({
+            error: "메시지 형식이 올바르지 않아 처리할 수 없습니다.",
+          })
+        );
         return;
       }
 
-      // NLP 서비스로 메시지를 보내서 응답 스트리밍 처리
-      const streamResponse = getNLPResponse(messages);
+      // 3. NLP 서비스 호출 및 응답 스트리밍
+      try {
+        const streamResponse = getNLPResponse(messages);
+        let botResponseContent = "";
+        for await (const botResponse of streamResponse) {
+          ws.send(JSON.stringify({ bot: botResponse, isFinal: false }));
+          botResponseContent += botResponse;
+        }
+        ws.send(JSON.stringify({ bot: null, isFinal: true }));
 
-      let botResponseContent = ""; // 스트리밍 응답을 저장할 변수
+        // --- 3단계 & 4단계: 출력 필터링 ---
+        if (botResponseContent && botResponseContent.trim()) {
+          try {
+            // 3.1 Moderation API 검사
+            const moderationResponse = await openai.moderations.create({
+              input: botResponseContent,
+            });
+            const moderationResult = moderationResponse.results[0];
 
-      for await (const botResponse of streamResponse) {
-        ws.send(JSON.stringify({ bot: botResponse, isFinal: false }));
-        botResponseContent += botResponse; // 전체 응답 저장
+            if (moderationResult.flagged) {
+              logger.warn(
+                `Output flagged by Moderation API for user ${userId}, client ${clientId}. Categories: ${JSON.stringify(
+                  moderationResult.categories
+                )}. Original response (start): ${botResponseContent.substring(
+                  0,
+                  100
+                )}...`
+              );
+              botResponseContent =
+                "죄송합니다. 답변 생성 중 문제가 발생했습니다. 다른 질문을 해주시겠어요?";
+            }
+
+            // 3.2 PII 마스킹
+            const originalBotResponseForMasking = botResponseContent;
+            botResponseContent = maskPII(botResponseContent);
+            if (botResponseContent !== originalBotResponseForMasking) {
+              logger.info(
+                `PII masked in bot response for user ${userId}, client ${clientId}.`
+              );
+            }
+
+            // 4단계: 출력 필터링 (키워드/패턴) - PII 마스킹 후 검사
+            const forbiddenCheckOutput =
+              containsForbiddenContent(botResponseContent);
+            if (forbiddenCheckOutput.forbidden) {
+              logger.warn(
+                // logger 사용
+                `Output blocked/modified by custom filter for user ${userId}, client ${clientId}. Type: ${
+                  forbiddenCheckOutput.type
+                }, Detail: ${
+                  forbiddenCheckOutput.detail
+                }. Original (start): ${botResponseContent.substring(0, 100)}...`
+              );
+              // 부적절한 응답은 안전한 메시지로 대체
+              botResponseContent =
+                "죄송합니다. 답변 내용에 부적절한 표현이 포함되어 수정되었습니다.";
+            }
+          } catch (outputFilterError) {
+            logger.error(
+              `Error during output filtering for client ${clientId}:`,
+              outputFilterError
+            );
+            botResponseContent =
+              "답변 처리 중 오류가 발생하여 내용을 표시할 수 없습니다.";
+          }
+        }
+        // --- 3단계 & 4단계: 출력 필터링 끝 ---
+
+        // 4. 대화 기록 저장 (모든 필터링/마스킹 거친 내용)
+        if (saveToHistory && finalUserMessage.trim()) {
+          chatHistory.push({ user: finalUserMessage, bot: botResponseContent });
+          await redisClient.set(chatHistoryKey, JSON.stringify(chatHistory));
+          logger.info(
+            `Chat history (user masked, bot filtered/masked) saved for user ${userId}`
+          );
+        } else if (!saveToHistory) {
+          logger.info(
+            `Initial greeting sent to user ${userId}, not saved to history.`
+          );
+        }
+      } catch (nlpError) {
+        logger.error(
+          `[chatbotController] Error getting NLP response for client ${clientId}:`,
+          nlpError
+        );
+        ws.send(
+          JSON.stringify({ error: "챗봇 응답 생성 중 오류가 발생했습니다." })
+        );
       }
-
-      ws.send(JSON.stringify({ bot: null, isFinal: true })); // 마지막 응답
-
-      // Redis에 유저 메시지와 봇의 응답 저장
-      chatHistory.push({ user: userMessage, bot: botResponseContent });
-      await redisClient.set(chatHistoryKey, JSON.stringify(chatHistory)); // Redis에 대화 기록 저장
     } catch (error) {
-      console.error("Error handling message:", error);
-      ws.send(JSON.stringify({ error: "Failed to process message" }));
+      logger.error(
+        `[chatbotController] Error handling message for client ${clientId}:`,
+        error
+      );
+      ws.send(JSON.stringify({ error: "메시지 처리 중 오류가 발생했습니다." }));
     }
 
     const endTime = process.hrtime(startTime);
