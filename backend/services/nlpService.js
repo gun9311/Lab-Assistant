@@ -22,7 +22,7 @@ const getNLPResponse = async function* (messages) {
       model: "gpt-4.1-nano",
       messages: messages, // 전달받은 messages를 그대로 사용합니다.
       stream: true,
-      max_tokens: 500,
+      max_tokens: 1000,
       temperature: 0.7,
     });
 

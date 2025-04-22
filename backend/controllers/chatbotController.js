@@ -5,6 +5,8 @@ const redisClient = require("../utils/redisClient");
 const winston = require("winston");
 const { OpenAI } = require("openai");
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const Student = require("../models/Student");
+const { format } = require("date-fns");
 
 const logger = winston.createLogger({
   level: "info",
@@ -19,6 +21,9 @@ const logger = winston.createLogger({
 });
 
 let clients = {};
+
+const DAILY_LIMIT = 20;
+const MONTHLY_LIMIT = 150;
 
 // PII 마스킹 함수 (2.5단계)
 function maskPII(text) {
@@ -146,7 +151,7 @@ const handleWebSocketConnection = async (ws, userId, subject) => {
   logger.info(
     `Client connected: ${clientId} for user ${userId}, subject: ${subject}. Total active connections: ${
       Object.keys(clients).length
-    }`
+    }. Checking usage limits.`
   );
 
   let isAlive = true;
@@ -170,11 +175,143 @@ const handleWebSocketConnection = async (ws, userId, subject) => {
     }
   }, 60000);
 
+  // --- 사용량 제한 확인 로직 시작 ---
+  try {
+    const today = format(new Date(), "yyyy-MM-dd");
+    const thisMonth = format(new Date(), "yyyy-MM");
+
+    const student = await Student.findById(userId);
+    if (!student) {
+      logger.error(`Student not found for ID: ${userId}`);
+      ws.send(JSON.stringify({ error: "사용자 정보를 찾을 수 없습니다." }));
+      ws.close();
+      return;
+    }
+
+    let { dailyChatCount, lastChatDay, monthlyChatCount, lastChatMonth } =
+      student;
+    let needsUpdate = false;
+    const updateOps = { $inc: {}, $set: {} };
+
+    // 날짜/달 비교 및 카운트 초기화
+    if (lastChatDay !== today) {
+      dailyChatCount = 0;
+      updateOps.$set.dailyChatCount = 0;
+      updateOps.$set.lastChatDay = today;
+      needsUpdate = true;
+    }
+    if (lastChatMonth !== thisMonth) {
+      monthlyChatCount = 0;
+      updateOps.$set.monthlyChatCount = 0;
+      updateOps.$set.lastChatMonth = thisMonth;
+      needsUpdate = true;
+    }
+
+    // 제한 확인
+    if (dailyChatCount >= DAILY_LIMIT) {
+      logger.warn(`User ${userId} exceeded daily limit.`);
+      ws.send(JSON.stringify({ error: "daily_limit_exceeded" }));
+      // ws.close(); // 연결을 바로 닫지 않고 메시지만 보낼 수도 있습니다.
+      // return; // 메시지 처리를 여기서 중단해야 함
+    } else if (monthlyChatCount >= MONTHLY_LIMIT) {
+      logger.warn(`User ${userId} exceeded monthly limit.`);
+      ws.send(JSON.stringify({ error: "monthly_limit_exceeded" }));
+      // ws.close();
+      // return; // 메시지 처리를 여기서 중단해야 함
+    } else {
+      // 제한 내 사용 시 카운트 증가 준비
+      updateOps.$inc.dailyChatCount = 1;
+      updateOps.$inc.monthlyChatCount = 1;
+      // 날짜/달 업데이트가 필요 없다면, 카운트 증가만 DB에 반영하기 위해 needsUpdate 설정
+      if (
+        !needsUpdate &&
+        (updateOps.$inc.dailyChatCount || updateOps.$inc.monthlyChatCount)
+      ) {
+        needsUpdate = true;
+      }
+      // 실제 업데이트는 메시지 처리 로직에서 성공적으로 완료된 후에 수행하는 것이 더 안전할 수 있습니다.
+      // 여기서는 일단 업데이트 준비만 합니다.
+    }
+
+    // 만약 제한 초과 시, 여기서 바로 return 하여 아래의 메시지 처리 로직이 실행되지 않도록 합니다.
+    if (dailyChatCount >= DAILY_LIMIT || monthlyChatCount >= MONTHLY_LIMIT) {
+      // DB 업데이트는 필요 시 수행 (초기화가 발생했을 수 있으므로)
+      if (needsUpdate) {
+        // 빈 $inc 객체 제거
+        if (Object.keys(updateOps.$inc).length === 0) delete updateOps.$inc;
+        if (Object.keys(updateOps.$set).length === 0) delete updateOps.$set;
+        if (Object.keys(updateOps).length > 0) {
+          await Student.findByIdAndUpdate(userId, updateOps);
+          logger.info(
+            `Usage limits updated for ${userId} due to initialization.`
+          );
+        }
+      }
+      return; // 메시지 처리 중단
+    }
+  } catch (error) {
+    logger.error(
+      `Error checking/updating usage limits for user ${userId}:`,
+      error
+    );
+    ws.send(JSON.stringify({ error: "사용량 확인 중 오류 발생" }));
+    ws.close();
+    return;
+  }
+  // --- 사용량 제한 확인 로직 끝 ---
+
   ws.on("message", async (message) => {
     const startTime = process.hrtime();
     let saveToHistory = true;
 
     try {
+      // --- 추가: 메시지 처리 전 사용량 제한 재확인 ---
+      try {
+        const student = await Student.findById(userId);
+        if (!student) {
+          // 이 경우는 거의 없겠지만 방어적으로 추가
+          logger.error(`Student not found mid-session: ${userId}`);
+          ws.send(JSON.stringify({ error: "사용자 정보를 찾을 수 없습니다." }));
+          return; // 처리 중단
+        }
+
+        const today = format(new Date(), "yyyy-MM-dd");
+        const thisMonth = format(new Date(), "yyyy-MM");
+        let { dailyChatCount, lastChatDay, monthlyChatCount, lastChatMonth } =
+          student;
+
+        // 날짜/달 비교 및 카운트 초기화 (메시지 받을 때마다 확인)
+        // 실제 DB 업데이트는 아래에서 하므로 여기서는 변수 값만 조정
+        if (lastChatDay !== today) {
+          dailyChatCount = 0;
+        }
+        if (lastChatMonth !== thisMonth) {
+          monthlyChatCount = 0;
+        }
+
+        // 현재 카운트로 제한 확인
+        if (dailyChatCount >= DAILY_LIMIT) {
+          logger.warn(`User ${userId} exceeded daily limit mid-session.`);
+          ws.send(JSON.stringify({ error: "daily_limit_exceeded" }));
+          return; // NLP 호출 등 다음 단계로 넘어가지 않음
+        }
+        if (monthlyChatCount >= MONTHLY_LIMIT) {
+          logger.warn(`User ${userId} exceeded monthly limit mid-session.`);
+          ws.send(JSON.stringify({ error: "monthly_limit_exceeded" }));
+          return; // NLP 호출 등 다음 단계로 넘어가지 않음
+        }
+      } catch (checkError) {
+        logger.error(
+          `Error re-checking usage limits for user ${userId} mid-session:`,
+          checkError
+        );
+        ws.send(
+          JSON.stringify({ error: "사용량 확인 중 오류 발생 (세션 중)" })
+        );
+        return; // 처리 중단
+      }
+      // --- 사용량 제한 재확인 끝 ---
+
       const { grade, semester, subject, unit, topic, userMessage } =
         JSON.parse(message);
 
@@ -371,8 +508,54 @@ const handleWebSocketConnection = async (ws, userId, subject) => {
         }
         // --- 3단계 & 4단계: 출력 필터링 끝 ---
 
+        // --- 사용량 카운트 DB 업데이트 (성공적으로 응답 생성 후) ---
+        // 첫 인사말이 아닐 경우에만 카운트 업데이트 (saveToHistory가 true일 때)
+        if (saveToHistory) {
+          try {
+            const todayUpdate = format(new Date(), "yyyy-MM-dd");
+            const thisMonthUpdate = format(new Date(), "yyyy-MM");
+            const finalUpdateOps = {
+              $inc: { dailyChatCount: 1, monthlyChatCount: 1 },
+              $set: {},
+            };
+            const studentData = await Student.findById(
+              userId,
+              "lastChatDay lastChatMonth"
+            );
+            if (studentData && studentData.lastChatDay !== todayUpdate) {
+              finalUpdateOps.$set.lastChatDay = todayUpdate;
+              finalUpdateOps.$set.dailyChatCount = 1; // 날짜 바뀌면 1로 설정
+              delete finalUpdateOps.$inc.dailyChatCount;
+            }
+            if (studentData && studentData.lastChatMonth !== thisMonthUpdate) {
+              finalUpdateOps.$set.lastChatMonth = thisMonthUpdate;
+              finalUpdateOps.$set.monthlyChatCount = 1; // 달 바뀌면 1로 설정
+              delete finalUpdateOps.$inc.monthlyChatCount;
+            }
+            if (Object.keys(finalUpdateOps.$inc).length === 0)
+              delete finalUpdateOps.$inc;
+            if (Object.keys(finalUpdateOps.$set).length === 0)
+              delete finalUpdateOps.$set;
+            if (Object.keys(finalUpdateOps).length > 0) {
+              await Student.findByIdAndUpdate(userId, finalUpdateOps);
+              logger.info(`Usage count incremented for user ${userId}`);
+            }
+          } catch (updateError) {
+            logger.error(
+              `Failed to update usage count for user ${userId}:`,
+              updateError
+            );
+          }
+        } else {
+          // 첫 인사말인 경우 로그만 남김 (선택 사항)
+          logger.info(
+            `Initial greeting processed for user ${userId}, usage count not incremented.`
+          );
+        }
+        // --- 사용량 카운트 DB 업데이트 끝 ---
+
         // 4. 대화 기록 저장 (모든 필터링/마스킹 거친 내용)
-        if (saveToHistory && finalUserMessage.trim()) {
+        if (saveToHistory && finalUserMessage.trim() && botResponseContent) {
           chatHistory.push({ user: finalUserMessage, bot: botResponseContent });
           await redisClient.set(chatHistoryKey, JSON.stringify(chatHistory));
           logger.info(
@@ -398,13 +581,13 @@ const handleWebSocketConnection = async (ws, userId, subject) => {
         error
       );
       ws.send(JSON.stringify({ error: "메시지 처리 중 오류가 발생했습니다." }));
+    } finally {
+      const endTime = process.hrtime(startTime);
+      const elapsedTime = endTime[0] * 1000 + endTime[1] / 1e6;
+      logger.info(
+        `Message processed for client ${clientId}: ${elapsedTime.toFixed(2)}ms`
+      );
     }
-
-    const endTime = process.hrtime(startTime);
-    const elapsedTime = endTime[0] * 1000 + endTime[1] / 1e6;
-    logger.info(
-      `Message processed for client ${clientId}: ${elapsedTime.toFixed(2)}ms`
-    );
   });
 
   ws.on("close", async () => {

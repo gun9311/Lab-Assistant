@@ -1,5 +1,5 @@
-const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs');
+const mongoose = require("mongoose");
+const bcrypt = require("bcryptjs");
 
 const studentSchema = new mongoose.Schema({
   loginId: { type: String, required: true, unique: true },
@@ -9,13 +9,17 @@ const studentSchema = new mongoose.Schema({
   grade: { type: Number, required: true },
   class: { type: String, required: true }, // 반
   school: { type: String, required: true },
-  role: { type: String, default: 'student' },
+  role: { type: String, default: "student" },
   tokens: [{ token: { type: String, required: false } }], // FCM 토큰 저장
+  dailyChatCount: { type: Number, default: 0 },
+  lastChatDay: { type: String, default: null }, // 예: "YYYY-MM-DD"
+  monthlyChatCount: { type: Number, default: 0 },
+  lastChatMonth: { type: String, default: null }, // 예: "YYYY-MM"
 });
 
-studentSchema.pre('save', async function(next) {
+studentSchema.pre("save", async function (next) {
   const student = this;
-  if (student.isModified('password')) {
+  if (student.isModified("password")) {
     student.password = await bcrypt.hash(student.password, 8);
   }
   next();
@@ -24,6 +28,6 @@ studentSchema.pre('save', async function(next) {
 // studentSchema.index({ school: 1, grade: 1, class: 1, studentId: 1 }, { unique: true });
 studentSchema.index({ loginId: 1 }, { unique: true });
 
-const Student = mongoose.model('Student', studentSchema);
+const Student = mongoose.model("Student", studentSchema);
 
 module.exports = Student;
