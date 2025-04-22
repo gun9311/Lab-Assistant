@@ -11,8 +11,11 @@ import {
   MenuItem,
   ListSubheader,
   Grid,
+  Chip,
 } from "@mui/material";
+import { InfoOutlined } from "@mui/icons-material";
 import { getGradeStatus } from "../../utils/auth";
+import { ChatUsageData } from "../../utils/api";
 
 type SubjectSelectorProps = {
   onSelectionChange: (selection: {
@@ -24,12 +27,16 @@ type SubjectSelectorProps = {
   }) => void;
   showTopic: boolean;
   disabled?: boolean;
+  chatUsage: ChatUsageData | null;
+  usageError: string | null;
 };
 
 const SubjectSelector: React.FC<SubjectSelectorProps> = ({
   onSelectionChange,
   showTopic,
   disabled = false,
+  chatUsage,
+  usageError,
 }) => {
   const [grade, setGrade] = useState(getGradeStatus() || "");
   const [semester, setSemester] = useState("");
@@ -40,6 +47,7 @@ const SubjectSelector: React.FC<SubjectSelectorProps> = ({
 
   const mainSubjects = ["국어", "도덕", "수학", "과학", "사회"];
   const otherSubjects = ["영어", "음악", "미술", "체육", "실과"];
+  const allSubjects = [...mainSubjects, ...otherSubjects];
 
   useEffect(() => {
     const fetchUnits = async () => {
@@ -83,9 +91,37 @@ const SubjectSelector: React.FC<SubjectSelectorProps> = ({
 
   return (
     <Box sx={{ mt: 2 }}>
-      <Typography variant="h6" gutterBottom sx={{ mb: 3 }}>
-        학습 내용 선택
-      </Typography>
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          mb: 3,
+        }}
+      >
+        <Typography variant="h6" gutterBottom sx={{ mb: 0 }}>
+          학습 내용 선택
+        </Typography>
+        <Box>
+          {chatUsage && !usageError && (
+            <Chip
+              icon={<InfoOutlined />}
+              label={`남은 질문: 오늘 ${chatUsage.dailyRemaining}/${chatUsage.dailyLimit} | 이번 달 ${chatUsage.monthlyRemaining}/${chatUsage.monthlyLimit}`}
+              variant="outlined"
+              color="info"
+              size="small"
+            />
+          )}
+          {usageError && (
+            <Chip
+              label={usageError}
+              variant="outlined"
+              color="error"
+              size="small"
+            />
+          )}
+        </Box>
+      </Box>
       <Grid container spacing={2.5}>
         <Grid item xs={12} sm={6}>
           <TextField
@@ -97,7 +133,7 @@ const SubjectSelector: React.FC<SubjectSelectorProps> = ({
           />
         </Grid>
         <Grid item xs={12} sm={6}>
-          <FormControl fullWidth variant="outlined">
+          <FormControl fullWidth variant="outlined" disabled={disabled}>
             <InputLabel>학기</InputLabel>
             <Select
               value={semester}
@@ -108,7 +144,6 @@ const SubjectSelector: React.FC<SubjectSelectorProps> = ({
                 setUnits([]);
               }}
               label="학기"
-              disabled={disabled}
             >
               <MenuItem value="" disabled>
                 <em>학기 선택</em>
@@ -119,52 +154,50 @@ const SubjectSelector: React.FC<SubjectSelectorProps> = ({
           </FormControl>
         </Grid>
         <Grid item xs={12} sm={6}>
-          <FormControl fullWidth variant="outlined">
+          <FormControl fullWidth variant="outlined" disabled={disabled}>
             <InputLabel>과목</InputLabel>
             <Select
               value={subject}
               onChange={(e) => {
-                setSubject(e.target.value);
+                const newSubject = e.target.value;
+                setSubject(newSubject);
                 setUnit("");
                 setTopic("");
-                setUnits([]);
+                if (!mainSubjects.includes(newSubject)) {
+                  setUnits([]);
+                }
               }}
               label="과목"
-              disabled={disabled}
             >
               <MenuItem value="" disabled>
                 <em>과목 선택</em>
               </MenuItem>
-              <ListSubheader>주요 과목</ListSubheader>
-              {mainSubjects.map((sub, index) => (
-                <MenuItem key={`main-${index}`} value={sub}>
-                  {sub}
-                </MenuItem>
-              ))}
-              <ListSubheader>기타 과목</ListSubheader>
-              {otherSubjects.map((sub, index) => (
-                <MenuItem key={`other-${index}`} value={sub}>
+              {allSubjects.map((sub, index) => (
+                <MenuItem key={`subject-${index}`} value={sub}>
                   {sub}
                 </MenuItem>
               ))}
             </Select>
           </FormControl>
         </Grid>
-        {mainSubjects.includes(subject) && units.length > 0 && (
+        {mainSubjects.includes(subject) && (
           <Grid item xs={12} sm={6}>
-            <FormControl fullWidth variant="outlined">
+            <FormControl
+              fullWidth
+              variant="outlined"
+              disabled={disabled || !semester || units.length === 0}
+            >
               <InputLabel>단원</InputLabel>
               <Select
                 value={unit}
                 onChange={(e) => setUnit(e.target.value)}
                 label="단원"
-                disabled={disabled || !subject || !semester}
               >
                 <MenuItem value="" disabled>
                   <em>단원 선택</em>
                 </MenuItem>
                 {units.map((u, index) => (
-                  <MenuItem key={index} value={u}>
+                  <MenuItem key={`unit-${index}`} value={u}>
                     {u}
                   </MenuItem>
                 ))}
@@ -172,7 +205,28 @@ const SubjectSelector: React.FC<SubjectSelectorProps> = ({
             </FormControl>
           </Grid>
         )}
-        {subject && showTopic && (
+        {!mainSubjects.includes(subject) && subject && (
+          <Grid item xs={12} sm={6}>
+            <TextField
+              label="단원"
+              value="선택 불필요"
+              variant="outlined"
+              fullWidth
+              disabled
+              InputProps={{ readOnly: true }}
+              sx={{
+                "& .MuiInputBase-input.Mui-disabled": {
+                  WebkitTextFillColor: "rgba(0, 0, 0, 0.6)",
+                  cursor: "default",
+                },
+                "& .MuiFormLabel-root.Mui-disabled": {
+                  color: "rgba(0, 0, 0, 0.6)",
+                },
+              }}
+            />
+          </Grid>
+        )}
+        {showTopic && (
           <Grid item xs={12}>
             <TextField
               fullWidth
@@ -180,12 +234,9 @@ const SubjectSelector: React.FC<SubjectSelectorProps> = ({
               label="주제"
               value={topic}
               onChange={(e) => setTopic(e.target.value)}
-              placeholder="구체적인 학습 주제를 입력하세요 (예: 시의 특징)"
+              placeholder="학습 주제를 입력하세요"
               disabled={disabled || !subject}
-              required={
-                !mainSubjects.includes(subject) ||
-                (mainSubjects.includes(subject) && !!unit)
-              }
+              required
             />
           </Grid>
         )}

@@ -24,6 +24,7 @@ import FaceIcon from "@mui/icons-material/Face";
 import { SxProps } from "@mui/system";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { ChatUsageData } from "../../utils/api";
 
 type ChatMessage = {
   id: number;
@@ -40,6 +41,8 @@ type ChatbotProps = {
   onChatbotEnd: () => void;
   onAlertOpen: () => void;
   sx?: SxProps;
+  setChatUsage: React.Dispatch<React.SetStateAction<ChatUsageData | null>>;
+  chatUsage: ChatUsageData | null;
 };
 
 const Chatbot: React.FC<ChatbotProps> = ({
@@ -51,6 +54,8 @@ const Chatbot: React.FC<ChatbotProps> = ({
   onChatbotEnd,
   onAlertOpen,
   sx,
+  setChatUsage,
+  chatUsage,
 }) => {
   const [message, setMessage] = useState<string>("");
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
@@ -64,6 +69,9 @@ const Chatbot: React.FC<ChatbotProps> = ({
   const [alertOpen, setAlertOpen] = useState(false);
   const [errorAlertOpen, setErrorAlertOpen] = useState(false);
   const [isResponding, setIsResponding] = useState<boolean>(false);
+  const [limitExceededError, setLimitExceededError] = useState<string | null>(
+    null
+  );
 
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const currentBotMessageIdRef = useRef<number | null>(null);
@@ -142,18 +150,26 @@ const Chatbot: React.FC<ChatbotProps> = ({
     );
 
     newWs.onopen = () => {
-      console.log("WebSocket connection established");
-      // setIsResponding(true);
-      newWs.send(
-        JSON.stringify({
-          grade,
-          semester,
-          subject,
-          unit,
-          topic,
-          userMessage: "",
-        })
-      );
+      setIsResponding(true);
+      setTimeout(() => {
+        if (newWs.readyState === WebSocket.OPEN) {
+          console.log("[Chatbot] Sending initial message after delay.");
+          newWs.send(
+            JSON.stringify({
+              grade,
+              semester,
+              subject,
+              unit,
+              topic,
+              userMessage: "",
+            })
+          );
+        } else {
+          console.warn(
+            "[Chatbot] WebSocket closed before initial message could be sent after delay."
+          );
+        }
+      }, 100);
     };
 
     newWs.onmessage = (event) => {
@@ -162,7 +178,17 @@ const Chatbot: React.FC<ChatbotProps> = ({
 
         if (data.error) {
           console.error("WebSocket message error:", data.error);
-          setErrorAlertOpen(true);
+          if (data.error === "daily_limit_exceeded") {
+            setLimitExceededError(
+              "오늘 질문 횟수를 모두 사용했어요. 내일 다시 시도해주세요."
+            );
+          } else if (data.error === "monthly_limit_exceeded") {
+            setLimitExceededError(
+              "이번 달 질문 횟수를 모두 사용했어요. 다음 달에 다시 시도해주세요."
+            );
+          } else {
+            setErrorAlertOpen(true);
+          }
           setIsResponding(false);
           if (typingTimeoutRef.current) {
             clearTimeout(typingTimeoutRef.current);
@@ -173,6 +199,7 @@ const Chatbot: React.FC<ChatbotProps> = ({
           return;
         }
 
+        setLimitExceededError(null);
         const { bot, isFinal } = data;
 
         if (isFinal) {
@@ -191,7 +218,7 @@ const Chatbot: React.FC<ChatbotProps> = ({
           if (messageIdToFinalize !== null) {
             setChatHistory((prev) =>
               prev.map((msg) =>
-                msg.id === messageIdToFinalize && msg.content !== finalContent
+                msg.id === messageIdToFinalize
                   ? { ...msg, content: finalContent }
                   : msg
               )
@@ -215,49 +242,45 @@ const Chatbot: React.FC<ChatbotProps> = ({
           bot !== null &&
           typeof bot === "string"
         ) {
-          setChatHistory((prevChatHistory) => {
-            const lastMessage = prevChatHistory[prevChatHistory.length - 1];
+          setIsResponding(true);
 
-            if (
-              lastMessage?.sender === "챗봇" &&
-              lastMessage.id === currentBotMessageIdRef.current
-            ) {
-              targetBotContentRef.current += bot;
-              if (!typingTimeoutRef.current) {
-                const randomDelay = Math.floor(Math.random() * 21) + 40;
-                typingTimeoutRef.current = setTimeout(
-                  typeCharacter,
-                  randomDelay
-                );
-              }
-            } else {
-              if (typingTimeoutRef.current) {
-                clearTimeout(typingTimeoutRef.current);
-                typingTimeoutRef.current = null;
-              }
+          if (currentBotMessageIdRef.current !== null) {
+            targetBotContentRef.current += bot;
 
-              const newMsgId = messageIdCounter.current++;
-              const newBotMessage: ChatMessage = {
-                id: newMsgId,
-                sender: "챗봇",
-                content: "",
-              };
-              currentBotMessageIdRef.current = newMsgId;
-              targetBotContentRef.current = bot;
-
+            if (!typingTimeoutRef.current) {
               const randomDelay = Math.floor(Math.random() * 21) + 40;
               typingTimeoutRef.current = setTimeout(typeCharacter, randomDelay);
-
-              return [...prevChatHistory, newBotMessage];
             }
-            return prevChatHistory;
-          });
-          setIsResponding(true);
+          } else {
+            if (typingTimeoutRef.current) {
+              clearTimeout(typingTimeoutRef.current);
+              typingTimeoutRef.current = null;
+            }
+
+            const newMsgId = messageIdCounter.current++;
+            const newBotMessage: ChatMessage = {
+              id: newMsgId,
+              sender: "챗봇",
+              content: "",
+            };
+
+            setChatHistory((prevChatHistory) => [
+              ...prevChatHistory,
+              newBotMessage,
+            ]);
+
+            currentBotMessageIdRef.current = newMsgId;
+            targetBotContentRef.current = bot;
+
+            const randomDelay = Math.floor(Math.random() * 21) + 40;
+            typingTimeoutRef.current = setTimeout(typeCharacter, randomDelay);
+          }
         }
       } catch (error) {
         console.error("Error processing WebSocket message:", error);
         setIsResponding(false);
         setErrorAlertOpen(true);
+        setLimitExceededError(null);
       }
     };
 
@@ -265,6 +288,7 @@ const Chatbot: React.FC<ChatbotProps> = ({
       console.error("[Chatbot] WebSocket error:", error);
       setErrorAlertOpen(true);
       setIsResponding(false);
+      setLimitExceededError(null);
     };
 
     newWs.onclose = (event) => {
@@ -273,6 +297,7 @@ const Chatbot: React.FC<ChatbotProps> = ({
         setErrorAlertOpen(true);
         setIsResponding(false);
       }
+      setLimitExceededError(null);
     };
 
     setWs(newWs);
@@ -287,7 +312,7 @@ const Chatbot: React.FC<ChatbotProps> = ({
       }
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     };
-  }, [grade, semester, subject, unit, topic]);
+  }, [grade, semester, subject, unit, topic, typeCharacter]);
 
   useEffect(() => {
     const SpeechRecognitionAPI =
@@ -337,9 +362,26 @@ const Chatbot: React.FC<ChatbotProps> = ({
   }, [chatHistory]);
 
   const handleSendMessage = useCallback(async () => {
+    if (chatUsage && chatUsage.dailyRemaining <= 0) {
+      setLimitExceededError(
+        "오늘 질문 횟수를 모두 사용했어요. 내일 다시 시도해주세요."
+      );
+      return;
+    }
+    if (chatUsage && chatUsage.monthlyRemaining <= 0) {
+      setLimitExceededError(
+        "이번 달 질문 횟수를 모두 사용했어요. 다음 달에 다시 시도해주세요."
+      );
+      return;
+    }
+
     const trimmedMessage = message.trim();
     if (!trimmedMessage) {
       setAlertOpen(true);
+      return;
+    }
+    if (limitExceededError) {
+      console.warn("Cannot send message due to usage limit exceeded.");
       return;
     }
 
@@ -369,6 +411,19 @@ const Chatbot: React.FC<ChatbotProps> = ({
       setMessage("");
       setIsResponding(true);
 
+      setChatUsage((prevUsage) => {
+        if (!prevUsage) return null;
+        const newDailyCount = prevUsage.dailyCount + 1;
+        const newMonthlyCount = prevUsage.monthlyCount + 1;
+        return {
+          ...prevUsage,
+          dailyRemaining: Math.max(0, prevUsage.dailyRemaining - 1),
+          monthlyRemaining: Math.max(0, prevUsage.monthlyRemaining - 1),
+          dailyCount: newDailyCount,
+          monthlyCount: newMonthlyCount,
+        };
+      });
+
       if (recognition && isListening) {
         recognition.stop();
       }
@@ -387,6 +442,9 @@ const Chatbot: React.FC<ChatbotProps> = ({
     subject,
     unit,
     topic,
+    limitExceededError,
+    setChatUsage,
+    chatUsage,
   ]);
 
   const handleSaveChatSummary = useCallback(async () => {
@@ -493,30 +551,21 @@ const Chatbot: React.FC<ChatbotProps> = ({
               mr: chat.sender === "챗봇" ? "auto" : 0,
             }}
           >
-            <Avatar
-              sx={{
-                width: 32,
-                height: 32,
-                bgcolor:
-                  chat.sender === "사용자"
-                    ? theme.palette.primary.light
-                    : theme.palette.grey[200],
-                color:
-                  chat.sender === "사용자"
-                    ? theme.palette.primary.contrastText
-                    : theme.palette.text.primary,
-                boxShadow: 1,
-                order: chat.sender === "사용자" ? 2 : 1,
-                ml: chat.sender === "사용자" ? 1 : 0,
-                mr: chat.sender === "챗봇" ? 1 : 0,
-              }}
-            >
-              {chat.sender === "챗봇" ? (
+            {chat.sender === "챗봇" && (
+              <Avatar
+                sx={{
+                  width: 32,
+                  height: 32,
+                  bgcolor: theme.palette.grey[200],
+                  color: theme.palette.text.primary,
+                  boxShadow: 1,
+                  order: 1,
+                  mr: 1,
+                }}
+              >
                 <SmartToyIcon fontSize="small" />
-              ) : (
-                <FaceIcon fontSize="small" />
-              )}
-            </Avatar>
+              </Avatar>
+            )}
             <Paper
               elevation={0}
               variant="outlined"
@@ -528,17 +577,19 @@ const Chatbot: React.FC<ChatbotProps> = ({
                     : "12px 12px 12px 0",
                 bgcolor:
                   chat.sender === "사용자"
-                    ? theme.palette.primary.main
+                    ? theme.palette.success.main
                     : theme.palette.background.default,
                 color:
                   chat.sender === "사용자"
-                    ? theme.palette.primary.contrastText
+                    ? theme.palette.success.contrastText
                     : theme.palette.text.primary,
                 maxWidth: "fit-content",
                 wordBreak: "break-word",
                 fontSize: { xs: "0.9rem", sm: "1rem" },
                 lineHeight: 1.6,
                 order: chat.sender === "사용자" ? 1 : 2,
+                ml: chat.sender === "사용자" ? 0 : 0,
+                mr: chat.sender === "사용자" ? 0 : 0,
                 "& p": { my: 0.5 },
                 "& ul, & ol": { pl: 2.5, my: 0.5 },
                 "& li": { mb: 0.2 },
@@ -637,7 +688,7 @@ const Chatbot: React.FC<ChatbotProps> = ({
               opacity: 1,
             },
           }}
-          disabled={isResponding}
+          disabled={isResponding || !!limitExceededError}
           onKeyDown={handleKeyDown}
         />
         <Box
@@ -650,7 +701,12 @@ const Chatbot: React.FC<ChatbotProps> = ({
           <Box>
             <IconButton
               onClick={handleStartListening}
-              disabled={!recognition || isListening || isResponding}
+              disabled={
+                !recognition ||
+                isListening ||
+                isResponding ||
+                !!limitExceededError
+              }
               color={isListening ? "secondary" : "primary"}
               size={isMobile ? "medium" : "large"}
               sx={{ mr: 0.5 }}
@@ -674,7 +730,9 @@ const Chatbot: React.FC<ChatbotProps> = ({
                 type="submit"
                 color="primary"
                 size="medium"
-                disabled={isResponding || !message.trim()}
+                disabled={
+                  isResponding || !message.trim() || !!limitExceededError
+                }
                 aria-label="전송"
                 sx={{
                   bgcolor: "primary.main",
@@ -692,7 +750,9 @@ const Chatbot: React.FC<ChatbotProps> = ({
                 size="large"
                 endIcon={<Send />}
                 sx={{ borderRadius: "8px", fontWeight: "bold" }}
-                disabled={isResponding || !message.trim()}
+                disabled={
+                  isResponding || !message.trim() || !!limitExceededError
+                }
               >
                 전송
               </Button>
@@ -782,6 +842,24 @@ const Chatbot: React.FC<ChatbotProps> = ({
           variant="filled"
         >
           오류가 발생했습니다. 잠시 후 다시 시도해주세요.
+        </Alert>
+      </Snackbar>
+
+      <Snackbar
+        open={!!limitExceededError}
+        autoHideDuration={6000}
+        onClose={() => setLimitExceededError(null)}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+        sx={{ mt: { xs: 8, sm: 9 } }}
+      >
+        <Alert
+          onClose={() => setLimitExceededError(null)}
+          severity="error"
+          sx={{ width: "100%" }}
+          variant="filled"
+          elevation={6}
+        >
+          {limitExceededError}
         </Alert>
       </Snackbar>
     </Paper>

@@ -408,7 +408,15 @@ const Navbar: React.FC<{ role: string; isQuizMode: boolean }> = ({
           value={value}
           onChange={(event, newValue) => handleChange(newValue)}
           showLabels
-          sx={{ position: "fixed", bottom: 0, width: "100%", zIndex: 1000 }}
+          sx={{
+            position: "fixed",
+            bottom: 0,
+            width: "100%",
+            zIndex: 1000,
+            paddingLeft: 0,
+            paddingRight: 0,
+            boxSizing: "border-box",
+          }}
         >
           <BottomNavigationAction label={getHomeLabel()} icon={<Home />} />
           {role === "student" && (
