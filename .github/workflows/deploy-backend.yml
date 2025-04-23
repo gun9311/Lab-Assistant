@@ -53,6 +53,7 @@ jobs:
             GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
             GOOGLE_REDIRECT_URI=${{ secrets.GOOGLE_REDIRECT_URI }}
             CLIENT_URL=${{ secrets.CLIENT_URL }}
+            TEACHER_AUTH_CODE=${{ secrets.TEACHER_AUTH_CODE }}
 
       - name: Set up SSH agent
         uses: webfactory/ssh-agent@v0.5.3
