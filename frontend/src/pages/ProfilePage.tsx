@@ -21,10 +21,10 @@ import {
   Autocomplete,
   IconButton,
 } from "@mui/material";
-import { Cancel, Save, Delete, Logout, Edit } from "@mui/icons-material";
+import { Logout } from "@mui/icons-material";
 import { educationOffices } from "../educationOffices";
 import api from "../utils/api";
-import { clearAuth, getUserId } from "../utils/auth";
+import { clearAuth, getUserId, setSchoolName } from "../utils/auth";
 import { SelectChangeEvent } from "@mui/material/Select";
 import apiNoAuth from "../utils/apiNoAuth";
 
@@ -157,6 +157,7 @@ const ProfilePage = () => {
 
     try {
       const res = await api.put("/users/profile", validFormData);
+      setSchoolName(res.data.school);
       setProfile(res.data);
       setEditMode(false);
       setDialogOpen(false);
@@ -218,8 +219,8 @@ const ProfilePage = () => {
   };
 
   return (
-    <Container component="main" maxWidth="sm">
-      <Paper elevation={3} sx={{ padding: 4, marginTop: 6 }}>
+    <Container component="main" maxWidth="sm" sx={{ mt: 6, mb: 4 }}>
+      <Paper elevation={3} sx={{ padding: 4 }}>
         <Box
           sx={{
             display: "flex",

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   Container,
   Typography,
@@ -9,15 +9,18 @@ import {
   Alert,
   Tooltip,
   Chip,
+  useTheme,
 } from "@mui/material";
+import { keyframes } from "@mui/system";
 import {
-  Assistant,
   PlayArrow,
   StopCircle,
   AccessTime,
-  InfoOutlined,
   AddAlarm,
+  Today,
+  CalendarMonth,
 } from "@mui/icons-material";
+import { DotLottieReact } from "@lottiefiles/dotlottie-react";
 import Chatbot from "../../components/student/Chatbot";
 import SubjectSelector from "../../components/student/SubjectSelector";
 import { useChatbotContext } from "../../context/ChatbotContext";
@@ -50,7 +53,54 @@ const getMissingFieldsMessage = (
   return "챗봇 시작 준비 완료!"; // 모든 필드가 채워졌지만 다른 이유로 비활성화된 경우 (현재 로직상 발생 안 함)
 };
 
+// Helper function to determine chip color based on usage percentage (same as in SubjectSelector)
+const getUsageColor = (
+  remaining: number,
+  limit: number
+): "success" | "warning" | "error" => {
+  if (limit === 0) return "error";
+  const percentage = (remaining / limit) * 100;
+  if (percentage < 20) {
+    return "error";
+  } else if (percentage <= 50) {
+    return "warning";
+  } else {
+    return "success";
+  }
+};
+
+// --- Animation Constants ---
+const TARGET_TEXT = "T-B0T";
+const SHUFFLE_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!?%$#";
+const CHAR_SHUFFLE_DURATION = 150;
+const CHAR_REVEAL_DELAY = 300; // <--- Increased delay for slower reveal (기존 100)
+const SHUFFLE_INTERVAL = 50;
+const GLITCH_DELAY = 300;
+const GLITCH_ITERATIONS = 5;
+const TEXT_ANIMATION_START_DELAY = 100; // <--- Added: Delay before text animation starts (ms)
+
+// --- Keyframes ---
+const subtleGlitch = keyframes`
+  0%, 100% {
+    transform: translate(0, 0);
+    text-shadow: none;
+  }
+  25% {
+    transform: translate(1px, -1px);
+    text-shadow: -1px 0 red, 1px 0 cyan;
+  }
+  50% {
+    transform: translate(-1px, 1px);
+    text-shadow: 1px 0 red, -1px 0 cyan;
+  }
+  75% {
+    transform: translate(1px, 0);
+    text-shadow: -1px 0 red, 0 1px cyan;
+  }
+`;
+
 const StudentHomePage: React.FC = () => {
+  const theme = useTheme();
   const { isChatbotActive, setIsChatbotActive } = useChatbotContext();
   const [selection, setSelection] = useState({
     grade: "",
@@ -64,6 +114,16 @@ const StudentHomePage: React.FC = () => {
   const [chatbotEndAlertOpen, setChatbotEndAlertOpen] = useState(false);
   const [chatUsage, setChatUsage] = useState<ChatUsageData | null>(null);
   const [usageError, setUsageError] = useState<string | null>(null);
+
+  // --- State for Animation ---
+  const [displayedChars, setDisplayedChars] = useState<string[]>(
+    Array(TARGET_TEXT.length).fill(" ") // Initial placeholders
+  );
+  const [isShuffleComplete, setIsShuffleComplete] = useState(false);
+  const animationPlayedRef = useRef(false); // Track if animation has run once
+  const timeoutsRef = useRef<NodeJS.Timeout[]>([]); // Store timeouts
+  const intervalsRef = useRef<NodeJS.Timeout[]>([]); // Store intervals
+  const initialDelayTimeoutRef = useRef<NodeJS.Timeout | null>(null); // Ref for the initial delay
 
   const handleSelectionChange = (newSelection: typeof selection) => {
     setSelection(newSelection);
@@ -157,6 +217,78 @@ const StudentHomePage: React.FC = () => {
     return true;
   };
 
+  // Function to generate random character
+  const getRandomChar = (): string => {
+    return SHUFFLE_CHARS.charAt(
+      Math.floor(Math.random() * SHUFFLE_CHARS.length)
+    );
+  };
+
+  // --- Animation Effect ---
+  useEffect(() => {
+    // Clear any previous initial delay timer first
+    if (initialDelayTimeoutRef.current)
+      clearTimeout(initialDelayTimeoutRef.current);
+
+    if (!isChatbotActive && !animationPlayedRef.current) {
+      // Start the animation process after an initial delay
+      initialDelayTimeoutRef.current = setTimeout(() => {
+        animationPlayedRef.current = true; // Mark as played once the delay is over
+
+        TARGET_TEXT.split("").forEach((targetChar, index) => {
+          // Timeout to start shuffling for this character
+          const startTimeout = setTimeout(() => {
+            let shuffleCount = 0;
+            const maxShuffleCount = Math.floor(
+              CHAR_SHUFFLE_DURATION / SHUFFLE_INTERVAL
+            );
+
+            // Interval to perform shuffling
+            const shuffleInterval = setInterval(() => {
+              if (shuffleCount < maxShuffleCount) {
+                setDisplayedChars((prev) => {
+                  const newChars = [...prev];
+                  newChars[index] = getRandomChar();
+                  return newChars;
+                });
+                shuffleCount++;
+              } else {
+                clearInterval(shuffleInterval);
+                // Set the final character
+                setDisplayedChars((prev) => {
+                  const newChars = [...prev];
+                  newChars[index] = targetChar;
+                  return newChars;
+                });
+
+                // If this is the last character, schedule glitch effect start
+                if (index === TARGET_TEXT.length - 1) {
+                  const glitchTimeout = setTimeout(() => {
+                    setIsShuffleComplete(true);
+                  }, GLITCH_DELAY);
+                  timeoutsRef.current.push(glitchTimeout); // Store timeout ID
+                }
+              }
+            }, SHUFFLE_INTERVAL);
+            intervalsRef.current.push(shuffleInterval); // Store interval ID
+          }, index * CHAR_REVEAL_DELAY); // Staggered start still relative to the initial delay end
+          timeoutsRef.current.push(startTimeout); // Store timeout ID
+        });
+      }, TEXT_ANIMATION_START_DELAY); // Apply the initial delay here
+    }
+
+    // Cleanup function
+    return () => {
+      if (initialDelayTimeoutRef.current)
+        clearTimeout(initialDelayTimeoutRef.current);
+      timeoutsRef.current.forEach(clearTimeout);
+      intervalsRef.current.forEach(clearInterval);
+      // Reset refs (optional, maybe useful if animation should replay)
+      // timeoutsRef.current = [];
+      // intervalsRef.current = [];
+    };
+  }, [isChatbotActive]); // Depend only on isChatbotActive
+
   return (
     <Container
       component="main"
@@ -187,10 +319,39 @@ const StudentHomePage: React.FC = () => {
               alignItems: "center",
               fontWeight: 600,
               mb: 3,
+              minHeight: "48px",
             }}
           >
-            <Assistant sx={{ mr: 1.5, fontSize: "2rem" }} />
-            T-BOT
+            <DotLottieReact
+              src="https://lottie.host/2e3acf33-4936-4f95-9767-dd944149de89/qZ7uMvbo9Q.lottie"
+              loop
+              autoplay
+              style={{
+                width: "50px",
+                height: "50px",
+                marginRight: theme.spacing(1.5),
+              }}
+            />
+            {/* Container for the animated text */}
+            <Box
+              component="span"
+              sx={{
+                display: "inline-block",
+                // Apply glitch animation conditionally with limited iterations
+                animation: isShuffleComplete
+                  ? `${subtleGlitch} 0.4s ${GLITCH_ITERATIONS} alternate steps(1, end)` // Use iteration count instead of infinite
+                  : "none",
+                whiteSpace: "pre",
+              }}
+            >
+              {/* Render each character */}
+              {displayedChars.map((char, index) => (
+                <span key={index} style={{ display: "inline-block" }}>
+                  {/* Render space correctly */}
+                  {char === " " ? "\u00A0" : char}
+                </span>
+              ))}
+            </Box>
           </Typography>
         )}
         {!isChatbotActive && (
@@ -270,14 +431,13 @@ const StudentHomePage: React.FC = () => {
                   color={
                     remainingTime !== null && remainingTime < 60
                       ? "error"
-                      : "third"
+                      : "text.secondary"
                   }
                   sx={{
                     display: "flex",
                     alignItems: "center",
                     fontWeight: 500,
                     fontSize: { xs: "1rem", sm: "1.1rem" },
-                    mr: { xs: 0, sm: 0.5 },
                   }}
                 >
                   <AccessTime sx={{ mr: 0.5 }} />
@@ -290,21 +450,35 @@ const StudentHomePage: React.FC = () => {
                   onClick={handleExtendTime}
                   size="small"
                   startIcon={<AddAlarm />}
-                  sx={{}}
                 >
                   시간 연장
                 </Button>
               </Box>
 
-              <Box>
+              <Box sx={{ display: "flex", gap: 1 }}>
                 {chatUsage && !usageError && (
-                  <Chip
-                    icon={<InfoOutlined />}
-                    label={`${chatUsage.dailyRemaining}/${chatUsage.dailyLimit} | ${chatUsage.monthlyRemaining}/${chatUsage.monthlyLimit}`}
-                    variant="outlined"
-                    color="info"
-                    size="small"
-                  />
+                  <>
+                    <Chip
+                      icon={<Today fontSize="small" />}
+                      label={`오늘 ${chatUsage.dailyRemaining}/${chatUsage.dailyLimit}`}
+                      variant="outlined"
+                      color={getUsageColor(
+                        chatUsage.dailyRemaining,
+                        chatUsage.dailyLimit
+                      )}
+                      size="small"
+                    />
+                    <Chip
+                      icon={<CalendarMonth fontSize="small" />}
+                      label={`월 ${chatUsage.monthlyRemaining}/${chatUsage.monthlyLimit}`}
+                      variant="outlined"
+                      color={getUsageColor(
+                        chatUsage.monthlyRemaining,
+                        chatUsage.monthlyLimit
+                      )}
+                      size="small"
+                    />
+                  </>
                 )}
                 {usageError && (
                   <Chip
@@ -328,7 +502,7 @@ const StudentHomePage: React.FC = () => {
               setChatUsage={setChatUsage}
               chatUsage={chatUsage}
               sx={{
-                height: { xs: "60vh", sm: "65vh" },
+                height: "65vh",
                 mt: 2,
               }}
             />

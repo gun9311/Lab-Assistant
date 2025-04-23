@@ -29,7 +29,7 @@ const NotificationsPage: React.FC = () => {
     <Container
       component="main"
       maxWidth="sm"
-      sx={{ marginTop: { xs: 4, sm: 6 } }}
+      sx={{ marginTop: { xs: 4, sm: 6 }, mb: 4 }}
     >
       <Paper
         elevation={3}

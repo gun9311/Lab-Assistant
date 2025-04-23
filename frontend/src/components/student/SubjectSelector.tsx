@@ -13,7 +13,7 @@ import {
   Grid,
   Chip,
 } from "@mui/material";
-import { InfoOutlined } from "@mui/icons-material";
+import { Today, CalendarMonth } from "@mui/icons-material";
 import { getGradeStatus } from "../../utils/auth";
 import { ChatUsageData } from "../../utils/api";
 
@@ -29,6 +29,22 @@ type SubjectSelectorProps = {
   disabled?: boolean;
   chatUsage: ChatUsageData | null;
   usageError: string | null;
+};
+
+// Helper function to determine chip color based on usage percentage
+const getUsageColor = (
+  remaining: number,
+  limit: number
+): "success" | "warning" | "error" => {
+  if (limit === 0) return "error"; // Handle division by zero or no limit
+  const percentage = (remaining / limit) * 100;
+  if (percentage < 20) {
+    return "error";
+  } else if (percentage <= 50) {
+    return "warning";
+  } else {
+    return "success";
+  }
 };
 
 const SubjectSelector: React.FC<SubjectSelectorProps> = ({
@@ -102,15 +118,30 @@ const SubjectSelector: React.FC<SubjectSelectorProps> = ({
         <Typography variant="h6" gutterBottom sx={{ mb: 0 }}>
           학습 내용 선택
         </Typography>
-        <Box>
+        <Box sx={{ display: "flex", gap: 1 }}>
           {chatUsage && !usageError && (
-            <Chip
-              icon={<InfoOutlined />}
-              label={`남은 질문: 오늘 ${chatUsage.dailyRemaining}/${chatUsage.dailyLimit} | 이번 달 ${chatUsage.monthlyRemaining}/${chatUsage.monthlyLimit}`}
-              variant="outlined"
-              color="info"
-              size="small"
-            />
+            <>
+              <Chip
+                icon={<Today fontSize="small" />}
+                label={`오늘 ${chatUsage.dailyRemaining}/${chatUsage.dailyLimit}`}
+                variant="outlined"
+                color={getUsageColor(
+                  chatUsage.dailyRemaining,
+                  chatUsage.dailyLimit
+                )}
+                size="small"
+              />
+              <Chip
+                icon={<CalendarMonth fontSize="small" />}
+                label={`월 ${chatUsage.monthlyRemaining}/${chatUsage.monthlyLimit}`}
+                variant="outlined"
+                color={getUsageColor(
+                  chatUsage.monthlyRemaining,
+                  chatUsage.monthlyLimit
+                )}
+                size="small"
+              />
+            </>
           )}
           {usageError && (
             <Chip

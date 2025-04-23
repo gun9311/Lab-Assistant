@@ -169,7 +169,7 @@ const Chatbot: React.FC<ChatbotProps> = ({
             "[Chatbot] WebSocket closed before initial message could be sent after delay."
           );
         }
-      }, 100);
+      }, 300);
     };
 
     newWs.onmessage = (event) => {

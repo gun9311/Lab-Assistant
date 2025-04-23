@@ -20,7 +20,7 @@ import QuizResults from "./QuizResults";
 import { getUserId } from "../../../utils/auth";
 import api from "../../../utils/api";
 import { useNavigate } from "react-router-dom";
-import background from '../../../../src/assets/nudge-background2-edit.png';
+import background from "../../../../src/assets/nudge-background2-edit.png";
 import { PlayCircleFilled } from "@mui/icons-material";
 
 interface Selection {
@@ -129,7 +129,7 @@ const MyQuizzesPage: React.FC<MyQuizzesPageProps> = ({ setIsQuizMode }) => {
   };
 
   return (
-    <Container component="main" maxWidth="lg" sx={{ mt: 6 }}>
+    <Container component="main" maxWidth="lg" sx={{ mt: 6, mb: 4 }}>
       <Paper
         elevation={3}
         sx={{
@@ -148,8 +148,7 @@ const MyQuizzesPage: React.FC<MyQuizzesPageProps> = ({ setIsQuizMode }) => {
           flexDirection: "column",
           justifyContent: "space-between",
         }}
-      >
-      </Paper>
+      ></Paper>
       <Paper
         elevation={3}
         sx={{ p: 3, borderRadius: "16px", backgroundColor: "#ffffff" }}
@@ -195,29 +194,54 @@ const MyQuizzesPage: React.FC<MyQuizzesPageProps> = ({ setIsQuizMode }) => {
         )} */}
       </Paper>
 
-      <Snackbar open={!!successMessage} autoHideDuration={2000} onClose={() => setSuccessMessage(null)} anchorOrigin={{ vertical: "top", horizontal: "center" }}>
-        <Alert onClose={() => setSuccessMessage(null)} severity="success" sx={{ width: "100%" }}>
+      <Snackbar
+        open={!!successMessage}
+        autoHideDuration={2000}
+        onClose={() => setSuccessMessage(null)}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+      >
+        <Alert
+          onClose={() => setSuccessMessage(null)}
+          severity="success"
+          sx={{ width: "100%" }}
+        >
           {successMessage}
         </Alert>
       </Snackbar>
 
-      <Snackbar open={!!error} autoHideDuration={6000} onClose={() => setError(null)} anchorOrigin={{ vertical: "top", horizontal: "center" }}>
-        <Alert onClose={() => setError(null)} severity="error" sx={{ width: "100%" }}>
+      <Snackbar
+        open={!!error}
+        autoHideDuration={6000}
+        onClose={() => setError(null)}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+      >
+        <Alert
+          onClose={() => setError(null)}
+          severity="error"
+          sx={{ width: "100%" }}
+        >
           {error}
         </Alert>
       </Snackbar>
 
-      <Snackbar open={snackbarOpen} autoHideDuration={6000} onClose={() => setSnackbarOpen(false)} anchorOrigin={{ vertical: "top", horizontal: "center" }}>
-        <Alert onClose={() => setSnackbarOpen(false)} severity="warning" sx={{ width: "100%" }}>
+      <Snackbar
+        open={snackbarOpen}
+        autoHideDuration={6000}
+        onClose={() => setSnackbarOpen(false)}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+      >
+        <Alert
+          onClose={() => setSnackbarOpen(false)}
+          severity="warning"
+          sx={{ width: "100%" }}
+        >
           세션을 찾을 수 없거나 오류가 발생했습니다.
         </Alert>
       </Snackbar>
 
       <Dialog open={isModalOpen} onClose={handleCloseModal}>
         <DialogContent>
-          <DialogContentText>
-            PIN을 입력하세요.
-          </DialogContentText>
+          <DialogContentText>PIN을 입력하세요.</DialogContentText>
           <TextField
             label="PIN 입력"
             variant="outlined"

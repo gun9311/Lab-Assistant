@@ -1,17 +1,26 @@
 import React from "react";
 import { Outlet } from "react-router-dom";
-import { Container } from "@mui/material";
+import { Container, useTheme, useMediaQuery, Box } from "@mui/material";
 import Navbar from "./Navbar";
 import { getRole } from "../utils/auth";
 
 const Layout: React.FC<{ isQuizMode: boolean }> = ({ isQuizMode }) => {
   const role = getRole() || "";
+  const theme = useTheme();
+  const isDesktop = useMediaQuery(theme.breakpoints.up("lg"));
+
+  const bottomNavHeight = isDesktop ? 0 : 56;
 
   return (
-    <Container component="main" maxWidth={false}>
+    <Box
+      component="main"
+      sx={{
+        pb: `${bottomNavHeight}px`,
+      }}
+    >
       {!isQuizMode && <Navbar role={role} isQuizMode={isQuizMode} />}
       <Outlet />
-    </Container>
+    </Box>
   );
 };
 

@@ -30,7 +30,7 @@ type Student = {
 };
 
 type ReportGenerationProps = {
-  onBack: () => void;
+  // onBack: () => void;
   school: string | null;
   grade: number | null;
   classNumber: string;
@@ -38,7 +38,7 @@ type ReportGenerationProps = {
 };
 
 const ReportGeneration: React.FC<ReportGenerationProps> = ({
-  onBack,
+  // onBack,
   school,
   grade,
   classNumber,
@@ -320,7 +320,7 @@ const ReportGeneration: React.FC<ReportGenerationProps> = ({
 
         <ActionButtons
           tabValue={tabValue}
-          onBack={onBack}
+          // onBack={onBack}
           onGenerate={handleReportGeneration}
           onQuery={handleReportQuery}
         />

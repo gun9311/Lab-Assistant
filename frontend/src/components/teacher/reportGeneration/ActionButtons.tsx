@@ -6,14 +6,14 @@ import SearchIcon from "@mui/icons-material/Search";
 
 type ActionButtonsProps = {
   tabValue: number;
-  onBack: () => void;
+  // onBack: () => void;
   onGenerate: () => void;
   onQuery: () => void;
 };
 
 const ActionButtons: React.FC<ActionButtonsProps> = ({
   tabValue,
-  onBack,
+  // onBack,
   onGenerate,
   onQuery,
 }) => {
