@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
+const logger = require("../utils/logger"); // 로거 추가
 
 const studentSchema = new mongoose.Schema({
   loginId: { type: String, required: true, unique: true },
@@ -20,13 +21,22 @@ const studentSchema = new mongoose.Schema({
 studentSchema.pre("save", async function (next) {
   const student = this;
   if (student.isModified("password")) {
-    student.password = await bcrypt.hash(student.password, 8);
+    try {
+      student.password = await bcrypt.hash(student.password, 12);
+      logger.info(`Password hashed for student: ${student.loginId}`);
+    } catch (error) {
+      logger.error(`Error hashing password for student ${student.loginId}:`, {
+        error: error.message,
+        stack: error.stack,
+      });
+      return next(error);
+    }
   }
   next();
 });
 
-// studentSchema.index({ school: 1, grade: 1, class: 1, studentId: 1 }, { unique: true });
 studentSchema.index({ loginId: 1 }, { unique: true });
+studentSchema.index({ school: 1, grade: 1, class: 1, loginId: 1 });
 
 const Student = mongoose.model("Student", studentSchema);
 

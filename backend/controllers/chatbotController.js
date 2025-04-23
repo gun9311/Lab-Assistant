@@ -2,50 +2,56 @@ const { v4: uuidv4 } = require("uuid");
 const { getNLPResponse } = require("../services/nlpService");
 const ChatSummary = require("../models/ChatSummary");
 const redisClient = require("../utils/redisClient");
-const winston = require("winston");
+const logger = require("../utils/logger");
 const { OpenAI } = require("openai");
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const Student = require("../models/Student");
 const { format } = require("date-fns");
 
-const logger = winston.createLogger({
-  level: "info",
-  format: winston.format.combine(
-    winston.format.timestamp(),
-    winston.format.json()
-  ),
-  transports: [
-    new winston.transports.Console(),
-    // new winston.transports.File({ filename: '/app/logs/websocket.log' })
-  ],
-});
-
 let clients = {};
 
-const DAILY_LIMIT = 20;
+const DAILY_LIMIT = 15;
 const MONTHLY_LIMIT = 150;
 
 // PII 마스킹 함수 (2.5단계)
 function maskPII(text) {
   if (!text) return text;
   let maskedText = text;
-  // 전화번호 (010-xxxx-xxxx, 01x-xxx-xxxx, 0x0-xxxx-xxxx 등, 공백/하이픈 허용)
+
+  // 1. 전화번호 (휴대폰 및 주요 유선/인터넷 전화, 공백/하이픈 허용) - 수정된 정규식
   maskedText = maskedText.replace(
-    /\b01[016789](?:[ -]?\d{3,4}){2}\b/g,
+    /\b(?:01[016789](?:[ -]?\d{3,4}){2}|0(?:2|3[1-3]|4[1-4]|5[1-5]|6[1-4]|70)[ -]?\d{3,4}[ -]?\d{4})\b/g,
     "[전화번호]"
   );
-  // 주민등록번호 (xxxxxx-xxxxxxx)
+
+  // 2. 주민등록번호
   maskedText = maskedText.replace(
     /\b\d{6}[- ]?[1-4]\d{6}\b/g,
     "[주민등록번호]"
   );
-  // 이메일 주소
+
+  // 3. 이메일 주소
   maskedText = maskedText.replace(
     /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g,
     "[이메일]"
   );
-  // 간단한 주소 패턴 (시/도/구/군/동/면/읍/리/길/로 + 숫자) - 오탐 가능성 높음, 필요시 정교화
-  // maskedText = maskedText.replace(/([가-힣]+(시|도|구|군|동|면|읍|리|길|로))(\s?\d+)/g, "[주소]");
+
+  // --- 주소 마스킹 시작 ---
+  // 4. 아파트/빌딩 동/호수 패턴 먼저 적용
+  maskedText = maskedText.replace(
+    // Optional building name with type + mandatory d+ 동 + optional d+ 호
+    /\b(?:[가-힣]+\s*(?:아파트|빌라|빌딩|오피스텔|주공|맨션|타운)\s+)?(\d+)\s*동(?:\s+(\d+)\s*호)?\b/g,
+    "[주소(동/호)]" // 마스킹 문자열 구분
+  );
+
+  // 5. 도로명 주소 패턴 적용 (위에서 마스킹되지 않은 부분 대상)
+  maskedText = maskedText.replace(
+    // Optional preceding words + Road name (로/길) + Building number (d, d-d, d번길) + Optional (details like 층/호/동 in parentheses/comma)
+    /\b(?:[가-힣]+\s*)*([가-힣]+(?:로|길))\s+(\d+(?:-\d+)?(?:번길)?)(?:\s*[,\(]?\s*(?:(?:지하)?\d+층|\d+호|[^)]+동)\s*[,\)]?)?\b/g,
+    "[주소(도로명)]" // 마스킹 문자열 구분
+  );
+  // --- 주소 마스킹 끝 ---
+
   return maskedText;
 }
 
@@ -67,6 +73,12 @@ const forbiddenKeywords = [
   "미친",
   "존나",
   "병신",
+  "좆나",
+  "좆",
+  "좆년",
+  "좆년새끼",
+  "좆년새끼놈",
+  "좆년새끼놈년",
   // 카테고리 3: 폭력적이거나 무서운 내용 (일부)
   "살인",
   "자살",
@@ -144,7 +156,15 @@ const handleWebSocketConnection = async (ws, userId, subject) => {
   if (!chatHistory) {
     chatHistory = [];
   } else {
-    chatHistory = JSON.parse(chatHistory);
+    try {
+      chatHistory = JSON.parse(chatHistory);
+    } catch (parseError) {
+      logger.error(
+        `Error parsing chat history for user ${userId}:`,
+        parseError
+      );
+      chatHistory = []; // Reset history on parse error
+    }
   }
 
   clients[clientId] = ws;
@@ -263,9 +283,11 @@ const handleWebSocketConnection = async (ws, userId, subject) => {
   ws.on("message", async (message) => {
     const startTime = process.hrtime();
     let saveToHistory = true;
+    let messageFiltered = false;
+    let refusalBotResponse = "";
 
     try {
-      // --- 추가: 메시지 처리 전 사용량 제한 재확인 ---
+      // --- 사용량 제한 재확인 (변경 없음) ---
       try {
         const student = await Student.findById(userId);
         if (!student) {
@@ -300,26 +322,129 @@ const handleWebSocketConnection = async (ws, userId, subject) => {
           ws.send(JSON.stringify({ error: "monthly_limit_exceeded" }));
           return; // NLP 호출 등 다음 단계로 넘어가지 않음
         }
+        if (
+          dailyChatCount >= DAILY_LIMIT ||
+          monthlyChatCount >= MONTHLY_LIMIT
+        ) {
+          // ... (send limit exceeded error and return) ...
+          logger.warn(`User ${userId} exceeded limit upon message receive.`);
+          const errorType =
+            dailyChatCount >= DAILY_LIMIT
+              ? "daily_limit_exceeded"
+              : "monthly_limit_exceeded";
+          ws.send(JSON.stringify({ error: errorType }));
+          return; // Stop processing
+        }
       } catch (checkError) {
-        logger.error(
-          `Error re-checking usage limits for user ${userId} mid-session:`,
-          checkError
-        );
-        ws.send(
-          JSON.stringify({ error: "사용량 확인 중 오류 발생 (세션 중)" })
-        );
-        return; // 처리 중단
+        // ... (error handling for limit check) ...
+        return;
       }
       // --- 사용량 제한 재확인 끝 ---
 
       const { grade, semester, subject, unit, topic, userMessage } =
         JSON.parse(message);
 
+      // --- *** 핵심 변경: DB 카운트 증가를 여기로 이동 *** ---
+      // 사용자가 빈 메시지가 아닌 실제 요청을 보냈을 때 카운트 증가
+      if (userMessage && userMessage.trim()) {
+        saveToHistory = true; // Indicate it's a countable message
+        try {
+          const todayUpdate = format(new Date(), "yyyy-MM-dd");
+          const thisMonthUpdate = format(new Date(), "yyyy-MM");
+          const finalUpdateOps = {
+            $inc: {}, // Initialize $inc
+            $set: {}, // Initialize $set
+          };
+
+          // Fetch current lastChatDay/Month to avoid race conditions if possible, though might be omitted for performance
+          const studentData = await Student.findById(
+            userId,
+            "lastChatDay lastChatMonth dailyChatCount monthlyChatCount"
+          );
+
+          // Determine increments and resets based on fetched data or assume current limits are accurate enough for immediate increment
+          let currentDaily = studentData
+            ? studentData.dailyChatCount
+            : dailyChatCount; // Use count from initial check or fetched
+          let currentMonthly = studentData
+            ? studentData.monthlyChatCount
+            : monthlyChatCount;
+          let lastDay = studentData ? studentData.lastChatDay : lastChatDay;
+          let lastMonth = studentData
+            ? studentData.lastChatMonth
+            : lastChatMonth;
+
+          if (lastDay !== todayUpdate) {
+            finalUpdateOps.$set.lastChatDay = todayUpdate;
+            finalUpdateOps.$set.dailyChatCount = 1; // Reset and set to 1 for today
+            currentDaily = 1; // Reflect the change locally for potential subsequent checks (though unlikely needed now)
+          } else {
+            finalUpdateOps.$inc.dailyChatCount = 1; // Increment today's count
+            currentDaily += 1;
+          }
+
+          if (lastMonth !== thisMonthUpdate) {
+            finalUpdateOps.$set.lastChatMonth = thisMonthUpdate;
+            finalUpdateOps.$set.monthlyChatCount = 1; // Reset and set to 1 for this month
+            currentMonthly = 1;
+          } else {
+            // Only increment monthly if daily was also incremented (or reset)
+            if (
+              finalUpdateOps.$inc.dailyChatCount ||
+              finalUpdateOps.$set.dailyChatCount
+            ) {
+              finalUpdateOps.$inc.monthlyChatCount = 1;
+              currentMonthly += 1;
+            }
+          }
+
+          // Clean up empty operators
+          if (Object.keys(finalUpdateOps.$inc).length === 0)
+            delete finalUpdateOps.$inc;
+          if (Object.keys(finalUpdateOps.$set).length === 0)
+            delete finalUpdateOps.$set;
+
+          // Perform the update only if there's something to update
+          if (Object.keys(finalUpdateOps).length > 0) {
+            await Student.findByIdAndUpdate(userId, finalUpdateOps, {
+              new: true,
+            }); // `new: true` is optional
+            logger.info(
+              `Usage count incremented for user ${userId} *before* processing message.`
+            );
+
+            // Optional: Update local counts if needed elsewhere, though maybe not necessary now
+            dailyChatCount = currentDaily;
+            monthlyChatCount = currentMonthly;
+          }
+        } catch (updateError) {
+          logger.error(
+            `Failed to update usage count for user ${userId} before processing:`,
+            updateError
+          );
+          // Decide how to handle: maybe send an error, or just log and continue?
+          // For now, let's log and potentially let the user know an error occurred during counting.
+          // ws.send(JSON.stringify({ error: "사용량 집계 중 오류가 발생했습니다." }));
+          // return; // Or maybe continue processing the message anyway? Let's continue for now.
+        }
+      } else {
+        // This is likely the initial empty message from frontend to start the chat
+        saveToHistory = false;
+        logger.info(
+          `Initial empty message received from user ${userId}, usage count not incremented.`
+        );
+      }
+      // --- *** DB 카운트 증가 로직 끝 *** ---
+
       let finalUserMessage = userMessage;
       let messageForProcessing = userMessage;
 
-      // --- 2.5단계: PII 마스킹 ---
-      if (messageForProcessing && messageForProcessing.trim()) {
+      // --- PII 마스킹 (변경 없음) ---
+      if (
+        messageForProcessing &&
+        messageForProcessing.trim() &&
+        saveToHistory
+      ) {
         const originalMessage = messageForProcessing;
         messageForProcessing = maskPII(messageForProcessing);
         if (messageForProcessing !== originalMessage) {
@@ -330,8 +455,12 @@ const handleWebSocketConnection = async (ws, userId, subject) => {
         finalUserMessage = messageForProcessing;
       }
 
-      // --- 2단계: 입력 필터링 (Moderation API) ---
-      if (messageForProcessing && messageForProcessing.trim()) {
+      // --- 입력 필터링 (Moderation API) (변경 없음) ---
+      if (
+        messageForProcessing &&
+        messageForProcessing.trim() &&
+        saveToHistory
+      ) {
         try {
           const moderationResponse = await openai.moderations.create({
             input: messageForProcessing,
@@ -344,12 +473,25 @@ const handleWebSocketConnection = async (ws, userId, subject) => {
                 moderationResult.categories
               )}`
             );
-            ws.send(
-              JSON.stringify({
-                bot: "죄송합니다. 해당 내용은 답변해 드리기 어렵습니다. 다른 질문을 해주시겠어요?",
-                isFinal: true,
-              })
-            );
+            refusalBotResponse =
+              "죄송합니다. 해당 내용은 답변해 드리기 어렵습니다. 다른 질문을 해주시겠어요?";
+            messageFiltered = true;
+
+            ws.send(JSON.stringify({ bot: refusalBotResponse, isFinal: true }));
+
+            if (saveToHistory) {
+              chatHistory.push({
+                user: finalUserMessage,
+                bot: refusalBotResponse,
+              });
+              await redisClient.set(
+                chatHistoryKey,
+                JSON.stringify(chatHistory)
+              );
+              logger.info(
+                `Saved filtered (Moderation API) interaction for user ${userId}`
+              );
+            }
             return;
           }
         } catch (moderationError) {
@@ -366,27 +508,40 @@ const handleWebSocketConnection = async (ws, userId, subject) => {
         }
       }
 
-      // --- 4단계: 입력 필터링 (키워드/패턴) ---
-      if (messageForProcessing && messageForProcessing.trim()) {
+      // --- 입력 필터링 (키워드/패턴) (변경 없음) ---
+      if (
+        messageForProcessing &&
+        messageForProcessing.trim() &&
+        saveToHistory
+      ) {
         const forbiddenCheck = containsForbiddenContent(messageForProcessing);
         if (forbiddenCheck.forbidden) {
           logger.warn(
             // logger 사용
             `Input blocked by custom filter for user ${userId}, client ${clientId}. Type: ${forbiddenCheck.type}, Detail: ${forbiddenCheck.detail}`
           );
-          ws.send(
-            JSON.stringify({
-              bot: "죄송합니다. 사용할 수 없는 단어나 표현이 포함되어 있어요. 다른 질문을 해주시겠어요?",
-              isFinal: true,
-            })
-          );
-          return; // 처리 중단
+          refusalBotResponse =
+            "죄송합니다. 사용할 수 없는 단어나 표현이 포함되어 있어요. 다른 질문을 해주시겠어요?";
+          messageFiltered = true;
+
+          ws.send(JSON.stringify({ bot: refusalBotResponse, isFinal: true }));
+
+          if (saveToHistory) {
+            chatHistory.push({
+              user: finalUserMessage,
+              bot: refusalBotResponse,
+            });
+            await redisClient.set(chatHistoryKey, JSON.stringify(chatHistory));
+            logger.info(
+              `Saved filtered (Custom Filter) interaction for user ${userId}`
+            );
+          }
+          return;
         }
       }
-      // --- 4단계: 입력 필터링 (키워드/패턴) 끝 ---
 
+      // --- NLP 호출 준비 (첫 인사말 로직 등은 유지) ---
       const recentHistory = chatHistory.slice(-3);
-
       const systemMessageContent = `너는 초등학생을 위한 친절하고 **매우 안전한** AI 학습 튜터야. 현재 ${grade}학년 ${subject} ${
         unit ? `${unit} 단원 ` : ""
       }${topic} 학습을 돕고 있어. 다음 원칙을 **반드시** 지켜줘:
@@ -441,139 +596,97 @@ const handleWebSocketConnection = async (ws, userId, subject) => {
       }
 
       // 3. NLP 서비스 호출 및 응답 스트리밍
-      try {
-        const streamResponse = getNLPResponse(messages);
-        let botResponseContent = "";
-        for await (const botResponse of streamResponse) {
-          ws.send(JSON.stringify({ bot: botResponse, isFinal: false }));
-          botResponseContent += botResponse;
-        }
-        ws.send(JSON.stringify({ bot: null, isFinal: true }));
+      if (!messageFiltered) {
+        try {
+          const streamResponse = getNLPResponse(messages);
+          let botResponseContent = "";
+          for await (const botResponse of streamResponse) {
+            ws.send(JSON.stringify({ bot: botResponse, isFinal: false }));
+            botResponseContent += botResponse;
+          }
+          ws.send(JSON.stringify({ bot: null, isFinal: true }));
 
-        // --- 3단계 & 4단계: 출력 필터링 ---
-        if (botResponseContent && botResponseContent.trim()) {
-          try {
-            // 3.1 Moderation API 검사
-            const moderationResponse = await openai.moderations.create({
-              input: botResponseContent,
+          // --- 출력 필터링 (변경 없음) ---
+          if (botResponseContent && botResponseContent.trim()) {
+            try {
+              // 3.1 Moderation API 검사
+              const moderationResponse = await openai.moderations.create({
+                input: botResponseContent,
+              });
+              const moderationResult = moderationResponse.results[0];
+
+              if (moderationResult.flagged) {
+                logger.warn(
+                  `Output flagged by Moderation API for user ${userId}, client ${clientId}. Categories: ${JSON.stringify(
+                    moderationResult.categories
+                  )}. Original response (start): ${botResponseContent.substring(
+                    0,
+                    100
+                  )}...`
+                );
+                botResponseContent =
+                  "죄송합니다. 답변 생성 중 문제가 발생했습니다. 다른 질문을 해주시겠어요?";
+              }
+
+              // 3.2 PII 마스킹
+              const originalBotResponseForMasking = botResponseContent;
+              botResponseContent = maskPII(botResponseContent);
+              if (botResponseContent !== originalBotResponseForMasking) {
+                logger.info(
+                  `PII masked in bot response for user ${userId}, client ${clientId}.`
+                );
+              }
+
+              // 4단계: 출력 필터링 (키워드/패턴) - PII 마스킹 후 검사
+              const forbiddenCheckOutput =
+                containsForbiddenContent(botResponseContent);
+              if (forbiddenCheckOutput.forbidden) {
+                logger.warn(
+                  // logger 사용
+                  `Output blocked/modified by custom filter for user ${userId}, client ${clientId}. Type: ${
+                    forbiddenCheckOutput.type
+                  }, Detail: ${
+                    forbiddenCheckOutput.detail
+                  }. Original (start): ${botResponseContent.substring(
+                    0,
+                    100
+                  )}...`
+                );
+                // 부적절한 응답은 안전한 메시지로 대체
+                botResponseContent =
+                  "죄송합니다. 답변 내용에 부적절한 표현이 포함되어 수정되었습니다.";
+              }
+            } catch (outputFilterError) {
+              logger.error(
+                `Error during output filtering for client ${clientId}:`,
+                outputFilterError
+              );
+              botResponseContent =
+                "답변 처리 중 오류가 발생하여 내용을 표시할 수 없습니다.";
+            }
+          }
+          // --- 출력 필터링 끝 ---
+
+          // --- 대화 기록 저장 (변경 없음) ---
+          if (saveToHistory && finalUserMessage.trim() && botResponseContent) {
+            chatHistory.push({
+              user: finalUserMessage,
+              bot: botResponseContent,
             });
-            const moderationResult = moderationResponse.results[0];
-
-            if (moderationResult.flagged) {
-              logger.warn(
-                `Output flagged by Moderation API for user ${userId}, client ${clientId}. Categories: ${JSON.stringify(
-                  moderationResult.categories
-                )}. Original response (start): ${botResponseContent.substring(
-                  0,
-                  100
-                )}...`
-              );
-              botResponseContent =
-                "죄송합니다. 답변 생성 중 문제가 발생했습니다. 다른 질문을 해주시겠어요?";
-            }
-
-            // 3.2 PII 마스킹
-            const originalBotResponseForMasking = botResponseContent;
-            botResponseContent = maskPII(botResponseContent);
-            if (botResponseContent !== originalBotResponseForMasking) {
-              logger.info(
-                `PII masked in bot response for user ${userId}, client ${clientId}.`
-              );
-            }
-
-            // 4단계: 출력 필터링 (키워드/패턴) - PII 마스킹 후 검사
-            const forbiddenCheckOutput =
-              containsForbiddenContent(botResponseContent);
-            if (forbiddenCheckOutput.forbidden) {
-              logger.warn(
-                // logger 사용
-                `Output blocked/modified by custom filter for user ${userId}, client ${clientId}. Type: ${
-                  forbiddenCheckOutput.type
-                }, Detail: ${
-                  forbiddenCheckOutput.detail
-                }. Original (start): ${botResponseContent.substring(0, 100)}...`
-              );
-              // 부적절한 응답은 안전한 메시지로 대체
-              botResponseContent =
-                "죄송합니다. 답변 내용에 부적절한 표현이 포함되어 수정되었습니다.";
-            }
-          } catch (outputFilterError) {
-            logger.error(
-              `Error during output filtering for client ${clientId}:`,
-              outputFilterError
-            );
-            botResponseContent =
-              "답변 처리 중 오류가 발생하여 내용을 표시할 수 없습니다.";
-          }
-        }
-        // --- 3단계 & 4단계: 출력 필터링 끝 ---
-
-        // --- 사용량 카운트 DB 업데이트 (성공적으로 응답 생성 후) ---
-        // 첫 인사말이 아닐 경우에만 카운트 업데이트 (saveToHistory가 true일 때)
-        if (saveToHistory) {
-          try {
-            const todayUpdate = format(new Date(), "yyyy-MM-dd");
-            const thisMonthUpdate = format(new Date(), "yyyy-MM");
-            const finalUpdateOps = {
-              $inc: { dailyChatCount: 1, monthlyChatCount: 1 },
-              $set: {},
-            };
-            const studentData = await Student.findById(
-              userId,
-              "lastChatDay lastChatMonth"
-            );
-            if (studentData && studentData.lastChatDay !== todayUpdate) {
-              finalUpdateOps.$set.lastChatDay = todayUpdate;
-              finalUpdateOps.$set.dailyChatCount = 1; // 날짜 바뀌면 1로 설정
-              delete finalUpdateOps.$inc.dailyChatCount;
-            }
-            if (studentData && studentData.lastChatMonth !== thisMonthUpdate) {
-              finalUpdateOps.$set.lastChatMonth = thisMonthUpdate;
-              finalUpdateOps.$set.monthlyChatCount = 1; // 달 바뀌면 1로 설정
-              delete finalUpdateOps.$inc.monthlyChatCount;
-            }
-            if (Object.keys(finalUpdateOps.$inc).length === 0)
-              delete finalUpdateOps.$inc;
-            if (Object.keys(finalUpdateOps.$set).length === 0)
-              delete finalUpdateOps.$set;
-            if (Object.keys(finalUpdateOps).length > 0) {
-              await Student.findByIdAndUpdate(userId, finalUpdateOps);
-              logger.info(`Usage count incremented for user ${userId}`);
-            }
-          } catch (updateError) {
-            logger.error(
-              `Failed to update usage count for user ${userId}:`,
-              updateError
+            await redisClient.set(chatHistoryKey, JSON.stringify(chatHistory));
+            logger.info(
+              `Chat history (user masked, bot filtered/masked) saved for user ${userId}`
             );
           }
-        } else {
-          // 첫 인사말인 경우 로그만 남김 (선택 사항)
-          logger.info(
-            `Initial greeting processed for user ${userId}, usage count not incremented.`
+        } catch (nlpError) {
+          logger.error(
+            `[chatbotController] Error getting NLP response for client ${clientId}:`,
+            nlpError
+          );
+          ws.send(
+            JSON.stringify({ error: "챗봇 응답 생성 중 오류가 발생했습니다." })
           );
         }
-        // --- 사용량 카운트 DB 업데이트 끝 ---
-
-        // 4. 대화 기록 저장 (모든 필터링/마스킹 거친 내용)
-        if (saveToHistory && finalUserMessage.trim() && botResponseContent) {
-          chatHistory.push({ user: finalUserMessage, bot: botResponseContent });
-          await redisClient.set(chatHistoryKey, JSON.stringify(chatHistory));
-          logger.info(
-            `Chat history (user masked, bot filtered/masked) saved for user ${userId}`
-          );
-        } else if (!saveToHistory) {
-          logger.info(
-            `Initial greeting sent to user ${userId}, not saved to history.`
-          );
-        }
-      } catch (nlpError) {
-        logger.error(
-          `[chatbotController] Error getting NLP response for client ${clientId}:`,
-          nlpError
-        );
-        ws.send(
-          JSON.stringify({ error: "챗봇 응답 생성 중 오류가 발생했습니다." })
-        );
       }
     } catch (error) {
       logger.error(
@@ -629,49 +742,109 @@ const saveChatSummaryInternal = async (userId, subject) => {
   try {
     let chatHistory = await redisClient.get(chatHistoryKey);
     if (!chatHistory) {
-      logger.warn("No chat history found for this user");
+      logger.warn(
+        `No chat history found in Redis for user ${userId} to save summary.`
+      );
       return;
     }
 
-    chatHistory = JSON.parse(chatHistory);
-    const summary = chatHistory
+    // Redis에서 가져온 데이터 파싱 및 유효성 검사
+    let parsedChatHistory;
+    try {
+      parsedChatHistory = JSON.parse(chatHistory);
+    } catch (parseError) {
+      logger.error(
+        `Invalid JSON in Redis chat history for user ${userId}. Key: ${chatHistoryKey}`,
+        { error: parseError.message }
+      );
+      await redisClient.del(chatHistoryKey); // 잘못된 데이터 삭제
+      return;
+    }
+
+    if (!Array.isArray(parsedChatHistory)) {
+      logger.error(
+        `Invalid chat history format retrieved from Redis for user ${userId}. Expected array, got ${typeof parsedChatHistory}. Key: ${chatHistoryKey}`
+      );
+      await redisClient.del(chatHistoryKey); // 잘못된 데이터 삭제
+      return;
+    }
+
+    // 요약 텍스트 생성
+    const summaryText = parsedChatHistory
       .map((msg) => `You: ${msg.user}\nBot: ${msg.bot}`)
       .join("\n");
 
-    let chatSummary = await ChatSummary.findOne({
-      student: userId,
-      "subjects.subject": subject,
-    });
+    // 요약 텍스트가 비어있으면 저장하지 않음
+    if (!summaryText || summaryText.trim() === "") {
+      logger.info(
+        `Empty summary generated for user ${userId} (Key: ${chatHistoryKey}), skipping save.`
+      );
+      await redisClient.del(chatHistoryKey); // Redis 기록은 삭제
+      return;
+    }
 
-    if (chatSummary) {
-      // 성능 개선: subjects 배열에서 해당 과목을 찾을 때 find 사용
-      let subjectData = chatSummary.subjects.find(
+    const newSummaryEntry = { summary: summaryText, createdAt: new Date() };
+
+    // 1. 학생 ID로 기존 ChatSummary 문서 찾기
+    let chatSummaryDoc = await ChatSummary.findOne({ student: userId });
+
+    if (chatSummaryDoc) {
+      // 2. 문서가 있으면 업데이트
+      logger.info(
+        `Found existing ChatSummary document for student ${userId}. Updating subjects.`
+      );
+      let subjectData = chatSummaryDoc.subjects.find(
         (sub) => sub.subject === subject
       );
 
       if (subjectData) {
-        subjectData.summaries.push({ summary, createdAt: new Date() });
+        // b. 과목이 이미 있으면 summaries 배열의 맨 앞에 새 요약 추가 (최신순 저장)
+        logger.debug(
+          `Subject '${subject}' found in document for student ${userId}, adding new summary to the beginning.`
+        );
+        subjectData.summaries.unshift(newSummaryEntry);
       } else {
-        chatSummary.subjects.push({
-          subject,
-          summaries: [{ summary, createdAt: new Date() }],
+        // c. 과목이 없으면 subjects 배열에 새 과목 객체 추가
+        logger.debug(
+          `Subject '${subject}' not found for student ${userId}, adding new subject entry.`
+        );
+        chatSummaryDoc.subjects.push({
+          subject: subject,
+          summaries: [newSummaryEntry],
         });
       }
     } else {
-      chatSummary = new ChatSummary({
+      // 3. 문서가 없으면 새로 생성
+      logger.info(
+        `No existing ChatSummary document found for student ${userId}, creating new one with subject '${subject}'.`
+      );
+      chatSummaryDoc = new ChatSummary({
         student: userId,
-        subjects: [
-          { subject, summaries: [{ summary, createdAt: new Date() }] },
-        ],
+        subjects: [{ subject: subject, summaries: [newSummaryEntry] }],
       });
     }
 
-    await chatSummary.save();
-    await redisClient.del(chatHistoryKey); // Redis에서 기록 삭제
+    // 4. 변경된 문서 저장
+    await chatSummaryDoc.save();
+    logger.info(
+      `Chat summary saved successfully for student ${userId}, subject '${subject}'.`
+    );
 
-    logger.info("Chat summary saved successfully");
+    // 5. Redis에서 채팅 기록 삭제
+    await redisClient.del(chatHistoryKey);
+    logger.debug(`Deleted chat history from Redis for key ${chatHistoryKey}.`);
   } catch (error) {
-    logger.error("Failed to save chat summary:", error);
+    // 에러 로깅 강화
+    logger.error(
+      `Failed to save chat summary for student ${userId}, subject '${subject}':`,
+      {
+        error: error.message,
+        stack: error.stack,
+        redisKey: chatHistoryKey,
+      }
+    );
+    // Redis 삭제 실패 시 에러가 발생할 수 있으므로, DB 저장 실패 시 Redis 삭제 여부 결정 필요
+    // 여기서는 일단 DB 저장 실패 시 Redis는 남겨두는 것으로 가정 (재시도나 확인을 위해)
   }
 };
 

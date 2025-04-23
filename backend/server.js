@@ -1,4 +1,5 @@
 require("dotenv").config();
+const logger = require("./utils/logger");
 require("./services/fcmService");
 
 const express = require("express");
@@ -8,6 +9,7 @@ const session = require("express-session");
 const RedisStore = require("connect-redis").default;
 const { WebSocketServer } = require("ws");
 const jwt = require("jsonwebtoken");
+const compression = require("compression");
 const authRoutes = require("./routes/authRoutes");
 // const quizRoutes = require('./routes/quizRoutes');
 const quizResultsRoutes = require("./routes/quizResultsRoutes");
@@ -29,21 +31,7 @@ const ChatSummary = require("./models/ChatSummary");
 const cron = require("node-cron");
 const redisClient = require("./utils/redisClient");
 const cors = require("cors");
-const winston = require("winston");
 const KahootQuizSession = require("./models/KahootQuizSession");
-
-// Winston 로거 설정
-const logger = winston.createLogger({
-  level: "info",
-  format: winston.format.combine(
-    winston.format.timestamp(),
-    winston.format.json()
-  ),
-  transports: [
-    new winston.transports.Console(),
-    // new winston.transports.File({ filename: '/app/logs/server.log' })
-  ],
-});
 
 // MongoDB 연결
 mongoose
@@ -78,6 +66,7 @@ app.use(
   })
 );
 
+app.use(compression());
 app.use(bodyParser.json());
 
 // 헬스체크 엔드포인트 추가 (라우트 설정 전에 추가)
@@ -205,9 +194,14 @@ wss.on("connection", (ws, req) => {
 cron.schedule("0 0 * * *", async () => {
   logger.info("Running removeOldSummaries at midnight");
   try {
-    const days = 3;
-    const chatSummaries = await ChatSummary.find();
-    for (const chatSummary of chatSummaries) {
+    const days = 7;
+    // 기존: const chatSummaries = await ChatSummary.find();
+    // 변경: ChatSummary.find().cursor() 사용하여 메모리 효율성 증대
+    const cursor = ChatSummary.find().cursor();
+
+    // 기존: for (const chatSummary of chatSummaries) {
+    // 변경: for await...of 구문으로 커서 처리
+    for await (const chatSummary of cursor) {
       await chatSummary.removeOldSummaries(days);
     }
     logger.info("Old summaries removed successfully");
