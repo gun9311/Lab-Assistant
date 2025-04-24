@@ -504,7 +504,37 @@ const UnifiedModal: React.FC<UnifiedModalProps> = ({
                     <TableHead>
                       <TableRow>
                         <TableCell align="center">번호</TableCell>
-                        <TableCell align="center">이름</TableCell>
+                        <TableCell align="center">
+                          <Box
+                            sx={{
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              gap: 0.5,
+                            }}
+                          >
+                            이름
+                            <Tooltip
+                              title={
+                                <Typography sx={{ fontSize: "0.875rem" }}>
+                                  개인정보 보호를 위해 실명 대신
+                                  <br />
+                                  가명 또는 닉네임을 사용해도 좋습니다.
+                                </Typography>
+                              }
+                              arrow // 툴크 화살표 추가
+                            >
+                              {/* 정보 아이콘 추가 */}
+                              <InfoOutlinedIcon
+                                sx={{
+                                  fontSize: "1.1rem",
+                                  color: "action.active",
+                                  cursor: "help",
+                                }}
+                              />
+                            </Tooltip>
+                          </Box>
+                        </TableCell>
                         <TableCell align="center">아이디</TableCell>
                         <TableCell align="center">비밀번호</TableCell>
                         <TableCell align="center">작업</TableCell>
