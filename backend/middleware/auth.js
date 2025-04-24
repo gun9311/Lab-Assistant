@@ -4,8 +4,13 @@ const auth = (role) => async (req, res, next) => {
   try {
     const token = req.header("Authorization").replace("Bearer ", "");
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    if (role && decoded.role !== role) {
-      return res.status(403).send({ error: "Access denied" });
+
+    // 역할 검증 로직: 문자열 or 배열 모두 처리
+    if (role) {
+      const allowedRoles = Array.isArray(role) ? role : [role];
+      if (!allowedRoles.includes(decoded.role)) {
+        return res.status(403).send({ error: "Access denied" });
+      }
     }
 
     req.user = decoded;
