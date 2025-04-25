@@ -37,6 +37,7 @@ import ReportGeneration from "../../components/teacher/reportGeneration/ReportGe
 import StudentRegistrationResultModal from "./StudentRegistrationResultModal";
 import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+import ComingSoon from "../../components/common/ComingSoon";
 
 type Student = {
   _id: number;
@@ -399,12 +400,13 @@ const TeacherHomePage: React.FC = () => {
           {showReportGeneration ? (
             <>
               {grade && classNumber && uniqueIdentifier ? (
-                <ReportGeneration
-                  school={school}
-                  grade={grade}
-                  classNumber={classNumber}
-                  students={students}
-                />
+                // <ReportGeneration
+                //   school={school}
+                //   grade={grade}
+                //   classNumber={classNumber}
+                //   students={students}
+                // />
+                <ComingSoon />
               ) : (
                 <Box
                   sx={{

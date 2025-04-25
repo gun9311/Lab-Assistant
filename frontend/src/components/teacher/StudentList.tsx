@@ -38,6 +38,7 @@ import QuizResults from "../student/quiz/QuizResults";
 import ChatSummaryList from "./ChatSummaryList";
 import StudentReport from "./StudentReport";
 import { debounce } from "lodash";
+import ComingSoon from "../common/ComingSoon";
 
 type QuizResult = any; // 필요하다면 정확한 타입으로 수정
 
@@ -457,26 +458,28 @@ const StudentList: React.FC<StudentListProps> = ({
                       }}
                     >
                       <Typography>
-                        과목을 선택하거나 검색어를 입력하면 채팅 내역을 볼
-                        수 있습니다.
+                        과목을 선택하거나 검색어를 입력하면 채팅 내역을 볼 수
+                        있습니다.
                       </Typography>
                     </Box>
                   )}
                 </TabPanel>
                 <TabPanel value={activeTab} index={1}>
-                  <QuizResults
+                  {/* <QuizResults
                     studentId={selectedStudent._id}
                     selectedSemester={selectedSemester}
                     selectedSubject={selectedSubject}
                     isStudentView={false}
-                  />
+                  /> */}
+                  <ComingSoon />
                 </TabPanel>
                 <TabPanel value={activeTab} index={2}>
-                  <StudentReport
+                  {/* <StudentReport
                     studentId={selectedStudent._id}
                     selectedSemester={selectedSemester}
                     selectedSubject={selectedSubject}
-                  />
+                  /> */}
+                  <ComingSoon />
                 </TabPanel>
               </>
             ) : (

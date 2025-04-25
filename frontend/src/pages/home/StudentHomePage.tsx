@@ -396,7 +396,29 @@ const StudentHomePage: React.FC = () => {
                   size="large"
                   // disabled 속성에 canStartChatbot() 결과의 반대를 적용
                   disabled={!canStartChatbot()}
-                  sx={{ py: 1.5, px: 4, fontSize: "1.1rem" }}
+                  sx={{
+                    py: 1.5, // 상하 패딩
+                    px: 5, // 좌우 패딩 증가
+                    fontSize: "1.15rem", // 폰트 크기 살짝 키움
+                    fontWeight: "bold", // 폰트 굵게
+                    color: "white", // 텍스트 색상 흰색으로 명확히
+                    background: `linear-gradient(45deg, ${theme.palette.primary.main} 30%, ${theme.palette.primary.dark} 90%)`, // 그라데이션 배경
+                    boxShadow: `0 3px 5px 2px rgba(0, 0, 0, .1)`, // 기본 그림자
+                    transition:
+                      "transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out", // 부드러운 전환 효과
+                    "&:hover": {
+                      // 호버 시 효과
+                      transform: "scale(1.03)", // 살짝 확대
+                      boxShadow: `0 6px 10px 4px rgba(0, 0, 0, .15)`, // 그림자 강조
+                      background: `linear-gradient(45deg, ${theme.palette.primary.dark} 30%, ${theme.palette.primary.main} 90%)`, // 그라데이션 방향 반전 (선택적)
+                    },
+                    "&.Mui-disabled": {
+                      // 비활성화 시 스타일
+                      background: theme.palette.action.disabledBackground,
+                      boxShadow: "none",
+                      color: theme.palette.action.disabled,
+                    },
+                  }}
                 >
                   학습 챗봇 시작하기
                 </Button>

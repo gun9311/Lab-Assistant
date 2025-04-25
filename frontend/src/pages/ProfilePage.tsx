@@ -494,73 +494,55 @@ const ProfilePage = () => {
                 )}
                 <TextField
                   fullWidth
-                  label={profile.role === "teacher" ? "닉네임" : "이름"}
+                  label="👤 이름"
                   name="name"
                   value={formData.name || ""}
-                  onChange={handleChange}
-                  disabled={
-                    isLoading || !editMode || profile.role === "student"
-                  }
+                  disabled
+                  InputProps={{ readOnly: true }}
                   variant="filled"
-                  InputProps={{
-                    readOnly: !editMode || profile.role === "student",
-                  }}
+                  sx={{ mb: 1 }}
                 />
                 {profile.role === "student" && (
                   <>
                     {profile.loginId && (
                       <TextField
                         fullWidth
-                        label="아이디"
+                        label="🆔 아이디"
                         name="loginId"
                         value={formData.loginId || ""}
                         disabled
                         InputProps={{ readOnly: true }}
                         variant="filled"
+                        sx={{ mb: 1 }}
                       />
                     )}
-                    {profile.grade !== undefined && (
+                    <TextField
+                      fullWidth
+                      label="🏫 학교"
+                      name="school"
+                      value={formData.school || ""}
+                      disabled
+                      InputProps={{ readOnly: true }}
+                      variant="filled"
+                      sx={{ mb: 1 }}
+                    />
+                    {(profile.grade !== undefined ||
+                      profile.class !== undefined ||
+                      profile.studentId) && (
                       <TextField
                         fullWidth
-                        label="학년"
-                        name="grade"
-                        value={formData.grade || ""}
+                        label="📚 학년/반/번호"
+                        value={
+                          `${formData.grade || ""}학년 ${
+                            formData.class || ""
+                          }반 ${formData.studentId || ""}번`
+                            .replace(/ +/g, " ")
+                            .trim() || "정보 없음"
+                        }
                         disabled
                         InputProps={{ readOnly: true }}
                         variant="filled"
-                      />
-                    )}
-                    {profile.class !== undefined && (
-                      <TextField
-                        fullWidth
-                        label="반"
-                        name="class"
-                        value={formData.class || ""}
-                        disabled
-                        InputProps={{ readOnly: true }}
-                        variant="filled"
-                      />
-                    )}
-                    {profile.studentId && (
-                      <TextField
-                        fullWidth
-                        label="출석번호"
-                        name="studentId"
-                        value={formData.studentId || ""}
-                        disabled
-                        InputProps={{ readOnly: true }}
-                        variant="filled"
-                      />
-                    )}
-                    {!editMode && (
-                      <TextField
-                        fullWidth
-                        label="학교"
-                        name="school"
-                        value={formData.school || ""}
-                        disabled
-                        InputProps={{ readOnly: true }}
-                        variant="filled"
+                        sx={{ mb: 1 }}
                       />
                     )}
                   </>
