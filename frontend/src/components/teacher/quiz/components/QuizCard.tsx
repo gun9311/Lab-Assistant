@@ -102,7 +102,7 @@ const QuizCard: React.FC<QuizCardProps> = ({ quiz, onDelete, onOpenModal, isMyQu
           {quiz.title}
         </Typography>
         <Typography variant="body2" color="textSecondary">
-          단원: {quiz.unit} | 문제 수: {quiz.questionsCount}
+          단원(영역): {quiz.unit} | 문제 수: {quiz.questionsCount}
         </Typography>
         {/* <Box display="flex" justifyContent="space-between" mt={2}>
           <Chip label={`${quiz.grade}학년`} color="primary" size="small" />

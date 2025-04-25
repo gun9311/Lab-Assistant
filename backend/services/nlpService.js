@@ -1,60 +1,56 @@
-require('dotenv').config();
-const { OpenAI } = require('openai');
+require("dotenv").config();
+const { OpenAI } = require("openai");
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
 const getNLPResponse = async function* (messages) {
+  // console.log("[nlpService] Starting getNLPResponse");
   try {
-    messages.unshift({ role: 'system', content: '간결하고 짧은 응답을 제공해 주세요.' });
+    // messages.unshift({  // 이 부분을 삭제합니다.
+    //   role: "system",
+    //   content:
+    //     "명확하고 이해하기 쉬운 설명을 제공하되, 너무 길어지지 않도록 핵심 내용을 중심으로 답변하세요.",
+    // });
+    // console.log(
+    //   "[nlpService] Messages received:",
+    //   JSON.stringify(messages, null, 2)
+    // );
 
     const response = await openai.chat.completions.create({
-      model: 'gpt-3.5-turbo',
-      messages: messages,
+      model: "gpt-4.1-nano",
+      messages: messages, // 전달받은 messages를 그대로 사용합니다.
       stream: true,
-      max_tokens: 300,
+      max_tokens: 1000,
       temperature: 0.7,
     });
 
-    let accumulatedText = "";  // 누적된 텍스트를 저장할 변수
-    let buffer = [];  // 청크를 저장할 배열
-
-    // 문장 끝을 확인하는 정규 표현식에 이모지 및 특수 문자를 포함
-    const sentenceEndRegex = /([.?!]|[😊👍😉❤️🎉✨…—*📚✏️📝📖🧑‍🏫🧑‍🎓🎓📅⏰📊💡📐🔍💻🎒👏💪🌟🏆🤓😊🙌🙏🤔😃😅😴😮🤯])\s*$/g;
+    //console.log("[nlpService] OpenAI stream initiated");
+    let chunkCounter = 0;
 
     for await (const chunk of response) {
       const delta = chunk.choices[0].delta;
 
       if (delta && delta.content) {
-        accumulatedText += delta.content;
-        buffer.push(delta.content);  // 청크를 버퍼에 추가
-
-        // 문장의 끝을 구두점과 이모지 및 특수 문자로 확인
-        if (accumulatedText.match(sentenceEndRegex)) {
-          // 타이핑 효과를 위해 각 청크를 일정 간격으로 전송
-          for (const bufferedChunk of buffer) {
-            yield bufferedChunk;
-            await new Promise(resolve => setTimeout(resolve, 60));  // 100ms 간격으로 청크 전송
-          }
-          buffer = [];  // 버퍼 초기화
-          accumulatedText = "";  // 누적된 텍스트 초기화
-        }
+        chunkCounter++;
+        // console.log(
+        //   `[nlpService] Yielding chunk ${chunkCounter}:`,
+        //   delta.content
+        // );
+        yield delta.content;
       }
-
-      // 스트리밍 종료 시점 처리
-      if (chunk.choices[0].finish_reason === 'stop') {
-        // 스트리밍이 종료된 후, 남아 있는 불완전한 청크들을 일정 간격으로 전송
-        for (const bufferedChunk of buffer) {
-          yield bufferedChunk;
-          await new Promise(resolve => setTimeout(resolve, 60));  // 100ms 간격으로 청크 전송
-        }
-        break; // 스트리밍 종료
-      }
+      // if (chunk.choices[0].finish_reason) {
+      //   // console.log(
+      //   //   "[nlpService] Stream finish reason:",
+      //   //   chunk.choices[0].finish_reason
+      //   // );
+      // }
     }
+    // console.log("[nlpService] Stream finished");
   } catch (error) {
-    console.error('Error in getNLPResponse:', error);
-    throw new Error('Failed to get response from OpenAI API');
+    console.error("[nlpService] Error in getNLPResponse:", error);
+    throw error;
   }
 };
 

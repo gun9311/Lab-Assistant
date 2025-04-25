@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   Container,
   Typography,
@@ -10,26 +10,39 @@ import {
   Box,
   Badge,
   Button,
+  CircularProgress,
 } from "@mui/material";
 import { useNotificationContext } from "../context/NotificationContext";
 import { NotificationsActive, Done, CheckCircle } from "@mui/icons-material";
 
 const NotificationsPage: React.FC = () => {
   const { notifications, markAsRead, markAllAsRead } = useNotificationContext();
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleNotificationClick = (id: string) => {
     markAsRead(id);
   };
 
-  const handleMarkAllAsRead = () => {
-    markAllAsRead();
+  const handleMarkAllAsRead = async () => {
+    if (isLoading) return;
+
+    setIsLoading(true);
+    try {
+      await markAllAsRead();
+    } catch (error) {
+      console.error("Failed to mark all notifications as read:", error);
+    } finally {
+      setIsLoading(false);
+    }
   };
+
+  const hasUnreadNotifications = notifications.some((n) => !n.read);
 
   return (
     <Container
       component="main"
       maxWidth="sm"
-      sx={{ marginTop: { xs: 4, sm: 6 } }}
+      sx={{ marginTop: { xs: 4, sm: 6 }, mb: 4 }}
     >
       <Paper
         elevation={3}
@@ -52,11 +65,21 @@ const NotificationsPage: React.FC = () => {
             variant="contained"
             color="primary"
             size="small"
-            startIcon={<CheckCircle />}
+            startIcon={
+              isLoading ? (
+                <CircularProgress size={20} color="inherit" />
+              ) : (
+                <CheckCircle />
+              )
+            }
             onClick={handleMarkAllAsRead}
-            sx={{ backgroundColor: "#4CAF50", borderRadius: "16px" }}
+            disabled={isLoading || !hasUnreadNotifications}
+            sx={{
+              borderRadius: "8px",
+              textTransform: "none",
+            }}
           >
-            모두 읽음 처리
+            {isLoading ? "처리 중..." : "모두 읽음 처리"}
           </Button>
         </Box>
         <List>

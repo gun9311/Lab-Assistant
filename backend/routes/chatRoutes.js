@@ -4,6 +4,6 @@ const { getChatSummaries } = require('../controllers/chatController');
 
 const router = express.Router();
 
-router.get('/summary/:studentId', auth(), getChatSummaries);
+router.get('/summary/:studentId', auth('teacher'), getChatSummaries);
 
 module.exports = router;

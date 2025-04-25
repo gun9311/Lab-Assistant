@@ -32,15 +32,16 @@ import {
 } from "./context/NotificationContext";
 // Firebase import
 import { requestPermissionAndGetToken, onMessageListener } from "./firebase"; // 수정된 함수 import
-import ManageQuizzesPage from "./components/teacher/quiz/ManageQuizzes";
-import CreateQuizPage from "./components/teacher/quiz/CreateQuiz";
-import EditQuizPage from "./components/teacher/quiz/EditQuiz";
-import QuizSessionPage from "./components/teacher/quiz/QuizSession";
+// import ManageQuizzesPage from "./components/teacher/quiz/ManageQuizzes"; // 주석 처리
+// import CreateQuizPage from "./components/teacher/quiz/CreateQuiz"; // 주석 처리
+// import EditQuizPage from "./components/teacher/quiz/EditQuiz"; // 주석 처리
+// import QuizSessionPage from "./components/teacher/quiz/QuizSession"; // 주석 처리
 import StudentQuizSessionPage from "./components/student/quiz/StudentQuizSession";
 import ForgotPasswordPage from "./pages/login/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/login/ResetPasswordPage";
 import ResetStudentPasswordPage from "./pages/login/ResetStudentPasswordPage";
 import axios from "axios";
+import ComingSoon from "./components/common/ComingSoon"; // ComingSoon 임포트 추가
 
 // NotificationPayload 타입 정의
 type NotificationPayload = {
@@ -181,23 +182,27 @@ const AppContent: React.FC = () => {
           <Route path="/notifications" element={<NotificationsPage />} />
           <Route
             path="/my-quizzes"
-            element={<MyQuizzesPage setIsQuizMode={setIsQuizMode} />} // isQuizMode를 설정하는 함수 전달
+            // element={<MyQuizzesPage setIsQuizMode={setIsQuizMode} />} // 기존 컴포넌트 주석 처리
+            element={<ComingSoon />} // ComingSoon 컴포넌트로 대체
           />
           <Route
             path="/manage-quizzes"
             element={
               <PrivateRoute
                 roles={["teacher"]}
-                element={<ManageQuizzesPage />}
+                // element={<ManageQuizzesPage />} // 기존 컴포넌트 주석 처리
+                element={<ComingSoon />} // ComingSoon 컴포넌트로 대체
               />
             }
           />
-          <Route path="/create-quiz" element={<CreateQuizPage />} />{" "}
-          {/* 퀴즈 생성 페이지 */}
-          <Route path="/edit-quiz/:quizId" element={<EditQuizPage />} />
+          {/* <Route path="/create-quiz" element={<CreateQuizPage />} /> */}{" "}
+          {/* 퀴즈 생성 페이지 주석 처리 */}
+          {/* <Route path="/edit-quiz/:quizId" element={<EditQuizPage />} /> */}{" "}
+          {/* 퀴즈 수정 페이지 주석 처리 */}
           <Route
             path="/start-quiz-session"
-            element={<QuizSessionPage setIsQuizMode={setIsQuizMode} />}
+            // element={<QuizSessionPage setIsQuizMode={setIsQuizMode} />} // 기존 컴포넌트 주석 처리
+            element={<ComingSoon />} // ComingSoon 컴포넌트로 대체
           />{" "}
           {/* 퀴즈 세션 페이지 */}
           <Route

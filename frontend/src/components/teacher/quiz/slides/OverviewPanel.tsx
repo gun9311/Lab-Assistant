@@ -1,7 +1,15 @@
 import React from "react";
-import { Box, Typography, TextField, MenuItem, IconButton, Grid, Button } from "@mui/material";
+import {
+  Box,
+  Typography,
+  TextField,
+  MenuItem,
+  IconButton,
+  Grid,
+  Button,
+} from "@mui/material";
 import { Image, Delete } from "@mui/icons-material";
-import backgroundDefault from "../../../../assets/background-default.webp"
+import backgroundDefault from "../../../../assets/background-default.webp";
 // import { PlayCircleFilled, Edit } from "@mui/icons-material"; // 아이콘 추가
 import { PlayArrow, Edit } from "@mui/icons-material"; // 간결한 아이콘 추가
 
@@ -59,7 +67,9 @@ const OverviewPanel: React.FC<OverviewPanelProps> = ({
         padding: "1.5rem",
         backgroundColor: isReadOnly ? "#f4f4f4" : "#fafafa",
         borderRadius: "12px",
-        boxShadow: isReadOnly ? "0px 2px 8px rgba(0, 0, 0, 0.1)" : "0px 4px 12px rgba(0, 0, 0, 0.05)",
+        boxShadow: isReadOnly
+          ? "0px 2px 8px rgba(0, 0, 0, 0.1)"
+          : "0px 4px 12px rgba(0, 0, 0, 0.05)",
         border: isReadOnly ? "1px solid #ddd" : "none",
         ...(isReadOnly && backgroundImageUrl
           ? {
@@ -87,25 +97,30 @@ const OverviewPanel: React.FC<OverviewPanelProps> = ({
 
       {/* 텍스트와 컨트롤 */}
       <Box sx={{ position: "relative", zIndex: 2 }}>
-        <Grid container spacing={1} alignItems="center" sx={{ marginBottom: "1rem" }}>
+        <Grid
+          container
+          spacing={1}
+          alignItems="center"
+          sx={{ marginBottom: "1rem" }}
+        >
           {/* 제목 */}
           <Grid item xs={9}>
             {isReadOnly ? (
               <Typography
-  variant="h6"
-  sx={{
-    fontWeight: 600,
-    fontSize: "1.5rem",
-    fontFamily: '"Roboto", "Noto Sans", sans-serif',
-    color: "#fff",
-    paddingBottom: "0.3rem",
-    borderBottom: "1px solid rgba(255, 255, 255, 0.7)",
-    marginBottom: "0.5rem",
-    textShadow: "1px 1px 3px rgba(0, 0, 0, 0.7)",
-  }}
->
-  {title || "제목 없음"}
-</Typography>
+                variant="h6"
+                sx={{
+                  fontWeight: 600,
+                  fontSize: "1.5rem",
+                  fontFamily: '"Roboto", "Noto Sans", sans-serif',
+                  color: "#fff",
+                  paddingBottom: "0.3rem",
+                  borderBottom: "1px solid rgba(255, 255, 255, 0.7)",
+                  marginBottom: "0.5rem",
+                  textShadow: "1px 1px 3px rgba(0, 0, 0, 0.7)",
+                }}
+              >
+                {title || "제목 없음"}
+              </Typography>
             ) : (
               <TextField
                 fullWidth
@@ -125,7 +140,12 @@ const OverviewPanel: React.FC<OverviewPanelProps> = ({
 
           {/* 이미지 업로드 버튼 및 미리보기 */}
           <Grid item xs={3} textAlign="center">
-            <Box display="flex" alignItems="center" justifyContent="center" gap={0.5}>
+            <Box
+              display="flex"
+              alignItems="center"
+              justifyContent="center"
+              gap={0.5}
+            >
               {!isReadOnly && (
                 <IconButton
                   onClick={() => setImageDialogOpen(true)}
@@ -161,7 +181,9 @@ const OverviewPanel: React.FC<OverviewPanelProps> = ({
                 >
                   <Box
                     component="img"
-                    src={quizImage ? URL.createObjectURL(quizImage) : quizImageUrl}
+                    src={
+                      quizImage ? URL.createObjectURL(quizImage) : quizImageUrl
+                    }
                     alt="퀴즈 이미지"
                     sx={{
                       width: "100%",
@@ -199,16 +221,18 @@ const OverviewPanel: React.FC<OverviewPanelProps> = ({
         <Grid container spacing={isReadOnly ? 1 : 2} sx={{ marginTop: "1rem" }}>
           <Grid item xs={2}>
             {isReadOnly ? (
-              <Typography   sx={{
-                fontSize: "1.1rem", // 기존보다 큰 글씨 크기
-                fontWeight: 500,
-                color: "rgba(255, 255, 255, 0.9)",
-                textShadow: "1px 1px 3px rgba(0, 0, 0, 0.7)",
-                whiteSpace: "nowrap", // 텍스트 줄바꿈 방지
-                overflow: "hidden", // 패널을 벗어나지 않도록
-                textOverflow: "ellipsis", // 길 경우 생략 표시
-                maxWidth: "100px", // 패널 내 공간 안에서 크기 제한
-              }}>
+              <Typography
+                sx={{
+                  fontSize: "1.1rem", // 기존보다 큰 글씨 크기
+                  fontWeight: 500,
+                  color: "rgba(255, 255, 255, 0.9)",
+                  textShadow: "1px 1px 3px rgba(0, 0, 0, 0.7)",
+                  whiteSpace: "nowrap", // 텍스트 줄바꿈 방지
+                  overflow: "hidden", // 패널을 벗어나지 않도록
+                  textOverflow: "ellipsis", // 길 경우 생략 표시
+                  maxWidth: "100px", // 패널 내 공간 안에서 크기 제한
+                }}
+              >
                 {grade ? `${grade}학년` : "학년 없음"}
               </Typography>
             ) : (
@@ -216,31 +240,41 @@ const OverviewPanel: React.FC<OverviewPanelProps> = ({
                 select
                 label="학년"
                 value={grade}
-                onChange={(e) => setGrade(e.target.value)}
+                onChange={(e) => {
+                  setGrade(e.target.value);
+                  setUnit(""); // 단원 초기화
+                }}
                 fullWidth
                 sx={{
-                  "& .MuiInputBase-root": { borderRadius: "8px", backgroundColor: "#fff" },
+                  "& .MuiInputBase-root": {
+                    borderRadius: "8px",
+                    backgroundColor: "#fff",
+                  },
                 }}
               >
+                {/* <MenuItem value="3">3</MenuItem> */}
+                {/* <MenuItem value="4">4</MenuItem> */}
                 <MenuItem value="5">5</MenuItem>
                 <MenuItem value="6">6</MenuItem>
               </TextField>
             )}
           </Grid>
-          
+
           {/* 학기, 과목, 단원에도 동일한 스타일 적용 */}
           <Grid item xs={2}>
             {isReadOnly ? (
-              <Typography   sx={{
-                fontSize: "1.1rem", // 기존보다 큰 글씨 크기
-                fontWeight: 500,
-                color: "rgba(255, 255, 255, 0.9)",
-                textShadow: "1px 1px 3px rgba(0, 0, 0, 0.7)",
-                whiteSpace: "nowrap", // 텍스트 줄바꿈 방지
-                overflow: "hidden", // 패널을 벗어나지 않도록
-                textOverflow: "ellipsis", // 길 경우 생략 표시
-                maxWidth: "100px", // 패널 내 공간 안에서 크기 제한
-              }}>
+              <Typography
+                sx={{
+                  fontSize: "1.1rem", // 기존보다 큰 글씨 크기
+                  fontWeight: 500,
+                  color: "rgba(255, 255, 255, 0.9)",
+                  textShadow: "1px 1px 3px rgba(0, 0, 0, 0.7)",
+                  whiteSpace: "nowrap", // 텍스트 줄바꿈 방지
+                  overflow: "hidden", // 패널을 벗어나지 않도록
+                  textOverflow: "ellipsis", // 길 경우 생략 표시
+                  maxWidth: "100px", // 패널 내 공간 안에서 크기 제한
+                }}
+              >
                 {semester || "학기 없음"}
               </Typography>
             ) : (
@@ -248,10 +282,16 @@ const OverviewPanel: React.FC<OverviewPanelProps> = ({
                 select
                 label="학기"
                 value={semester}
-                onChange={(e) => setSemester(e.target.value)}
+                onChange={(e) => {
+                  setSemester(e.target.value);
+                  setUnit(""); // 단원 초기화
+                }}
                 fullWidth
                 sx={{
-                  "& .MuiInputBase-root": { borderRadius: "8px", backgroundColor: "#fff" },
+                  "& .MuiInputBase-root": {
+                    borderRadius: "8px",
+                    backgroundColor: "#fff",
+                  },
                 }}
               >
                 <MenuItem value="1학기">1학기</MenuItem>
@@ -262,16 +302,18 @@ const OverviewPanel: React.FC<OverviewPanelProps> = ({
 
           <Grid item xs={2}>
             {isReadOnly ? (
-              <Typography   sx={{
-                fontSize: "1.1rem", // 기존보다 큰 글씨 크기
-                fontWeight: 500,
-                color: "rgba(255, 255, 255, 0.9)",
-                textShadow: "1px 1px 3px rgba(0, 0, 0, 0.7)",
-                whiteSpace: "nowrap", // 텍스트 줄바꿈 방지
-                overflow: "hidden", // 패널을 벗어나지 않도록
-                textOverflow: "ellipsis", // 길 경우 생략 표시
-                maxWidth: "100px", // 패널 내 공간 안에서 크기 제한
-              }}>
+              <Typography
+                sx={{
+                  fontSize: "1.1rem", // 기존보다 큰 글씨 크기
+                  fontWeight: 500,
+                  color: "rgba(255, 255, 255, 0.9)",
+                  textShadow: "1px 1px 3px rgba(0, 0, 0, 0.7)",
+                  whiteSpace: "nowrap", // 텍스트 줄바꿈 방지
+                  overflow: "hidden", // 패널을 벗어나지 않도록
+                  textOverflow: "ellipsis", // 길 경우 생략 표시
+                  maxWidth: "100px", // 패널 내 공간 안에서 크기 제한
+                }}
+              >
                 {subject || "과목 없음"}
               </Typography>
             ) : (
@@ -279,91 +321,111 @@ const OverviewPanel: React.FC<OverviewPanelProps> = ({
                 select
                 label="과목"
                 value={subject}
-                onChange={(e) => setSubject(e.target.value)}
+                onChange={(e) => {
+                  setSubject(e.target.value);
+                  setUnit(""); // 단원 초기화
+                }}
                 fullWidth
                 sx={{
-                  "& .MuiInputBase-root": { borderRadius: "8px", backgroundColor: "#fff" },
+                  "& .MuiInputBase-root": {
+                    borderRadius: "8px",
+                    backgroundColor: "#fff",
+                  },
                 }}
               >
+                <MenuItem value="국어">국어</MenuItem>
+                <MenuItem value="도덕">도덕</MenuItem>
                 <MenuItem value="수학">수학</MenuItem>
                 <MenuItem value="과학">과학</MenuItem>
+                <MenuItem value="사회">사회</MenuItem>
+                <MenuItem value="영어">영어</MenuItem>
+                <MenuItem value="음악">음악</MenuItem>
+                <MenuItem value="미술">미술</MenuItem>
+                <MenuItem value="체육">체육</MenuItem>
+                <MenuItem value="실과">실과</MenuItem>
               </TextField>
             )}
           </Grid>
 
           <Grid item xs={6}>
             {isReadOnly ? (
-              <Typography   sx={{
-                fontSize: "1.1rem", // 기존보다 큰 글씨 크기
-                fontWeight: 500,
-                color: "rgba(255, 255, 255, 0.9)",
-                textShadow: "1px 1px 3px rgba(0, 0, 0, 0.7)",
-                whiteSpace: "nowrap", // 텍스트 줄바꿈 방지
-                overflow: "hidden", // 패널을 벗어나지 않도록
-                textOverflow: "ellipsis", // 길 경우 생략 표시
-                maxWidth: "200px", // 패널 내 공간 안에서 크기 제한
-              }}>
+              <Typography
+                sx={{
+                  fontSize: "1.1rem", // 기존보다 큰 글씨 크기
+                  fontWeight: 500,
+                  color: "rgba(255, 255, 255, 0.9)",
+                  textShadow: "1px 1px 3px rgba(0, 0, 0, 0.7)",
+                  whiteSpace: "nowrap", // 텍스트 줄바꿈 방지
+                  overflow: "hidden", // 패널을 벗어나지 않도록
+                  textOverflow: "ellipsis", // 길 경우 생략 표시
+                  maxWidth: "200px", // 패널 내 공간 안에서 크기 제한
+                }}
+              >
                 {unit || "단원 없음"}
               </Typography>
             ) : (
               <TextField
                 select
-                label="단원"
+                label="단원(영역)"
                 value={unit}
                 onChange={(e) => setUnit(e.target.value)}
                 fullWidth
                 sx={{
-                  "& .MuiInputBase-root": { borderRadius: "8px", backgroundColor: "#fff" },
+                  "& .MuiInputBase-root": {
+                    borderRadius: "8px",
+                    backgroundColor: "#fff",
+                  },
                 }}
               >
-                <MenuItem value="">단원 선택</MenuItem>
+                <MenuItem value="">단원(영역) 선택</MenuItem>
                 {units.map((unit, index) => (
-                  <MenuItem key={index} value={unit}>{unit}</MenuItem>
+                  <MenuItem key={index} value={unit}>
+                    {unit}
+                  </MenuItem>
                 ))}
               </TextField>
             )}
           </Grid>
         </Grid>
 
-
         {isReadOnly && (
-  <Box display="flex" justifyContent="flex-end" gap={2} mt={1}> 
-    <IconButton
-      onClick={onStartQuiz}
-      sx={{
-        background: "linear-gradient(145deg, #ff9800, #ffc107)", // 밝은 그라데이션 색상
-        color: "#ffffff",
-        borderRadius: "50%", // 원형 버튼
-        boxShadow: "0 6px 12px rgba(0, 0, 0, 0.2)", // 더 강한 그림자
-        "&:hover": {
-          background: "linear-gradient(145deg, #fb8c00, #ff9800)", // 호버 시 더 진한 그라데이션
-          boxShadow: "0 8px 14px rgba(0, 0, 0, 0.3)",
-        },
-        padding: "0.7rem",
-        transition: "all 0.3s ease",
-      }}
-    >
-      <PlayArrow sx={{ fontSize: "2rem" }} /> {/* 퀴즈 시작 아이콘 */}
-    </IconButton>
-    <IconButton
-      onClick={onEditQuiz}
-      sx={{
-        background: "linear-gradient(145deg, #607d8b, #78909c)", // 밝은 회색-블루 그라데이션
-        color: "#ffffff",
-        borderRadius: "50%", // 원형 버튼
-        boxShadow: "0 6px 12px rgba(0, 0, 0, 0.2)",
-        "&:hover": {
-          background: "linear-gradient(145deg, #546e7a, #607d8b)", // 호버 시 더 진한 색상
-          boxShadow: "0 8px 14px rgba(0, 0, 0, 0.3)",
-        },
-        padding: "0.7rem",
-        transition: "all 0.3s ease",
-      }}
-    >
-      <Edit sx={{ fontSize: "1.8rem" }} /> {/* 수정 아이콘 */}
-    </IconButton>
-  </Box>
-)}
+          <Box display="flex" justifyContent="flex-end" gap={2} mt={1}>
+            <IconButton
+              onClick={onStartQuiz}
+              sx={{
+                background: "linear-gradient(145deg, #ff9800, #ffc107)", // 밝은 그라데이션 색상
+                color: "#ffffff",
+                borderRadius: "50%", // 원형 버튼
+                boxShadow: "0 6px 12px rgba(0, 0, 0, 0.2)", // 더 강한 그림자
+                "&:hover": {
+                  background: "linear-gradient(145deg, #fb8c00, #ff9800)", // 호버 시 더 진한 그라데이션
+                  boxShadow: "0 8px 14px rgba(0, 0, 0, 0.3)",
+                },
+                padding: "0.7rem",
+                transition: "all 0.3s ease",
+              }}
+            >
+              <PlayArrow sx={{ fontSize: "2rem" }} /> {/* 퀴즈 시작 아이콘 */}
+            </IconButton>
+            <IconButton
+              onClick={onEditQuiz}
+              sx={{
+                background: "linear-gradient(145deg, #607d8b, #78909c)", // 밝은 회색-블루 그라데이션
+                color: "#ffffff",
+                borderRadius: "50%", // 원형 버튼
+                boxShadow: "0 6px 12px rgba(0, 0, 0, 0.2)",
+                "&:hover": {
+                  background: "linear-gradient(145deg, #546e7a, #607d8b)", // 호버 시 더 진한 색상
+                  boxShadow: "0 8px 14px rgba(0, 0, 0, 0.3)",
+                },
+                padding: "0.7rem",
+                transition: "all 0.3s ease",
+              }}
+            >
+              <Edit sx={{ fontSize: "1.8rem" }} /> {/* 수정 아이콘 */}
+            </IconButton>
+          </Box>
+        )}
       </Box>
     </Box>
   );

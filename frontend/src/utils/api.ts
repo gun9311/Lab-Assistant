@@ -2,6 +2,16 @@ import axios from "axios";
 import { getToken, setToken, getRefreshToken, clearAuth } from "./auth";
 import { SubjectData, UnitData, RatingData, QuizData } from "./types"; // RatingData 추가
 
+// ChatUsageData 인터페이스 정의 (선택적이지만 권장)
+export interface ChatUsageData {
+  dailyLimit: number;
+  monthlyLimit: number;
+  dailyCount: number;
+  monthlyCount: number;
+  dailyRemaining: number;
+  monthlyRemaining: number;
+}
+
 const api = axios.create({
   baseURL: process.env.REACT_APP_API_URL,
   headers: {
@@ -56,5 +66,10 @@ export const getSubjects = () => api.get("/subjects");
 export const addUnitRating = (ratingData: RatingData) =>
   api.post("/subjects/add-unit-rating", ratingData);
 export const addQuiz = (quizData: QuizData) => api.post("/quiz", quizData);
+
+// --- 추가된 함수 ---
+export const getChatUsage = (): Promise<{ data: ChatUsageData }> =>
+  api.get("/users/chat-usage");
+// --- 추가된 함수 끝 ---
 
 export default api;
