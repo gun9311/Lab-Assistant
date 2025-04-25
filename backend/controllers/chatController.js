@@ -15,7 +15,9 @@ const getChatSummaries = async (req, res) => {
 
   if (!mongoose.Types.ObjectId.isValid(studentId)) {
     logger.error(`[getChatSummaries] Invalid studentId format: ${studentId}`);
-    return res.status(400).json({ message: "Invalid student ID format" });
+    return res
+      .status(400)
+      .json({ message: "올바르지 않은 학생 ID 형식입니다." });
   }
   const studentObjectId = new mongoose.Types.ObjectId(studentId);
 
@@ -206,9 +208,10 @@ const getChatSummaries = async (req, res) => {
         params: req.query,
       }
     );
-    res
-      .status(500)
-      .json({ message: "Error fetching chat summaries", error: error.message });
+    res.status(500).json({
+      error:
+        "채팅 요약을 불러오는 중 오류가 발생했습니다. 나중에 다시 시도해주세요.",
+    });
   }
 };
 

@@ -30,6 +30,13 @@ teacherSchema.pre("save", async function (next) {
   next();
 });
 
+// --- 인덱스 정의 ---
+// 기본적으로 email은 unique하므로 MongoDB가 자동으로 인덱스 생성
+// teacherSchema.index({ email: 1 }, { unique: true }); // 필요시 명시적으로 추가 가능
+
+// *** 추가: FCM 토큰 검색 성능 향상을 위한 인덱스 ***
+teacherSchema.index({ "tokens.token": 1 });
+
 const Teacher = mongoose.model("Teacher", teacherSchema);
 
 module.exports = Teacher;

@@ -1,6 +1,7 @@
 // services/fcmService.js
 const admin = require("firebase-admin");
 require("dotenv").config();
+const logger = require("../utils/logger"); // logger 추가
 // JSON 파일에서 민감한 정보(프라이빗 키)만 환경 변수로 대체
 const serviceAccount = {
   type: "service_account",
@@ -17,7 +18,7 @@ const serviceAccount = {
     "https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-y1dic%40lab-assistant-6f161.iam.gserviceaccount.com",
 };
 
-// console.log(serviceAccount); // 환경 변수가 제대로 파싱되었는지 확인
+// console.log(serviceAccount); // 제거
 if (!admin.apps.length) {
   admin.initializeApp({
     credential: admin.credential.cert(serviceAccount),
@@ -42,7 +43,8 @@ const sendNotification = async (token, message) => {
       // apns: { headers: { 'apns-priority': '10' } },
       // android: { priority: 'high' }
     });
-    // console.log('Successfully sent message:', response); // Use logger instead if available
+    // *** 변경: console.log -> logger.debug ***
+    logger.debug("Successfully sent FCM message:", { response, token }); // 상세 정보는 debug
     return { success: true, response };
   } catch (error) {
     // Check for specific error codes indicating an invalid token
@@ -50,14 +52,22 @@ const sendNotification = async (token, message) => {
       error.code === "messaging/registration-token-not-registered" ||
       error.code === "messaging/invalid-registration-token"
     ) {
-      console.error(
-        `FCM token ${token} is invalid or unregistered. Marking for removal.`
+      // *** 변경: console.error -> logger.warn *** (토큰 무효는 경고 수준)
+      logger.warn(
+        `FCM token ${token} is invalid or unregistered. Marking for removal.`,
+        { errorCode: error.code }
       );
       // Throw a specific error that the caller can catch
       throw new InvalidFcmTokenError(token, error.message);
     } else {
       // Log other errors and potentially re-throw or return an error status
-      console.error("Error sending FCM message:", error);
+      // *** 변경: console.error -> logger.error ***
+      logger.error("Error sending FCM message:", {
+        error: error.message,
+        stack: error.stack,
+        token,
+        message,
+      });
       // Consider re-throwing a generic error or returning a failure status
       throw error; // Or return { success: false, error: error };
     }

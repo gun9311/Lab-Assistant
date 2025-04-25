@@ -31,8 +31,10 @@ chatSummarySchema.index({ student: 1 });
 
 // 필요 시 subjects 배열 내의 subject 필드에도 인덱스 추가 가능
 // chatSummarySchema.index({ 'subjects.subject': 1 });
-// 학생 ID와 과목 조합으로 자주 검색한다면 복합 인덱스 고려
-// chatSummarySchema.index({ student: 1, 'subjects.subject': 1 });
+
+// *** 변경: 복합 인덱스 추가 (또는 주석 해제) ***
+// 학생 ID와 과목 조합으로 자주 검색하는 경우 (과목 필터링 시 사용)
+chatSummarySchema.index({ student: 1, "subjects.subject": 1 });
 
 // 일정 기간이 지난 summary 삭제 메소드 (기존과 동일)
 chatSummarySchema.methods.removeOldSummaries = function (days) {

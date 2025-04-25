@@ -34,8 +34,7 @@ const getStudents = async (req, res) => {
         { query: req.query }
       );
       return res.status(400).send({
-        error:
-          "School, grade, class, and a non-empty unique identifier are required.",
+        error: "학교, 학년, 반, 식별코드는 필수 항목입니다.",
       });
     }
 
@@ -65,9 +64,9 @@ const getStudents = async (req, res) => {
       error: error.message,
       stack: error.stack,
     });
-    res
-      .status(500)
-      .send({ error: "Failed to fetch students. Please try again later." });
+    res.status(500).send({
+      error: "학생 정보를 불러오는데 실패했습니다. 나중에 다시 시도해주세요.",
+    });
   }
 };
 
@@ -84,12 +83,14 @@ const getProfile = async (req, res) => {
       logger.warn(
         `getProfile attempt with invalid role: ${_id}, role: ${role}`
       );
-      return res.status(403).send({ error: "Invalid user role" });
+      return res.status(403).send({ error: "잘못된 사용자 역할입니다." });
     }
 
     if (!user) {
       logger.warn(`User not found for getProfile: ${_id}, role: ${role}`);
-      return res.status(404).send({ error: "User profile not found." }); // 표준화된 메시지
+      return res
+        .status(404)
+        .send({ error: "사용자 프로필을 찾을 수 없습니다." });
     }
 
     res.send(user);
@@ -99,9 +100,9 @@ const getProfile = async (req, res) => {
       stack: error.stack,
       role: role,
     });
-    res
-      .status(500)
-      .send({ error: "Failed to fetch profile. Please try again later." }); // 표준화된 메시지
+    res.status(500).send({
+      error: "프로필 정보를 불러오는데 실패했습니다. 나중에 다시 시도해주세요.",
+    });
   }
 };
 
@@ -124,12 +125,12 @@ const updateProfile = async (req, res) => {
       logger.warn(
         `updateProfile attempt with invalid role: ${_id}, role: ${role}`
       );
-      return res.status(403).send({ error: "Invalid user role" });
+      return res.status(403).send({ error: "잘못된 사용자 역할입니다." });
     }
 
     if (!user) {
       logger.warn(`User not found for update: ${_id}, role: ${role}`);
-      return res.status(404).send({ error: "User not found." }); // 표준화된 메시지
+      return res.status(404).send({ error: "사용자를 찾을 수 없습니다." });
     }
 
     // 2. 역할별 업데이트 처리
@@ -143,7 +144,9 @@ const updateProfile = async (req, res) => {
         const trimmedEmail = updates.email.trim();
         // 이메일 형식 유효성 검사 (간단하게)
         if (!/\S+@\S+\.\S+/.test(trimmedEmail)) {
-          return res.status(400).send({ error: "Invalid email format." });
+          return res
+            .status(400)
+            .send({ error: "유효하지 않은 이메일 형식입니다." });
         }
         const emailExists = await Teacher.findOne({ email: trimmedEmail });
         if (emailExists && emailExists._id.toString() !== _id.toString()) {
@@ -151,8 +154,8 @@ const updateProfile = async (req, res) => {
             `Email update conflict for teacher ${_id}: email ${trimmedEmail} already exists.`
           );
           return res.status(400).send({
-            error: "This email address is already in use by another account.",
-          }); // 표준화된 메시지
+            error: "이미 사용 중인 이메일 주소입니다.",
+          });
         }
         user.email = trimmedEmail;
       }
@@ -167,13 +170,12 @@ const updateProfile = async (req, res) => {
           logger.warn(`Incorrect current password attempt for teacher ${_id}.`);
           return res
             .status(401)
-            .send({ error: "The current password you entered is incorrect." }); // 표준화된 메시지
+            .send({ error: "현재 비밀번호가 올바르지 않습니다." });
         }
         // 새 비밀번호 길이 등 유효성 검사 추가 가능
         if (updates.password.length < 6) {
-          // 예시: 최소 6자리
           return res.status(400).send({
-            error: "New password must be at least 6 characters long.",
+            error: "새 비밀번호는 최소 6자 이상이어야 합니다.",
           });
         }
         user.password = updates.password; // pre-save 훅에서 해싱됨
@@ -184,12 +186,10 @@ const updateProfile = async (req, res) => {
         logger.warn(`Password change attempt for OAuth teacher ${_id}.`);
         return res.status(400).send({
           error:
-            "Password management is not available for accounts registered via social login.",
-        }); // 표준화된 메시지
+            "소셜 로그인을 통해 가입한 계정은 비밀번호를 관리할 수 없습니다.",
+        });
       } else if (updates.currentPassword && !updates.password) {
-        return res
-          .status(400)
-          .send({ error: "Please enter the new password." }); // 표준화된 메시지
+        return res.status(400).send({ error: "새 비밀번호를 입력해주세요." });
       } else if (
         !updates.currentPassword &&
         updates.password &&
@@ -197,8 +197,8 @@ const updateProfile = async (req, res) => {
       ) {
         // user.password 조건 추가
         return res.status(400).send({
-          error: "Please enter your current password to set a new one.",
-        }); // 표준화된 메시지
+          error: "새 비밀번호를 설정하려면 현재 비밀번호를 입력해주세요.",
+        });
       }
     } else if (role === "student") {
       // 학생 업데이트 가능 필드: password 만
@@ -215,8 +215,8 @@ const updateProfile = async (req, res) => {
           )}`
         );
         return res.status(400).send({
-          error: "Only password can be updated for student accounts.",
-        }); // 표준화된 메시지
+          error: "학생 계정은 비밀번호만 수정할 수 있습니다.",
+        });
       }
 
       if (updates.currentPassword && updates.password) {
@@ -228,12 +228,12 @@ const updateProfile = async (req, res) => {
           logger.warn(`Incorrect current password attempt for student ${_id}.`);
           return res
             .status(401)
-            .send({ error: "The current password you entered is incorrect." }); // 표준화된 메시지
+            .send({ error: "현재 비밀번호가 올바르지 않습니다." });
         }
         if (updates.password.length < 3) {
           // 예시: 학생은 3자리 (요구사항 맞게 수정)
           return res.status(400).send({
-            error: "New password must be at least 3 characters long.",
+            error: "새 비밀번호는 최소 3자 이상이어야 합니다.",
           });
         }
         user.password = updates.password; // pre-save 훅에서 해싱됨
@@ -241,13 +241,13 @@ const updateProfile = async (req, res) => {
         // 업데이트 시도 필드가 있으나 current/new가 모두 없는 경우
         return res.status(400).send({
           error:
-            "Both current and new passwords are required to change the password.",
-        }); // 표준화된 메시지
+            "비밀번호를 변경하려면 현재 비밀번호와 새 비밀번호를 모두 입력해야 합니다.",
+        });
       } else if (receivedUpdates.length === 0) {
         // 업데이트할 내용이 없을 때 (정상 처리 혹은 에러 처리 선택 가능 - 여기서는 에러 처리)
         return res
           .status(400)
-          .send({ error: "No update information provided." });
+          .send({ error: "업데이트할 정보가 제공되지 않았습니다." });
       }
     }
 
@@ -268,9 +268,9 @@ const updateProfile = async (req, res) => {
       role: role,
       updates: Object.keys(updates),
     });
-    res
-      .status(500)
-      .send({ error: "Failed to update profile. Please try again later." }); // 표준화된 메시지
+    res.status(500).send({
+      error: "프로필 업데이트에 실패했습니다. 나중에 다시 시도해주세요.",
+    });
   }
 };
 
@@ -287,18 +287,18 @@ const deleteProfile = async (req, res) => {
       logger.warn(
         `deleteProfile attempt with invalid role: ${_id}, role: ${role}`
       );
-      return res.status(403).send({ error: "Invalid user role" });
+      return res.status(403).send({ error: "잘못된 사용자 역할입니다." });
     }
 
     if (!user) {
       logger.warn(`User not found for deletion: ${_id}, role: ${role}`);
       // 404 Not Found 반환 및 표준 에러 메시지 사용
-      return res.status(404).send({ error: "User account not found." });
+      return res.status(404).send({ error: "사용자 계정을 찾을 수 없습니다." });
     }
 
     logger.info(`User account deleted successfully: ${_id}, role: ${role}`);
     // 성공 메시지를 JSON 형식으로 통일
-    res.send({ message: "Your account has been successfully deleted." });
+    res.send({ message: "계정이 성공적으로 삭제되었습니다." });
   } catch (error) {
     logger.error(`Error deleting profile for user ${_id}:`, {
       error: error.message,
@@ -308,7 +308,7 @@ const deleteProfile = async (req, res) => {
     // 500 Internal Server Error 반환 및 표준 에러 메시지 사용
     res
       .status(500)
-      .send({ error: "Failed to delete account. Please try again later." });
+      .send({ error: "계정 삭제에 실패했습니다. 나중에 다시 시도해주세요." });
   }
 };
 
@@ -321,69 +321,60 @@ const getChatUsage = async (req, res) => {
     );
     return res
       .status(403)
-      .send({ error: "Forbidden: Only students can access chat usage." });
+      .send({ error: "접근 금지: 학생만 채팅 사용량에 접근할 수 있습니다." });
   }
 
   try {
-    const student = await Student.findById(_id);
+    // 1. 학생 정보 조회 (DB 업데이트 없음)
+    const student = await Student.findById(_id).select(
+      "dailyChatCount lastChatDay monthlyChatCount lastChatMonth" // 필요한 필드만 선택
+    );
 
     if (!student) {
       logger.warn(`Student not found for getChatUsage: ${_id}`);
-      return res.status(404).send({ error: "Student profile not found." }); // 표준화된 메시지
+      return res.status(404).send({ error: "학생 프로필을 찾을 수 없습니다." });
     }
 
     const today = format(new Date(), "yyyy-MM-dd");
     const thisMonth = format(new Date(), "yyyy-MM");
 
-    let { dailyChatCount, lastChatDay, monthlyChatCount, lastChatMonth } =
-      student;
-    let needsUpdate = false;
-    const updateOps = { $set: {} };
+    // 2. 사용자에게 보여줄 값 계산
+    let displayDailyCount = student.dailyChatCount;
+    let displayMonthlyCount = student.monthlyChatCount;
 
-    // 날짜/월 변경 시 카운트 초기화 로직 (기존 유지)
-    if (lastChatDay !== today) {
-      dailyChatCount = 0;
-      updateOps.$set.dailyChatCount = 0;
-      updateOps.$set.lastChatDay = today;
-      needsUpdate = true;
+    if (student.lastChatDay !== today) {
+      displayDailyCount = 0; // 오늘 사용량은 0으로 간주
     }
-    if (lastChatMonth !== thisMonth) {
-      monthlyChatCount = 0;
-      updateOps.$set.monthlyChatCount = 0;
-      updateOps.$set.lastChatMonth = thisMonth;
-      needsUpdate = true;
+    if (student.lastChatMonth !== thisMonth) {
+      displayMonthlyCount = 0; // 이번 달 사용량은 0으로 간주
+      // 월이 바뀌면 일일 카운트도 0으로 간주해야 함 (어제 기록이므로)
+      if (student.lastChatDay !== today) {
+        // 만약 어제 데이터면서 월도 바뀌었다면, 일일 카운트도 0이어야 함.
+        displayDailyCount = 0;
+      }
     }
 
-    // DB 업데이트 (필요 시에만)
-    if (needsUpdate && Object.keys(updateOps.$set).length > 0) {
-      await Student.findByIdAndUpdate(_id, updateOps);
-      logger.info(
-        `Chat counts reset for student ${_id} - Day: ${
-          lastChatDay !== today
-        }, Month: ${lastChatMonth !== thisMonth}`
-      );
-    }
+    // 3. 남은 횟수 계산
+    const dailyRemaining = Math.max(0, DAILY_LIMIT - displayDailyCount);
+    const monthlyRemaining = Math.max(0, MONTHLY_LIMIT - displayMonthlyCount);
 
-    const dailyRemaining = Math.max(0, DAILY_LIMIT - dailyChatCount);
-    const monthlyRemaining = Math.max(0, MONTHLY_LIMIT - monthlyChatCount);
-
+    // 4. 응답 전송
     res.send({
       dailyLimit: DAILY_LIMIT,
       monthlyLimit: MONTHLY_LIMIT,
-      dailyCount: dailyChatCount,
-      monthlyCount: monthlyChatCount,
+      dailyCount: displayDailyCount, // DB값이 아닌 계산된 값 사용
+      monthlyCount: displayMonthlyCount, // DB값이 아닌 계산된 값 사용
       dailyRemaining,
       monthlyRemaining,
     });
   } catch (error) {
-    // console.error 대신 logger 사용
     logger.error(`Error fetching chat usage for student ${_id}:`, {
       error: error.message,
       stack: error.stack,
     });
-    res
-      .status(500)
-      .send({ error: "Failed to fetch chat usage. Please try again later." }); // 표준화된 메시지
+    res.status(500).send({
+      error: "채팅 사용량을 불러오는데 실패했습니다. 나중에 다시 시도해주세요.",
+    });
   }
 };
 

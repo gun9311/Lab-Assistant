@@ -12,6 +12,7 @@ let clients = {};
 
 const DAILY_LIMIT = 15;
 const MONTHLY_LIMIT = 150;
+const RECENT_HISTORY_COUNT = 4; // Redis에 저장할 최근 대화 기록 수
 
 // PII 마스킹 함수 (2.5단계)
 function maskPII(text) {
@@ -152,26 +153,37 @@ const handleWebSocketConnection = async (ws, userId, subject) => {
   const chatHistoryKey = `chatHistories:${userId}`;
   const clientId = uuidv4();
 
-  let chatHistory = await redisClient.get(chatHistoryKey);
-  if (!chatHistory) {
-    chatHistory = [];
-  } else {
-    try {
-      chatHistory = JSON.parse(chatHistory);
-    } catch (parseError) {
-      logger.error(
-        `Error parsing chat history for user ${userId}:`,
-        parseError
+  let initialRecentHistory = []; // 메모리 chatHistory 초기화
+  try {
+    const recentHistoryFromRedis = await redisClient.get(chatHistoryKey);
+    if (recentHistoryFromRedis) {
+      initialRecentHistory = JSON.parse(recentHistoryFromRedis);
+      // 가져온 기록이 배열 형태인지 간단히 확인
+      if (!Array.isArray(initialRecentHistory)) {
+        logger.warn(
+          `Invalid recent history format from Redis for user ${userId}, resetting.`
+        );
+        initialRecentHistory = [];
+      }
+      logger.info(
+        `Loaded ${initialRecentHistory.length} recent messages from Redis for user ${userId}`
       );
-      chatHistory = []; // Reset history on parse error
     }
+  } catch (parseOrRedisError) {
+    logger.error(
+      `Error reading or parsing recent chat history from Redis for user ${userId}:`,
+      parseOrRedisError
+    );
+    initialRecentHistory = []; // 오류 발생 시 빈 배열로 시작
   }
+
+  let chatHistory = initialRecentHistory; // 이제 chatHistory는 메모리의 전체 기록 담당
 
   clients[clientId] = ws;
   logger.info(
     `Client connected: ${clientId} for user ${userId}, subject: ${subject}. Total active connections: ${
       Object.keys(clients).length
-    }. Checking usage limits.`
+    }. Initial history length (from Redis): ${initialRecentHistory.length}`
   );
 
   let isAlive = true;
@@ -186,7 +198,7 @@ const handleWebSocketConnection = async (ws, userId, subject) => {
         logger.warn(
           `Client ${clientId} did not respond to ping, terminating connection`
         );
-        await handleDisconnection(userId, subject, clientId, ws);
+        await handleDisconnection(userId, subject, clientId, ws, chatHistory);
       } else {
         isAlive = false;
         ws.ping();
@@ -274,7 +286,7 @@ const handleWebSocketConnection = async (ws, userId, subject) => {
       `Error checking/updating usage limits for user ${userId}:`,
       error
     );
-    ws.send(JSON.stringify({ error: "사용량 확인 중 오류 발생" }));
+    ws.send(JSON.stringify({ error: "사용량 확인 중 오류가 발생했습니다." }));
     ws.close();
     return;
   }
@@ -287,159 +299,156 @@ const handleWebSocketConnection = async (ws, userId, subject) => {
     let refusalBotResponse = "";
 
     try {
-      // --- 사용량 제한 재확인 (변경 없음) ---
-      try {
-        const student = await Student.findById(userId);
-        if (!student) {
-          // 이 경우는 거의 없겠지만 방어적으로 추가
-          logger.error(`Student not found mid-session: ${userId}`);
-          ws.send(JSON.stringify({ error: "사용자 정보를 찾을 수 없습니다." }));
-          return; // 처리 중단
-        }
-
-        const today = format(new Date(), "yyyy-MM-dd");
-        const thisMonth = format(new Date(), "yyyy-MM");
-        let { dailyChatCount, lastChatDay, monthlyChatCount, lastChatMonth } =
-          student;
-
-        // 날짜/달 비교 및 카운트 초기화 (메시지 받을 때마다 확인)
-        // 실제 DB 업데이트는 아래에서 하므로 여기서는 변수 값만 조정
-        if (lastChatDay !== today) {
-          dailyChatCount = 0;
-        }
-        if (lastChatMonth !== thisMonth) {
-          monthlyChatCount = 0;
-        }
-
-        // 현재 카운트로 제한 확인
-        if (dailyChatCount >= DAILY_LIMIT) {
-          logger.warn(`User ${userId} exceeded daily limit mid-session.`);
-          ws.send(JSON.stringify({ error: "daily_limit_exceeded" }));
-          return; // NLP 호출 등 다음 단계로 넘어가지 않음
-        }
-        if (monthlyChatCount >= MONTHLY_LIMIT) {
-          logger.warn(`User ${userId} exceeded monthly limit mid-session.`);
-          ws.send(JSON.stringify({ error: "monthly_limit_exceeded" }));
-          return; // NLP 호출 등 다음 단계로 넘어가지 않음
-        }
-        if (
-          dailyChatCount >= DAILY_LIMIT ||
-          monthlyChatCount >= MONTHLY_LIMIT
-        ) {
-          // ... (send limit exceeded error and return) ...
-          logger.warn(`User ${userId} exceeded limit upon message receive.`);
-          const errorType =
-            dailyChatCount >= DAILY_LIMIT
-              ? "daily_limit_exceeded"
-              : "monthly_limit_exceeded";
-          ws.send(JSON.stringify({ error: errorType }));
-          return; // Stop processing
-        }
-      } catch (checkError) {
-        // ... (error handling for limit check) ...
-        return;
-      }
-      // --- 사용량 제한 재확인 끝 ---
-
       const { grade, semester, subject, unit, topic, userMessage } =
         JSON.parse(message);
 
-      // --- *** 핵심 변경: DB 카운트 증가를 여기로 이동 *** ---
-      // 사용자가 빈 메시지가 아닌 실제 요청을 보냈을 때 카운트 증가
       if (userMessage && userMessage.trim()) {
         saveToHistory = true; // Indicate it's a countable message
-        try {
-          const todayUpdate = format(new Date(), "yyyy-MM-dd");
-          const thisMonthUpdate = format(new Date(), "yyyy-MM");
-          const finalUpdateOps = {
-            $inc: {}, // Initialize $inc
-            $set: {}, // Initialize $set
-          };
+        const todayUpdate = format(new Date(), "yyyy-MM-dd");
+        const thisMonthUpdate = format(new Date(), "yyyy-MM");
 
-          // Fetch current lastChatDay/Month to avoid race conditions if possible, though might be omitted for performance
-          const studentData = await Student.findById(
-            userId,
-            "lastChatDay lastChatMonth dailyChatCount monthlyChatCount"
+        try {
+          // 원자적 업데이트 시도: 조건 확인 및 업데이트를 한 번에 처리
+          const updatedStudent = await Student.findOneAndUpdate(
+            {
+              _id: userId,
+              // 업데이트 조건: 아래 조건 중 하나라도 만족해야 업데이트 시도
+              $or: [
+                // 1. 월이 바뀜 (항상 허용)
+                { lastChatMonth: { $ne: thisMonthUpdate } },
+                // 2. 날짜가 바뀌고 월은 같음 (월간 제한 내 인 경우 허용)
+                {
+                  lastChatDay: { $ne: todayUpdate },
+                  lastChatMonth: thisMonthUpdate,
+                  monthlyChatCount: { $lt: MONTHLY_LIMIT },
+                },
+                // 3. 날짜와 월이 같음 (일간 및 월간 제한 내 인 경우 허용)
+                {
+                  lastChatDay: todayUpdate,
+                  dailyChatCount: { $lt: DAILY_LIMIT },
+                  lastChatMonth: thisMonthUpdate,
+                  monthlyChatCount: { $lt: MONTHLY_LIMIT },
+                },
+              ],
+            },
+            [
+              // 집계 파이프라인을 사용하여 조건부 업데이트 로직 구현
+              {
+                $set: {
+                  // 날짜/월 변경 시 업데이트, 아닐 시 기존 값 유지
+                  lastChatDay: {
+                    $cond: {
+                      if: { $ne: ["$lastChatDay", todayUpdate] },
+                      then: todayUpdate,
+                      else: "$lastChatDay",
+                    },
+                  },
+                  // 날짜 변경 시 1로 초기화, 아닐 시 1 증가
+                  dailyChatCount: {
+                    $cond: {
+                      if: { $ne: ["$lastChatDay", todayUpdate] },
+                      then: 1,
+                      else: { $add: ["$dailyChatCount", 1] },
+                    },
+                  },
+                  // 월 변경 시 업데이트, 아닐 시 기존 값 유지
+                  lastChatMonth: {
+                    $cond: {
+                      if: { $ne: ["$lastChatMonth", thisMonthUpdate] },
+                      then: thisMonthUpdate,
+                      else: "$lastChatMonth",
+                    },
+                  },
+                  // 월 변경 시 1로 초기화, 아닐 시 1 증가 (월이 같을 때만 증가)
+                  monthlyChatCount: {
+                    $cond: {
+                      if: { $ne: ["$lastChatMonth", thisMonthUpdate] },
+                      then: 1,
+                      else: { $add: ["$monthlyChatCount", 1] },
+                    },
+                  },
+                },
+              },
+            ],
+            { new: true } // 업데이트 후의 문서를 반환
           );
 
-          // Determine increments and resets based on fetched data or assume current limits are accurate enough for immediate increment
-          let currentDaily = studentData
-            ? studentData.dailyChatCount
-            : dailyChatCount; // Use count from initial check or fetched
-          let currentMonthly = studentData
-            ? studentData.monthlyChatCount
-            : monthlyChatCount;
-          let lastDay = studentData ? studentData.lastChatDay : lastChatDay;
-          let lastMonth = studentData
-            ? studentData.lastChatMonth
-            : lastChatMonth;
-
-          if (lastDay !== todayUpdate) {
-            finalUpdateOps.$set.lastChatDay = todayUpdate;
-            finalUpdateOps.$set.dailyChatCount = 1; // Reset and set to 1 for today
-            currentDaily = 1; // Reflect the change locally for potential subsequent checks (though unlikely needed now)
-          } else {
-            finalUpdateOps.$inc.dailyChatCount = 1; // Increment today's count
-            currentDaily += 1;
-          }
-
-          if (lastMonth !== thisMonthUpdate) {
-            finalUpdateOps.$set.lastChatMonth = thisMonthUpdate;
-            finalUpdateOps.$set.monthlyChatCount = 1; // Reset and set to 1 for this month
-            currentMonthly = 1;
-          } else {
-            // Only increment monthly if daily was also incremented (or reset)
-            if (
-              finalUpdateOps.$inc.dailyChatCount ||
-              finalUpdateOps.$set.dailyChatCount
-            ) {
-              finalUpdateOps.$inc.monthlyChatCount = 1;
-              currentMonthly += 1;
-            }
-          }
-
-          // Clean up empty operators
-          if (Object.keys(finalUpdateOps.$inc).length === 0)
-            delete finalUpdateOps.$inc;
-          if (Object.keys(finalUpdateOps.$set).length === 0)
-            delete finalUpdateOps.$set;
-
-          // Perform the update only if there's something to update
-          if (Object.keys(finalUpdateOps).length > 0) {
-            await Student.findByIdAndUpdate(userId, finalUpdateOps, {
-              new: true,
-            }); // `new: true` is optional
-            logger.info(
-              `Usage count incremented for user ${userId} *before* processing message.`
+          if (!updatedStudent) {
+            // 업데이트 실패: $or 조건 불만족 (즉, 제한 초과 상태)
+            // 어떤 제한에 걸렸는지 확인하기 위해 현재 상태 다시 조회
+            const currentStudentState = await Student.findById(
+              userId,
+              "dailyChatCount lastChatDay monthlyChatCount lastChatMonth"
             );
+            if (!currentStudentState) {
+              // 이 경우는 거의 없지만 방어 코드
+              logger.error(
+                `Failed to fetch student state after failed atomic update for user ${userId}`
+              );
+              ws.send(JSON.stringify({ error: "사용자 정보 조회 실패" }));
+              return;
+            }
 
-            // Optional: Update local counts if needed elsewhere, though maybe not necessary now
-            dailyChatCount = currentDaily;
-            monthlyChatCount = currentMonthly;
+            let errorType = null;
+            // 현재 상태와 날짜를 기준으로 어떤 제한에 걸렸는지 판단
+            if (
+              currentStudentState.lastChatDay === todayUpdate &&
+              currentStudentState.dailyChatCount >= DAILY_LIMIT
+            ) {
+              errorType = "daily_limit_exceeded";
+            } else if (
+              currentStudentState.lastChatMonth === thisMonthUpdate &&
+              currentStudentState.monthlyChatCount >= MONTHLY_LIMIT
+            ) {
+              // 일일 제한 초과가 아니거나 날짜가 다른 경우 월간 제한 확인
+              if (
+                errorType !== "daily_limit_exceeded" ||
+                currentStudentState.lastChatDay !== todayUpdate
+              ) {
+                errorType = "monthly_limit_exceeded";
+              }
+            } else {
+              // $or 조건이 정확하다면 이 경우는 발생하지 않아야 함
+              logger.error(
+                `Atomic update check failed unexpectedly for user ${userId}. State:`,
+                currentStudentState
+              );
+              errorType = "limit_check_failed_unexpectedly";
+            }
+
+            logger.warn(
+              `User ${userId} failed atomic update check, limit likely reached. Error: ${errorType}`
+            );
+            ws.send(JSON.stringify({ error: errorType || "limit_exceeded" }));
+            return; // 메시지 처리 중단
           }
+
+          // 업데이트 성공: 로그 남기고 계속 진행
+          logger.info(
+            `Usage count updated atomically for user ${userId}. New counts: D=${updatedStudent.dailyChatCount}, M=${updatedStudent.monthlyChatCount}`
+          );
+          // Note: 로컬 변수 dailyChatCount, monthlyChatCount 등을 업데이트할 필요는 없음 (이후 코드에서 사용하지 않음)
         } catch (updateError) {
           logger.error(
-            `Failed to update usage count for user ${userId} before processing:`,
+            `Error during atomic usage count update for user ${userId}:`,
             updateError
           );
-          // Decide how to handle: maybe send an error, or just log and continue?
-          // For now, let's log and potentially let the user know an error occurred during counting.
-          // ws.send(JSON.stringify({ error: "사용량 집계 중 오류가 발생했습니다." }));
-          // return; // Or maybe continue processing the message anyway? Let's continue for now.
+          ws.send(
+            JSON.stringify({ error: "사용량 업데이트 중 오류가 발생했습니다." })
+          );
+          return; // 오류 발생 시 처리 중단
         }
       } else {
-        // This is likely the initial empty message from frontend to start the chat
+        // 빈 메시지 또는 초기 메시지: 카운트 증가 안함
         saveToHistory = false;
         logger.info(
-          `Initial empty message received from user ${userId}, usage count not incremented.`
+          `Initial or empty message received from user ${userId}, usage count not incremented.`
         );
       }
-      // --- *** DB 카운트 증가 로직 끝 *** ---
 
       let finalUserMessage = userMessage;
       let messageForProcessing = userMessage;
 
-      // --- PII 마스킹 (변경 없음) ---
       if (
         messageForProcessing &&
         messageForProcessing.trim() &&
@@ -455,7 +464,6 @@ const handleWebSocketConnection = async (ws, userId, subject) => {
         finalUserMessage = messageForProcessing;
       }
 
-      // --- 입력 필터링 (Moderation API) (변경 없음) ---
       if (
         messageForProcessing &&
         messageForProcessing.trim() &&
@@ -484,12 +492,15 @@ const handleWebSocketConnection = async (ws, userId, subject) => {
                 user: finalUserMessage,
                 bot: refusalBotResponse,
               });
+              const recentHistoryForRedis = chatHistory.slice(
+                -RECENT_HISTORY_COUNT
+              );
               await redisClient.set(
                 chatHistoryKey,
-                JSON.stringify(chatHistory)
+                JSON.stringify(recentHistoryForRedis)
               );
               logger.info(
-                `Saved filtered (Moderation API) interaction for user ${userId}`
+                `Saved filtered (Moderation API) interaction to memory & recent ${RECENT_HISTORY_COUNT} to Redis for user ${userId}`
               );
             }
             return;
@@ -508,7 +519,6 @@ const handleWebSocketConnection = async (ws, userId, subject) => {
         }
       }
 
-      // --- 입력 필터링 (키워드/패턴) (변경 없음) ---
       if (
         messageForProcessing &&
         messageForProcessing.trim() &&
@@ -531,17 +541,22 @@ const handleWebSocketConnection = async (ws, userId, subject) => {
               user: finalUserMessage,
               bot: refusalBotResponse,
             });
-            await redisClient.set(chatHistoryKey, JSON.stringify(chatHistory));
+            const recentHistoryForRedis = chatHistory.slice(
+              -RECENT_HISTORY_COUNT
+            );
+            await redisClient.set(
+              chatHistoryKey,
+              JSON.stringify(recentHistoryForRedis)
+            );
             logger.info(
-              `Saved filtered (Custom Filter) interaction for user ${userId}`
+              `Saved filtered (Custom Filter) interaction to memory & recent ${RECENT_HISTORY_COUNT} to Redis for user ${userId}`
             );
           }
           return;
         }
       }
 
-      // --- NLP 호출 준비 (첫 인사말 로직 등은 유지) ---
-      const recentHistory = chatHistory.slice(-3);
+      const recentHistory = chatHistory.slice(-RECENT_HISTORY_COUNT);
       const systemMessageContent = `너는 초등학생을 위한 친절하고 **매우 안전한** AI 학습 튜터야. 현재 ${grade}학년 ${subject} ${
         unit ? `${unit} 단원 ` : ""
       }${topic} 학습을 돕고 있어. 다음 원칙을 **반드시** 지켜줘:
@@ -595,7 +610,6 @@ const handleWebSocketConnection = async (ws, userId, subject) => {
         return;
       }
 
-      // 3. NLP 서비스 호출 및 응답 스트리밍
       if (!messageFiltered) {
         try {
           const streamResponse = getNLPResponse(messages);
@@ -606,10 +620,8 @@ const handleWebSocketConnection = async (ws, userId, subject) => {
           }
           ws.send(JSON.stringify({ bot: null, isFinal: true }));
 
-          // --- 출력 필터링 (변경 없음) ---
           if (botResponseContent && botResponseContent.trim()) {
             try {
-              // 3.1 Moderation API 검사
               const moderationResponse = await openai.moderations.create({
                 input: botResponseContent,
               });
@@ -628,7 +640,6 @@ const handleWebSocketConnection = async (ws, userId, subject) => {
                   "죄송합니다. 답변 생성 중 문제가 발생했습니다. 다른 질문을 해주시겠어요?";
               }
 
-              // 3.2 PII 마스킹
               const originalBotResponseForMasking = botResponseContent;
               botResponseContent = maskPII(botResponseContent);
               if (botResponseContent !== originalBotResponseForMasking) {
@@ -637,7 +648,6 @@ const handleWebSocketConnection = async (ws, userId, subject) => {
                 );
               }
 
-              // 4단계: 출력 필터링 (키워드/패턴) - PII 마스킹 후 검사
               const forbiddenCheckOutput =
                 containsForbiddenContent(botResponseContent);
               if (forbiddenCheckOutput.forbidden) {
@@ -652,7 +662,6 @@ const handleWebSocketConnection = async (ws, userId, subject) => {
                     100
                   )}...`
                 );
-                // 부적절한 응답은 안전한 메시지로 대체
                 botResponseContent =
                   "죄송합니다. 답변 내용에 부적절한 표현이 포함되어 수정되었습니다.";
               }
@@ -665,18 +674,30 @@ const handleWebSocketConnection = async (ws, userId, subject) => {
                 "답변 처리 중 오류가 발생하여 내용을 표시할 수 없습니다.";
             }
           }
-          // --- 출력 필터링 끝 ---
 
-          // --- 대화 기록 저장 (변경 없음) ---
           if (saveToHistory && finalUserMessage.trim() && botResponseContent) {
             chatHistory.push({
               user: finalUserMessage,
               bot: botResponseContent,
             });
-            await redisClient.set(chatHistoryKey, JSON.stringify(chatHistory));
-            logger.info(
-              `Chat history (user masked, bot filtered/masked) saved for user ${userId}`
+            const recentHistoryForRedis = chatHistory.slice(
+              -RECENT_HISTORY_COUNT
             );
+            try {
+              await redisClient.set(
+                chatHistoryKey,
+                JSON.stringify(recentHistoryForRedis)
+              );
+              logger.info(
+                `Chat history saved to memory & recent ${RECENT_HISTORY_COUNT} to Redis for user ${userId}`
+              );
+            } catch (redisSetError) {
+              logger.error(
+                `Failed to save recent history to Redis for user ${userId}:`,
+                redisSetError
+              );
+              // Redis 저장 실패는 일단 계속 진행 (메모리에는 있음)
+            }
           }
         } catch (nlpError) {
           logger.error(
@@ -710,18 +731,24 @@ const handleWebSocketConnection = async (ws, userId, subject) => {
       }`
     );
     clearInterval(pingInterval); // pingInterval 정리
-    await handleDisconnection(userId, subject, clientId, ws);
+    await handleDisconnection(userId, subject, clientId, ws, chatHistory);
   });
 
   ws.on("error", async (error) => {
     logger.error(`Error occurred on client ${clientId}: ${error}`);
     clearInterval(pingInterval); // pingInterval 정리
-    await handleDisconnection(userId, subject, clientId, ws); // 비정상 종료 처리
+    await handleDisconnection(userId, subject, clientId, ws, chatHistory); // 비정상 종료 처리
   });
 };
 
-const handleDisconnection = async (userId, subject, clientId, ws) => {
-  await saveChatSummaryInternal(userId, subject);
+const handleDisconnection = async (
+  userId,
+  subject,
+  clientId,
+  ws,
+  chatHistory
+) => {
+  await saveChatSummaryInternal(userId, subject, chatHistory);
 
   delete clients[clientId];
   logger.info(
@@ -736,60 +763,42 @@ const handleDisconnection = async (userId, subject, clientId, ws) => {
   }
 };
 
-const saveChatSummaryInternal = async (userId, subject) => {
+const saveChatSummaryInternal = async (userId, subject, chatHistory) => {
   const chatHistoryKey = `chatHistories:${userId}`;
 
   try {
-    let chatHistory = await redisClient.get(chatHistoryKey);
-    if (!chatHistory) {
+    if (!chatHistory || !Array.isArray(chatHistory)) {
       logger.warn(
-        `No chat history found in Redis for user ${userId} to save summary.`
+        `Invalid or missing chat history in memory for user ${userId} to save summary.`
       );
+      try {
+        await redisClient.del(chatHistoryKey);
+      } catch (delErr) {
+        /* ignore */
+      }
       return;
     }
 
-    // Redis에서 가져온 데이터 파싱 및 유효성 검사
-    let parsedChatHistory;
-    try {
-      parsedChatHistory = JSON.parse(chatHistory);
-    } catch (parseError) {
-      logger.error(
-        `Invalid JSON in Redis chat history for user ${userId}. Key: ${chatHistoryKey}`,
-        { error: parseError.message }
-      );
-      await redisClient.del(chatHistoryKey); // 잘못된 데이터 삭제
-      return;
-    }
-
-    if (!Array.isArray(parsedChatHistory)) {
-      logger.error(
-        `Invalid chat history format retrieved from Redis for user ${userId}. Expected array, got ${typeof parsedChatHistory}. Key: ${chatHistoryKey}`
-      );
-      await redisClient.del(chatHistoryKey); // 잘못된 데이터 삭제
-      return;
-    }
-
-    // 요약 텍스트 생성
-    const summaryText = parsedChatHistory
+    const summaryText = chatHistory
       .map((msg) => `You: ${msg.user}\nBot: ${msg.bot}`)
       .join("\n");
 
-    // 요약 텍스트가 비어있으면 저장하지 않음
     if (!summaryText || summaryText.trim() === "") {
       logger.info(
-        `Empty summary generated for user ${userId} (Key: ${chatHistoryKey}), skipping save.`
+        `Empty summary generated from memory for user ${userId}, skipping save.`
       );
-      await redisClient.del(chatHistoryKey); // Redis 기록은 삭제
+      try {
+        await redisClient.del(chatHistoryKey);
+      } catch (delErr) {
+        /* ignore */
+      }
       return;
     }
 
     const newSummaryEntry = { summary: summaryText, createdAt: new Date() };
-
-    // 1. 학생 ID로 기존 ChatSummary 문서 찾기
     let chatSummaryDoc = await ChatSummary.findOne({ student: userId });
 
     if (chatSummaryDoc) {
-      // 2. 문서가 있으면 업데이트
       logger.info(
         `Found existing ChatSummary document for student ${userId}. Updating subjects.`
       );
@@ -798,13 +807,11 @@ const saveChatSummaryInternal = async (userId, subject) => {
       );
 
       if (subjectData) {
-        // b. 과목이 이미 있으면 summaries 배열의 맨 앞에 새 요약 추가 (최신순 저장)
         logger.debug(
           `Subject '${subject}' found in document for student ${userId}, adding new summary to the beginning.`
         );
         subjectData.summaries.unshift(newSummaryEntry);
       } else {
-        // c. 과목이 없으면 subjects 배열에 새 과목 객체 추가
         logger.debug(
           `Subject '${subject}' not found for student ${userId}, adding new subject entry.`
         );
@@ -814,7 +821,6 @@ const saveChatSummaryInternal = async (userId, subject) => {
         });
       }
     } else {
-      // 3. 문서가 없으면 새로 생성
       logger.info(
         `No existing ChatSummary document found for student ${userId}, creating new one with subject '${subject}'.`
       );
@@ -824,27 +830,25 @@ const saveChatSummaryInternal = async (userId, subject) => {
       });
     }
 
-    // 4. 변경된 문서 저장
     await chatSummaryDoc.save();
     logger.info(
-      `Chat summary saved successfully for student ${userId}, subject '${subject}'.`
+      `Chat summary saved successfully from memory for student ${userId}, subject '${subject}'.`
     );
 
-    // 5. Redis에서 채팅 기록 삭제
-    await redisClient.del(chatHistoryKey);
-    logger.debug(`Deleted chat history from Redis for key ${chatHistoryKey}.`);
+    try {
+      await redisClient.del(chatHistoryKey);
+    } catch (delErr) {
+      /* ignore */
+    }
   } catch (error) {
-    // 에러 로깅 강화
     logger.error(
-      `Failed to save chat summary for student ${userId}, subject '${subject}':`,
+      `Failed to save chat summary from memory for student ${userId}, subject '${subject}':`,
       {
         error: error.message,
         stack: error.stack,
         redisKey: chatHistoryKey,
       }
     );
-    // Redis 삭제 실패 시 에러가 발생할 수 있으므로, DB 저장 실패 시 Redis 삭제 여부 결정 필요
-    // 여기서는 일단 DB 저장 실패 시 Redis는 남겨두는 것으로 가정 (재시도나 확인을 위해)
   }
 };
 

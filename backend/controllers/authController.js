@@ -89,7 +89,7 @@ const completeRegistration = async (req, res) => {
     logger.warn("Invalid teacher auth code during registration completion", {
       providedCode: authCode,
     });
-    return res.status(400).send({ error: "Invalid authentication code" });
+    return res.status(400).send({ error: "유효하지 않은 인증 코드입니다" });
   }
 
   try {
@@ -253,20 +253,67 @@ const registerTeacher = async (req, res) => {
     logger.warn("Invalid teacher auth code during manual registration", {
       providedCode: authCode,
     });
-    return res.status(400).send({ error: "Invalid authentication code" });
+    return res.status(400).send({ error: "인증 코드가 올바르지 않습니다." });
+  }
+
+  if (!password || password.length < 6) {
+    logger.warn(
+      `Attempt to register teacher ${email} with password shorter than 6 characters.`
+    );
+    return res
+      .status(400)
+      .send({ error: "비밀번호는 최소 6자 이상이어야 합니다." });
   }
 
   try {
     const teacher = new Teacher({ email, password, name, school });
     await teacher.save();
     logger.info(`Teacher registered manually: ${email}`);
+
+    // --- 회원가입 성공 후 바로 로그인 처리 로직 추가 ---
+    // 1. 토큰 생성
+    const accessToken = jwt.sign(
+      { _id: teacher._id, role: teacher.role },
+      process.env.JWT_SECRET,
+      { expiresIn: "1h" }
+    );
+    const refreshToken = jwt.sign(
+      { _id: teacher._id, role: teacher.role },
+      process.env.JWT_REFRESH_SECRET,
+      { expiresIn: "7d" }
+    );
+
+    // 2. Redis에 리프레시 토큰 저장
+    try {
+      await redisClient.set(
+        teacher._id.toString(),
+        refreshToken,
+        "EX",
+        7 * 24 * 60 * 60 // 7일 (초 단위)
+      );
+      logger.info(
+        `Refresh token stored in Redis for new teacher ${teacher.email}`
+      );
+    } catch (redisError) {
+      logger.error(
+        `Failed to save refresh token to Redis for new teacher ${teacher.email}:`,
+        redisError
+      );
+      // Redis 저장 실패가 회원가입 자체를 중단시킬지는 정책에 따라 결정
+      // 여기서는 로깅만 하고 진행
+    }
+
+    // 3. 응답 데이터에 토큰 및 사용자 정보 포함하여 전송
     res.status(201).send({
-      _id: teacher._id,
-      email: teacher.email,
-      name: teacher.name,
-      school: teacher.school,
+      message: "회원가입 및 로그인이 완료되었습니다.", // 메시지 변경
+      accessToken,
+      refreshToken,
+      userId: teacher._id,
       role: teacher.role,
+      school: teacher.school,
+      // name: teacher.name, // 필요 시 이름도 포함 가능
     });
+    // --- 로그인 처리 로직 끝 ---
   } catch (error) {
     logger.error("Failed to register teacher manually", {
       error: error.message,
@@ -274,9 +321,9 @@ const registerTeacher = async (req, res) => {
       email,
     });
     if (error.code === 11000) {
-      return res.status(400).send({ error: "Email already exists." });
+      return res.status(400).send({ error: "이미 사용 중인 이메일입니다." });
     }
-    res.status(400).send({ error: "Failed to create teacher" });
+    res.status(400).send({ error: "교사 계정 생성에 실패했습니다." });
   }
 };
 
@@ -548,6 +595,15 @@ const resetPassword = async (req, res) => {
       return res.status(400).send({ error: "유효하지 않은 토큰입니다." });
     }
 
+    if (!password || password.length < 6) {
+      logger.warn(
+        `Attempt to reset password with length < 6 for teacher ${teacher.email}`
+      );
+      return res
+        .status(400)
+        .send({ error: "새 비밀번호는 최소 6자 이상이어야 합니다." });
+    }
+
     teacher.password = password;
     await teacher.save();
     logger.info(`Password reset successfully for teacher: ${teacher.email}`);
@@ -651,6 +707,15 @@ const resetStudentPassword = async (req, res) => {
         token,
       });
       return res.status(400).send({ error: "유효하지 않은 토큰입니다." });
+    }
+
+    if (!password || password.length < 3) {
+      logger.warn(
+        `Attempt to reset password with length < 3 for student ${student.loginId}`
+      );
+      return res
+        .status(400)
+        .send({ error: "새 비밀번호는 최소 3자 이상이어야 합니다." });
     }
 
     student.password = password;

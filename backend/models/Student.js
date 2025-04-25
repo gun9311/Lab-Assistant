@@ -37,6 +37,7 @@ studentSchema.pre("save", async function (next) {
 
 studentSchema.index({ loginId: 1 }, { unique: true });
 studentSchema.index({ school: 1, grade: 1, class: 1, loginId: 1 });
+studentSchema.index({ "tokens.token": 1 });
 
 const Student = mongoose.model("Student", studentSchema);
 

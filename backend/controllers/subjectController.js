@@ -1,4 +1,4 @@
-const Subject = require('../models/Subject');
+const Subject = require("../models/Subject");
 
 // 과목 추가
 const addSubject = async (req, res) => {
@@ -8,7 +8,7 @@ const addSubject = async (req, res) => {
     await subject.save();
     res.status(201).send(subject);
   } catch (error) {
-    res.status(400).send({ error: 'Failed to add subject' });
+    res.status(400).send({ error: "과목 추가에 실패했습니다." });
   }
 };
 
@@ -18,7 +18,7 @@ const getSubjects = async (req, res) => {
     const subjects = await Subject.find();
     res.status(200).send(subjects);
   } catch (error) {
-    res.status(500).send({ error: 'Failed to fetch subjects' });
+    res.status(500).send({ error: "과목 정보를 불러오는데 실패했습니다." });
   }
 };
 
@@ -28,8 +28,8 @@ const getUnits = async (req, res) => {
   try {
     if (subjects && semesters) {
       // 복수 과목 및 학기 처리
-      const subjectNames = subjects.split(',');
-      const semestersList = semesters.split(',');
+      const subjectNames = subjects.split(",");
+      const semestersList = semesters.split(",");
 
       const subjectsData = await Subject.find({
         name: { $in: subjectNames },
@@ -39,7 +39,7 @@ const getUnits = async (req, res) => {
 
       // 과목별 단원 데이터를 구성
       const unitsBySubject = subjectsData.reduce((acc, subject) => {
-        acc[subject.name] = subject.units.map(unit => unit.name);
+        acc[subject.name] = subject.units.map((unit) => unit.name);
         return acc;
       }, {});
 
@@ -53,18 +53,18 @@ const getUnits = async (req, res) => {
       });
 
       if (!subjectData) {
-        return res.status(404).send({ error: 'Subject not found' });
+        return res.status(404).send({ error: "과목을 찾을 수 없습니다." });
       }
 
       // 단원 목록만 반환 (기존 동작 유지)
-      const units = subjectData.units.map(unit => unit.name);
+      const units = subjectData.units.map((unit) => unit.name);
       res.status(200).send({ units });
     } else {
-      return res.status(400).send({ error: 'Invalid parameters' });
+      return res.status(400).send({ error: "잘못된 파라미터입니다." });
     }
   } catch (error) {
-    console.error('Failed to fetch units:', error);
-    res.status(500).send({ error: 'Failed to fetch units' });
+    console.error("Failed to fetch units:", error);
+    res.status(500).send({ error: "단원 정보를 불러오는데 실패했습니다." });
   }
 };
 
@@ -72,21 +72,21 @@ const getUnits = async (req, res) => {
 const addUnits = async (req, res) => {
   const { subject, units } = req.body; // units는 배열로 받음
   if (!subject || !units || !Array.isArray(units)) {
-    return res.status(400).send({ error: 'Invalid data format' });
+    return res.status(400).send({ error: "잘못된 데이터 형식입니다." });
   }
 
   try {
     const subjectDoc = await Subject.findById(subject);
     if (!subjectDoc) {
-      return res.status(404).send({ error: 'Subject not found' });
+      return res.status(404).send({ error: "과목을 찾을 수 없습니다." });
     }
 
-    units.forEach(unit => subjectDoc.units.push({ name: unit }));
+    units.forEach((unit) => subjectDoc.units.push({ name: unit }));
     await subjectDoc.save();
     res.status(200).send(subjectDoc);
   } catch (error) {
-    console.error('Error adding units:', error);
-    res.status(500).send({ error: 'Failed to add units' });
+    console.error("Error adding units:", error);
+    res.status(500).send({ error: "단원 추가에 실패했습니다." });
   }
 };
 
@@ -95,15 +95,15 @@ const addUnitRating = async (req, res) => {
   try {
     const subject = await Subject.findById(subjectId);
     if (!subject) {
-      return res.status(404).send({ error: 'Subject not found' });
+      return res.status(404).send({ error: "과목을 찾을 수 없습니다." });
     }
 
-    const unit = subject.units.find(u => u.name === unitName);
+    const unit = subject.units.find((u) => u.name === unitName);
     if (!unit) {
-      return res.status(404).send({ error: 'Unit not found' });
+      return res.status(404).send({ error: "단원을 찾을 수 없습니다." });
     }
 
-    let rating = unit.ratings.find(r => r.level === ratingLevel);
+    let rating = unit.ratings.find((r) => r.level === ratingLevel);
     if (!rating) {
       rating = { level: ratingLevel, comments: [] };
       unit.ratings.push(rating);
@@ -117,8 +117,8 @@ const addUnitRating = async (req, res) => {
     await subject.save();
     res.status(200).send(subject);
   } catch (error) {
-    console.error('Error adding unit rating:', error);
-    res.status(500).send({ error: 'Failed to add unit rating' });
+    console.error("Error adding unit rating:", error);
+    res.status(500).send({ error: "단원 평어 추가에 실패했습니다." });
   }
 };
 
