@@ -42,7 +42,7 @@ const HomePage = () => {
       lottieSrc:
         "https://lottie.host/35ec8ec8-40ba-49a7-a1d5-8ef2198c1521/hMol44ecSD.lottie",
       description:
-        "원 클릭! 퀴즈 결과를 분석하여\n작성되는 교과별 평어로 업무 부담을 줄여보세요.",
+        "한 번의 클릭으로 퀴즈 결과 기반의\n교과별 평어를 작성해 보세요.",
     },
   ];
   const maxSteps = tutorialSteps.length;

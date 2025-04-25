@@ -229,7 +229,7 @@ const ChatSummaryList: React.FC<ChatSummaryListProps> = ({
         alignItems="center"
         mb={2}
       >
-        <Typography variant="h6">{currentQueryTarget} 채팅 내역역</Typography>
+        <Typography variant="h6">{currentQueryTarget} 채팅 내역</Typography>
         <FormControlLabel
           control={
             <Switch

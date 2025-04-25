@@ -15,11 +15,21 @@ import {
   Checkbox,
   FormControlLabel,
   Link as MuiLink,
+  CircularProgress,
+  FormHelperText,
 } from "@mui/material";
 import Autocomplete from "@mui/material/Autocomplete";
 import { educationOffices } from "../../educationOffices";
 import apiNoAuth from "../../utils/apiNoAuth";
 import { useNavigate } from "react-router-dom";
+import { requestPermissionAndGetToken } from "../../firebase";
+import {
+  setToken,
+  setRefreshToken,
+  setRole,
+  setUserId,
+  setSchoolName,
+} from "../../utils/auth";
 
 interface School {
   label: string;
@@ -38,6 +48,9 @@ const TeacherRegisterPage = () => {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
   const [privacyAccepted, setPrivacyAccepted] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [passwordMatchError, setPasswordMatchError] = useState(false);
+  const [passwordError, setPasswordError] = useState("");
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -70,26 +83,107 @@ const TeacherRegisterPage = () => {
     }
   }, [educationOffice]);
 
-  const validateEmail = (email: string) => {
+  const validateEmail = (email: string): boolean => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(email);
   };
 
+  const handleInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
+    const { name, value } = e.target;
+    if (name === "email") {
+      setEmail(value);
+      setError("");
+    } else if (name === "password") {
+      setPassword(value);
+      if (error) setError("");
+    } else if (name === "confirmPassword") {
+      setConfirmPassword(value);
+      if (error) setError("");
+    } else if (name === "name") {
+      setName(value);
+      if (error) setError("");
+    } else if (name === "authCode") {
+      setAuthCode(value);
+      if (error) setError("");
+    }
+  };
+
+  const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newPassword = e.target.value;
+    setPassword(newPassword);
+    if (newPassword.length > 0 && newPassword.length < 6) {
+      setPasswordError("비밀번호는 최소 6자 이상이어야 합니다.");
+    } else {
+      setPasswordError("");
+    }
+    setPasswordMatchError(
+      newPassword !== confirmPassword && confirmPassword !== ""
+    );
+    if (error) setError("");
+  };
+
+  const handleConfirmPasswordChange = (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const newConfirmPassword = e.target.value;
+    setConfirmPassword(newConfirmPassword);
+    setPasswordMatchError(
+      password !== newConfirmPassword && newConfirmPassword !== ""
+    );
+    if (error) setError("");
+  };
+
+  const handleSchoolChange = (value: School | null) => {
+    setSchool(value?.label || "");
+    if (error) setError("");
+  };
+
+  const handlePrivacyChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setPrivacyAccepted(event.target.checked);
+    if (error) setError("");
+  };
+
   const handleRegister = async () => {
-    if (!validateEmail(email)) {
-      setError("유효한 이메일 주소를 입력하세요.");
+    setError("");
+    setPasswordError("");
+    setPasswordMatchError(false);
+
+    const emailValid = validateEmail(email);
+    setError(emailValid ? "" : "유효한 이메일 형식을 입력해주세요.");
+    if (!emailValid) return;
+
+    if (password.length < 6) {
+      setError("비밀번호는 최소 6자 이상이어야 합니다.");
+      setPasswordError("비밀번호는 최소 6자 이상이어야 합니다.");
       return;
     }
-
     if (password !== confirmPassword) {
       setError("비밀번호가 일치하지 않습니다.");
+      setPasswordMatchError(true);
       return;
     }
-
+    if (!name.trim()) {
+      setError("닉네임을 입력해주세요.");
+      return;
+    }
+    if (!school.trim()) {
+      setError("학교를 선택해주세요.");
+      return;
+    }
+    if (!authCode.trim()) {
+      setError("교사 인증코드를 입력해주세요.");
+      return;
+    }
     if (!privacyAccepted) {
       setError("개인정보처리방침에 동의해야 회원가입을 진행할 수 있습니다.");
       return;
     }
+
+    if (isLoading) return;
+    setIsLoading(true);
+    setSuccess(false);
 
     try {
       const res = await apiNoAuth.post("/auth/register/teacher", {
@@ -99,15 +193,43 @@ const TeacherRegisterPage = () => {
         school,
         authCode,
       });
-      console.log("교사 등록 완료:", res.data);
-      setSuccess(true);
-      setTimeout(() => {
-        navigate("/home");
-      }, 500);
-    } catch (error) {
-      setError("교사 등록에 실패했습니다");
+      const {
+        accessToken,
+        refreshToken,
+        userId,
+        role,
+        school: userSchool,
+      } = res.data;
+
+      setToken(accessToken);
+      setRefreshToken(refreshToken);
+      setRole(role);
+      setUserId(userId);
+      setSchoolName(userSchool);
+
+      window.location.href = `/${role}`;
+    } catch (error: any) {
+      const errorMessage =
+        error.response?.data?.error || "교사 등록에 실패했습니다.";
+      setError(errorMessage);
+      console.error("Teacher registration failed:", error);
+    } finally {
+      setIsLoading(false);
     }
   };
+
+  const disableInputs = isLoading;
+  const disableButton =
+    isLoading ||
+    !email ||
+    !password ||
+    !confirmPassword ||
+    !name ||
+    !school ||
+    !authCode ||
+    !privacyAccepted ||
+    passwordMatchError ||
+    !!passwordError;
 
   return (
     <Container
@@ -126,7 +248,12 @@ const TeacherRegisterPage = () => {
         >
           교사 회원가입
         </Typography>
-        <FormControl fullWidth variant="outlined" margin="normal">
+        <FormControl
+          fullWidth
+          variant="outlined"
+          margin="normal"
+          disabled={disableInputs}
+        >
           <InputLabel>지역(선택 후 학교 검색)</InputLabel>
           <Select
             value={educationOffice}
@@ -143,6 +270,7 @@ const TeacherRegisterPage = () => {
         <Autocomplete
           options={schools}
           fullWidth
+          disabled={disableInputs}
           renderInput={(params) => (
             <TextField
               {...params}
@@ -151,28 +279,36 @@ const TeacherRegisterPage = () => {
               margin="normal"
             />
           )}
-          onChange={(event, value: School | null) =>
-            setSchool(value?.label || "")
-          }
+          onChange={(event, value) => {
+            handleSchoolChange(value);
+          }}
         />
         <TextField
           fullWidth
           variant="outlined"
           margin="normal"
           label="이메일"
+          name="email"
           value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          onChange={handleInputChange}
           error={!!error && error.includes("이메일")}
           helperText={!!error && error.includes("이메일") ? error : ""}
+          disabled={disableInputs}
         />
         <TextField
           fullWidth
           variant="outlined"
           margin="normal"
-          label="비밀번호"
+          label="비밀번호 (6자 이상)"
           type="password"
           value={password}
-          onChange={(e) => setPassword(e.target.value)}
+          onChange={handlePasswordChange}
+          error={!!passwordError || passwordMatchError}
+          helperText={
+            passwordError ||
+            (passwordMatchError ? "비밀번호가 일치하지 않습니다." : "")
+          }
+          disabled={disableInputs}
         />
         <TextField
           fullWidth
@@ -181,7 +317,10 @@ const TeacherRegisterPage = () => {
           label="비밀번호 확인"
           type="password"
           value={confirmPassword}
-          onChange={(e) => setConfirmPassword(e.target.value)}
+          onChange={handleConfirmPasswordChange}
+          error={passwordMatchError}
+          helperText={passwordMatchError ? "비밀번호가 일치하지 않습니다." : ""}
+          disabled={disableInputs}
         />
         <TextField
           fullWidth
@@ -189,7 +328,11 @@ const TeacherRegisterPage = () => {
           margin="normal"
           label="닉네임"
           value={name}
-          onChange={(e) => setName(e.target.value)}
+          onChange={(e) => {
+            setName(e.target.value);
+            if (error) setError("");
+          }}
+          disabled={disableInputs}
         />
         <TextField
           fullWidth
@@ -197,15 +340,20 @@ const TeacherRegisterPage = () => {
           margin="normal"
           label="교사 인증코드"
           value={authCode}
-          onChange={(e) => setAuthCode(e.target.value)}
+          onChange={(e) => {
+            setAuthCode(e.target.value);
+            if (error) setError("");
+          }}
+          disabled={disableInputs}
         />
         <FormControlLabel
           control={
             <Checkbox
               checked={privacyAccepted}
-              onChange={(e) => setPrivacyAccepted(e.target.checked)}
+              onChange={handlePrivacyChange}
               name="privacyAccepted"
               color="primary"
+              disabled={disableInputs}
             />
           }
           label={
@@ -227,6 +375,7 @@ const TeacherRegisterPage = () => {
           variant="contained"
           color="primary"
           onClick={handleRegister}
+          disabled={disableButton}
           sx={{
             mt: 2,
             py: 1.5,
@@ -236,26 +385,33 @@ const TeacherRegisterPage = () => {
               backgroundColor: "#004d40",
             },
           }}
+          startIcon={
+            isLoading ? <CircularProgress size={24} color="inherit" /> : null
+          }
         >
-          확인
+          {isLoading ? "가입 처리 중..." : "확인"}
         </Button>
-        {error && (
-          <Typography color="error" sx={{ mt: 2 }}>
-            {error}
-          </Typography>
-        )}
+        {error &&
+          !error.includes("이메일") &&
+          !passwordError &&
+          !passwordMatchError && (
+            <Typography color="error" sx={{ mt: 2 }}>
+              {error}
+            </Typography>
+          )}
         <Snackbar
-          open={success}
-          autoHideDuration={3000}
-          onClose={() => setSuccess(false)}
-          anchorOrigin={{ vertical: "top", horizontal: "center" }}
+          open={!!error}
+          autoHideDuration={6000}
+          onClose={() => setError("")}
+          anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
         >
           <Alert
-            onClose={() => setSuccess(false)}
-            severity="success"
+            onClose={() => setError("")}
+            severity="error"
+            variant="filled"
             sx={{ width: "100%" }}
           >
-            회원가입이 성공적으로 완료되었습니다!
+            {error}
           </Alert>
         </Snackbar>
       </Paper>

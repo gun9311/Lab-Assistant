@@ -25,6 +25,7 @@ import {
   Checkbox,
   FormControlLabel,
   Link as MuiLink,
+  CircularProgress,
 } from "@mui/material";
 import Autocomplete from "@mui/material/Autocomplete";
 import { educationOffices } from "../../educationOffices";
@@ -47,6 +48,7 @@ const GoogleCallback = () => {
   const [success, setSuccess] = useState(false);
   const [isTokenFound, setTokenFound] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [privacyAccepted, setPrivacyAccepted] = useState(false);
 
   const getFcmToken = async () => {
@@ -133,7 +135,27 @@ const GoogleCallback = () => {
     }
   }, [educationOffice]);
 
+  const handleInputChange = (
+    setter: React.Dispatch<React.SetStateAction<string>>,
+    value: string
+  ) => {
+    setter(value);
+    if (error) setError("");
+  };
+
+  const handleSchoolChange = (value: School | null) => {
+    setSchool(value?.label || "");
+    if (error) setError("");
+  };
+
+  const handlePrivacyChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setPrivacyAccepted(event.target.checked);
+    if (error) setError("");
+  };
+
   const handleSubmit = async () => {
+    setError("");
+    if (isSubmitting) return;
     if (!name || !school || !authCode) {
       setError("모든 필드를 입력해주세요.");
       return;
@@ -143,7 +165,9 @@ const GoogleCallback = () => {
       return;
     }
 
-    setLoading(true);
+    setIsSubmitting(true);
+    setSuccess(false);
+
     try {
       const fcmToken = await getFcmToken();
       const response = await apiNoAuth.post(
@@ -167,11 +191,14 @@ const GoogleCallback = () => {
       setTimeout(() => {
         window.location.href = `/${role}`;
       }, 500);
-    } catch (error) {
-      setError("추가 정보를 저장하는 데 실패했습니다. 다시 시도해주세요.");
+    } catch (error: any) {
+      const errorMessage =
+        error.response?.data?.error ||
+        "추가 정보를 저장하는 데 실패했습니다. 다시 시도해주세요.";
+      setError(errorMessage);
       console.error("Failed to save additional info", error);
     } finally {
-      setLoading(false);
+      setIsSubmitting(false);
     }
   };
 
@@ -188,7 +215,12 @@ const GoogleCallback = () => {
           >
             필수 정보 입력
           </Typography>
-          <FormControl fullWidth variant="outlined" margin="normal">
+          <FormControl
+            fullWidth
+            variant="outlined"
+            margin="normal"
+            disabled={isSubmitting}
+          >
             <InputLabel>지역(선택 후 학교 검색)</InputLabel>
             <Select
               value={educationOffice}
@@ -206,6 +238,7 @@ const GoogleCallback = () => {
           <Autocomplete
             options={schools}
             fullWidth
+            disabled={isSubmitting}
             renderInput={(params) => (
               <TextField
                 {...params}
@@ -214,9 +247,7 @@ const GoogleCallback = () => {
                 margin="normal"
               />
             )}
-            onChange={(event, value: School | null) =>
-              setSchool(value?.label || "")
-            }
+            onChange={(event, value) => handleSchoolChange(value)}
           />
           <TextField
             fullWidth
@@ -224,8 +255,9 @@ const GoogleCallback = () => {
             margin="normal"
             label="닉네임"
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={(e) => handleInputChange(setName, e.target.value)}
             sx={{ mb: 2 }}
+            disabled={isSubmitting}
           />
           <TextField
             fullWidth
@@ -233,16 +265,18 @@ const GoogleCallback = () => {
             margin="normal"
             label="인증 코드"
             value={authCode}
-            onChange={(e) => setAuthCode(e.target.value)}
+            onChange={(e) => handleInputChange(setAuthCode, e.target.value)}
             sx={{ mb: 2 }}
+            disabled={isSubmitting}
           />
           <FormControlLabel
             control={
               <Checkbox
                 checked={privacyAccepted}
-                onChange={(e) => setPrivacyAccepted(e.target.checked)}
+                onChange={handlePrivacyChange}
                 name="privacyAccepted"
                 color="primary"
+                disabled={isSubmitting}
               />
             }
             label={
@@ -264,6 +298,9 @@ const GoogleCallback = () => {
             variant="contained"
             color="primary"
             onClick={handleSubmit}
+            disabled={
+              isSubmitting || !name || !school || !authCode || !privacyAccepted
+            }
             sx={{
               mt: 2,
               py: 1.5,
@@ -274,26 +311,42 @@ const GoogleCallback = () => {
               },
               borderRadius: "8px",
             }}
+            startIcon={
+              isSubmitting ? (
+                <CircularProgress size={24} color="inherit" />
+              ) : null
+            }
           >
-            가입하기
+            {isSubmitting ? "가입 처리 중..." : "가입하기"}
           </Button>
-          {error && (
-            <Typography color="error" sx={{ mt: 2 }}>
-              {error}
-            </Typography>
-          )}
           <Snackbar
             open={success}
             autoHideDuration={3000}
             onClose={() => setSuccess(false)}
-            anchorOrigin={{ vertical: "top", horizontal: "center" }}
+            anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
           >
             <Alert
               onClose={() => setSuccess(false)}
               severity="success"
+              variant="filled"
               sx={{ width: "100%" }}
             >
-              환영합니다!
+              환영합니다! 로그인되었습니다.
+            </Alert>
+          </Snackbar>
+          <Snackbar
+            open={!!error}
+            autoHideDuration={6000}
+            onClose={() => setError("")}
+            anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+          >
+            <Alert
+              onClose={() => setError("")}
+              severity="error"
+              variant="filled"
+              sx={{ width: "100%" }}
+            >
+              {error}
             </Alert>
           </Snackbar>
         </Box>

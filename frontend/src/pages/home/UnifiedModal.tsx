@@ -94,6 +94,7 @@ const UnifiedModal: React.FC<UnifiedModalProps> = ({
   const [newStudentId, setNewStudentId] = useState<string>("");
   const [addStudentError, setAddStudentError] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false); // 로딩 상태 추가
+  const [isResetting, setIsResetting] = useState(false); // 비밀번호 재설정 로딩 상태 추가
 
   const schoolPrefix = school ? school.split("초등학교")[0] : "school";
 
@@ -315,9 +316,29 @@ const UnifiedModal: React.FC<UnifiedModalProps> = ({
     }
   };
 
-  const handleSubmitReset = () => {
-    onSubmitReset(studentId);
-    onClose();
+  const handleSubmitReset = async () => {
+    // async 추가
+    // 연속 클릭 방지 및 로딩 상태 처리
+    if (isResetting || !studentId.trim()) {
+      // 로딩 중이거나 studentId가 비었으면 실행 안함
+      return;
+    }
+    setIsResetting(true); // 로딩 시작
+    try {
+      // onSubmitReset 내부에서 API 호출이 발생한다고 가정하고 호출
+      await onSubmitReset(studentId); // Promise를 반환한다고 가정
+      // 성공 시 모달 닫기 또는 성공 메시지 표시 등은 부모 컴포넌트에서 처리될 수 있음
+      // 여기서는 일단 로딩 상태만 해제
+      // onClose(); // 필요하다면 여기서 닫기
+    } catch (error) {
+      // 에러 처리 로직 (필요시)
+      console.error("Error during password reset:", error);
+      // Snackbar 등을 이용해 사용자에게 에러 알림
+      setSnackbarMessage("비밀번호 재설정 요청 중 오류 발생");
+      setSnackbarOpen(true);
+    } finally {
+      setIsResetting(false); // 로딩 종료
+    }
   };
 
   const handleResetStudents = () => {
@@ -794,43 +815,36 @@ const UnifiedModal: React.FC<UnifiedModalProps> = ({
                 value={studentId}
                 onChange={(e) => setStudentId(e.target.value)}
                 sx={{ marginBottom: 2 }}
+                disabled={isResetting} // 로딩 중 비활성화
               />
               <Box display="flex" justifyContent="center">
                 <Button
                   onClick={handleSubmitReset}
                   variant="contained"
                   color="primary"
+                  disabled={isResetting || !studentId.trim()} // 로딩 중 또는 ID 미입력 시 비활성화
+                  startIcon={
+                    isResetting ? (
+                      <CircularProgress size={20} color="inherit" />
+                    ) : null
+                  } // 로딩 스피너
                 >
-                  재설정
+                  {isResetting ? "처리 중..." : "재설정"}
                 </Button>
               </Box>
             </Box>
           )}
 
-          {error && (
-            <Typography
-              color="error"
-              sx={{
-                mt: 2,
-                mb: 2,
-                padding: 2,
-                backgroundColor: "#ffebee",
-                borderRadius: 1,
-                textAlign: "center",
-              }}
-            >
-              {error}
-            </Typography>
-          )}
           <Snackbar
             open={snackbarOpen}
             autoHideDuration={6000}
             onClose={() => setSnackbarOpen(false)}
-            anchorOrigin={{ vertical: "top", horizontal: "center" }}
+            anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
           >
             <Alert
               onClose={() => setSnackbarOpen(false)}
               severity="error"
+              variant="filled"
               sx={{ width: "100%" }}
             >
               {snackbarMessage}

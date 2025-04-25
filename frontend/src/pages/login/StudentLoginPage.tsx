@@ -20,6 +20,9 @@ import {
   FormControl,
   InputAdornment,
   Link as MuiLink,
+  CircularProgress,
+  Snackbar,
+  Alert,
 } from "@mui/material";
 import { Link } from "react-router-dom";
 import Autocomplete from "@mui/material/Autocomplete";
@@ -44,6 +47,7 @@ const StudentLoginPage = () => {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isTokenFound, setTokenFound] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     if (educationOffice) {
@@ -76,26 +80,20 @@ const StudentLoginPage = () => {
   }, [educationOffice]);
 
   const handleLogin = async () => {
-    try {
-      // FCM 토큰 가져오기 (권한 요청 포함)
-      let fcmToken = await requestPermissionAndGetToken(setTokenFound);
+    if (isLoading || !loginId.trim() || !password.trim()) return;
 
-      if (!fcmToken) {
-        // setError('알림 권한이 필요합니다. 알림 권한을 허용해주세요.');
-        // return;
-        fcmToken = null;
-      }
+    setIsLoading(true);
+    setError("");
+
+    try {
+      let fcmToken = await requestPermissionAndGetToken(setTokenFound);
+      fcmToken = fcmToken || null;
 
       const res = await apiNoAuth.post("/auth/login", {
         role: "student",
-        // school,
-        // grade,
-        // class: classNumber,
-        // studentId,
-        // name,
         loginId,
         password,
-        fcmToken, // FCM 토큰 추가
+        fcmToken,
       });
       setToken(res.data.accessToken);
       setRefreshToken(res.data.refreshToken);
@@ -104,8 +102,16 @@ const StudentLoginPage = () => {
       setSchoolName(res.data.school);
       setGradeStatus(res.data.grade);
       window.location.href = `/${res.data.role}`;
-    } catch (error) {
-      setError("로그인 정보가 유효하지 않습니다");
+    } catch (error: any) {
+      const errorMessage =
+        error.response?.data?.error === "Invalid login credentials"
+          ? "아이디 또는 비밀번호가 올바르지 않습니다."
+          : error.response?.data?.error ||
+            "로그인에 실패했습니다. 다시 시도해주세요.";
+      setError(errorMessage);
+      console.error("Login failed:", error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -113,7 +119,6 @@ const StudentLoginPage = () => {
     <Container
       component="main"
       maxWidth="xs"
-      // sx={{ marginTop: { xs: 4, sm: 8 } }}
       sx={{ marginY: { xs: 4, sm: 15, xl: 15 } }}
     >
       <Paper
@@ -142,6 +147,7 @@ const StudentLoginPage = () => {
           value={loginId}
           onChange={(e) => setLoginId(e.target.value)}
           sx={{ mb: 2 }}
+          disabled={isLoading}
         />
         <TextField
           fullWidth
@@ -152,12 +158,14 @@ const StudentLoginPage = () => {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           sx={{ mb: 2 }}
+          disabled={isLoading}
         />
         <Button
           fullWidth
           variant="contained"
           color="primary"
           onClick={handleLogin}
+          disabled={isLoading || !loginId.trim() || !password.trim()}
           sx={{
             mt: 2,
             py: 1.5,
@@ -167,31 +175,27 @@ const StudentLoginPage = () => {
               backgroundColor: "#004d40",
             },
           }}
+          startIcon={
+            isLoading ? <CircularProgress size={24} color="inherit" /> : null
+          }
         >
-          로그인
+          {isLoading ? "로그인 중..." : "로그인"}
         </Button>
-        {/* <Button
-          fullWidth
-          variant="text"
-          color="secondary"
-          onClick={() => (window.location.href = "/student-register")}
-          sx={{
-            mt: 1,
-            py: 1.5,
-            fontSize: "0.9rem",
-            color: "#00796b",
-            "&:hover": {
-              color: "#004d40",
-            },
-          }}
+        <Snackbar
+          open={!!error}
+          autoHideDuration={6000}
+          onClose={() => setError("")}
+          anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
         >
-          회원가입
-        </Button> */}
-        {error && (
-          <Typography color="error" sx={{ mt: 2 }}>
+          <Alert
+            onClose={() => setError("")}
+            severity="error"
+            variant="filled"
+            sx={{ width: "100%" }}
+          >
             {error}
-          </Typography>
-        )}
+          </Alert>
+        </Snackbar>
 
         <Typography
           variant="body2"

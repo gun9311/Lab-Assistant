@@ -849,15 +849,13 @@ const Chatbot: React.FC<ChatbotProps> = ({
         open={!!limitExceededError}
         autoHideDuration={6000}
         onClose={() => setLimitExceededError(null)}
-        anchorOrigin={{ vertical: "top", horizontal: "center" }}
-        sx={{ mt: { xs: 8, sm: 9 } }}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
       >
         <Alert
           onClose={() => setLimitExceededError(null)}
           severity="error"
           sx={{ width: "100%" }}
           variant="filled"
-          elevation={6}
         >
           {limitExceededError}
         </Alert>

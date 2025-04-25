@@ -217,9 +217,11 @@ const TeacherHomePage: React.FC = () => {
     try {
       await api.post("/auth/forgot-student-password", { studentId });
       setSuccessReset(true);
+      setErrorReset("");
     } catch (error) {
       console.error("비밀번호 재설정 실패:", error);
       setErrorReset("비밀번호 재설정 요청에 실패했습니다.");
+      setSuccessReset(false);
     }
   };
 
@@ -486,7 +488,7 @@ const TeacherHomePage: React.FC = () => {
           open={successReset}
           autoHideDuration={5000}
           onClose={() => setSuccessReset(false)}
-          anchorOrigin={{ vertical: "top", horizontal: "center" }}
+          anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
         >
           <Alert
             onClose={() => setSuccessReset(false)}
@@ -497,23 +499,21 @@ const TeacherHomePage: React.FC = () => {
             비밀번호 재설정 링크가 이메일로 발송되었습니다.
           </Alert>
         </Snackbar>
-        {errorReset && (
-          <Snackbar
-            open={!!errorReset}
-            autoHideDuration={3000}
+        <Snackbar
+          open={!!errorReset}
+          autoHideDuration={3000}
+          onClose={() => setErrorReset("")}
+          anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+        >
+          <Alert
             onClose={() => setErrorReset("")}
-            anchorOrigin={{ vertical: "top", horizontal: "center" }}
+            severity="error"
+            variant="filled"
+            sx={{ width: "100%" }}
           >
-            <Alert
-              onClose={() => setErrorReset("")}
-              severity="error"
-              variant="filled"
-              sx={{ width: "100%" }}
-            >
-              {errorReset}
-            </Alert>
-          </Snackbar>
-        )}
+            {errorReset}
+          </Alert>
+        </Snackbar>
       </Paper>
     </Container>
   );
