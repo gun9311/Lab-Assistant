@@ -276,7 +276,7 @@ const TeacherHomePage: React.FC = () => {
           open={isModalOpen}
           onClose={handleCloseModal}
           onSubmitCreate={handleCreateStudent}
-          onSubmitReset={handleResetStudentPassword}
+          // onSubmitReset={handleResetStudentPassword}
           school={school}
         />
         <Grid

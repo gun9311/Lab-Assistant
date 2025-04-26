@@ -378,10 +378,274 @@ const getChatUsage = async (req, res) => {
   }
 };
 
+// --- 새로운 컨트롤러 함수들 추가 ---
+
+// 학생 ID로 학생 정보 조회 (교사용)
+const getStudentByLoginId = async (req, res) => {
+  const { loginId } = req.query;
+  const { _id: teacherId } = req.user; // 요청 교사 ID (로깅 및 권한 확인용)
+
+  try {
+    if (!loginId) {
+      return res.status(400).send({ error: "학생 아이디를 입력해주세요." });
+    }
+
+    const student = await Student.findOne({ loginId }).select(
+      "-password -tokens"
+    ); // 비밀번호, 토큰 제외
+
+    if (!student) {
+      logger.warn(
+        `Student not found by loginId ${loginId} (requested by teacher ${teacherId})`
+      );
+      return res
+        .status(404)
+        .send({ error: "해당 아이디의 학생을 찾을 수 없습니다." });
+    }
+
+    // 추가 권한 확인: 이 교사가 이 학생을 관리할 권한이 있는가?
+    // 예를 들어, 같은 학교 소속인지 확인 등 (현재는 교사 역할만 확인됨)
+    // const teacher = await Teacher.findById(teacherId);
+    // if (teacher && teacher.school !== student.school) {
+    //   logger.warn(`Teacher ${teacherId} attempted to access student ${loginId} from different school.`);
+    //   return res.status(403).send({ error: "접근 권한이 없습니다." });
+    // }
+
+    res.send(student);
+  } catch (error) {
+    logger.error(
+      `Error fetching student by loginId ${loginId} (requested by teacher ${teacherId}):`,
+      {
+        error: error.message,
+        stack: error.stack,
+      }
+    );
+    res.status(500).send({ error: "학생 정보 조회 중 오류가 발생했습니다." });
+  }
+};
+
+// 학생 정보 수정 (교사용)
+const updateStudentByTeacher = async (req, res) => {
+  const { studentId: targetStudentObjectId } = req.params; // URL 파라미터는 학생의 ObjectId (_id)
+  const updates = req.body; // 수정할 정보 { name: "...", studentId: "..." }
+  const { _id: teacherId } = req.user;
+
+  // 교사가 수정할 수 있는 필드 제한 (name, studentId)
+  const allowedUpdates = ["name", "studentId"];
+  const receivedUpdates = Object.keys(updates);
+  const isValidOperation =
+    receivedUpdates.every((key) => allowedUpdates.includes(key)) &&
+    receivedUpdates.length > 0;
+
+  if (!isValidOperation) {
+    logger.warn(
+      `Invalid or empty field update attempt by teacher ${teacherId} for student ObjectId ${targetStudentObjectId}: ${receivedUpdates.join(
+        ", "
+      )}`
+    );
+    return res
+      .status(400)
+      .send({ error: "이름 또는 학생 번호만 수정할 수 있습니다." });
+  }
+
+  try {
+    const student = await Student.findById(targetStudentObjectId);
+
+    if (!student) {
+      logger.warn(
+        `Student not found for update by teacher ${teacherId}: ObjectId ${targetStudentObjectId}`
+      );
+      return res.status(404).send({ error: "수정할 학생을 찾을 수 없습니다." });
+    }
+
+    // --- 권한 확인 로직 (예: 같은 학교 소속인지) 추가 가능 ---
+    // const teacher = await Teacher.findById(teacherId);
+    // if (teacher && teacher.school !== student.school) { ... }
+
+    let newLoginId = student.loginId; // 기본값은 기존 아이디
+    let loginIdChanged = false;
+
+    // 1. 이름 업데이트 처리 (수정 요청이 있을 경우)
+    if (updates.name !== undefined) {
+      const trimmedName = updates.name.trim();
+      if (!trimmedName) {
+        return res
+          .status(400)
+          .send({ error: "학생 이름은 비워둘 수 없습니다." });
+      }
+      if (student.name !== trimmedName) {
+        student.name = trimmedName;
+      }
+    }
+
+    // 2. 학생 번호(studentId) 업데이트 처리 (수정 요청이 있을 경우)
+    if (updates.studentId !== undefined) {
+      const newStudentIdStr = updates.studentId.trim();
+      // 숫자 형식 및 범위 검증 (1 이상)
+      if (!/^\d+$/.test(newStudentIdStr) || parseInt(newStudentIdStr, 10) < 1) {
+        return res
+          .status(400)
+          .send({ error: "학생 번호는 1 이상의 숫자여야 합니다." });
+      }
+      // 기존 번호와 다른 경우에만 업데이트 및 loginId 재생성/검증 수행
+      if (student.studentId !== newStudentIdStr) {
+        const newStudentIdNum = parseInt(newStudentIdStr, 10);
+
+        // loginId 재생성
+        const paddedNewStudentId = newStudentIdStr.padStart(2, "0"); // 0 채우기 적용!
+        // 기존 loginId에서 prefix 추출 (마지막 두자리 숫자 제외)
+        const currentLoginIdPrefix = student.loginId.slice(0, -2);
+
+        // --- loginId prefix 검증 (선택적이지만 권장) ---
+        // 예: prefix가 비어있거나 예상 형식과 다르면 에러 처리
+        if (!currentLoginIdPrefix) {
+          logger.error(
+            `Failed to extract loginId prefix for student ${student.loginId} (ObjectId: ${targetStudentObjectId})`
+          );
+          return res.status(500).send({ error: "로그인 ID 구성 중 오류 발생" });
+        }
+        // --- 검증 끝 ---
+
+        newLoginId = `${currentLoginIdPrefix}${paddedNewStudentId}`;
+        loginIdChanged = true;
+
+        // 3. 새로운 loginId 고유성 검증 (자기 자신 제외)
+        const existingStudentWithNewLoginId = await Student.findOne({
+          loginId: newLoginId,
+          _id: { $ne: targetStudentObjectId }, // 현재 수정 중인 학생 제외
+        });
+
+        if (existingStudentWithNewLoginId) {
+          logger.warn(
+            `LoginId conflict during update: new loginId ${newLoginId} already exists. Requested by teacher ${teacherId} for student ObjectId ${targetStudentObjectId}`
+          );
+          return res.status(400).send({
+            error:
+              "해당 정보로 조합된 아이디가 이미 존재합니다. (번호 등 확인 필요)",
+          });
+        }
+
+        // 고유성 검증 통과 시 student 모델 업데이트 준비
+        student.studentId = newStudentIdStr; // studentId 업데이트
+        student.loginId = newLoginId; // loginId 업데이트
+      }
+    }
+
+    // 4. 변경사항 저장 (변경된 경우에만)
+    // isModified()를 사용하거나, 업데이트 플래그를 만들어 처리 가능
+    if (student.isModified("name") || loginIdChanged) {
+      await student.save();
+      logger.info(
+        `Student ${targetStudentObjectId} profile updated by teacher ${teacherId}. LoginId changed: ${loginIdChanged}`
+      );
+    } else {
+      logger.info(
+        `No actual changes detected for student ${targetStudentObjectId} update requested by teacher ${teacherId}.`
+      );
+      // 변경사항이 없다는 메시지를 보내거나, 그냥 성공 처리할 수 있음
+      // return res.status(200).send({ message: "변경사항이 없어 업데이트하지 않았습니다." });
+    }
+
+    const updatedStudentObject = student.toObject();
+    delete updatedStudentObject.password;
+    delete updatedStudentObject.tokens;
+    res.send(updatedStudentObject); // 업데이트된 (또는 변경 없는) 학생 정보 반환
+  } catch (error) {
+    logger.error(
+      `Error updating student ${targetStudentObjectId} by teacher ${teacherId}:`,
+      {
+        error: error.message,
+        stack: error.stack,
+        updates: receivedUpdates,
+      }
+    );
+    res.status(500).send({ error: "학생 정보 수정 중 오류가 발생했습니다." });
+  }
+};
+
+// 학생 비밀번호 초기화 (교사용)
+const resetStudentPasswordByTeacher = async (req, res) => {
+  const { studentId } = req.params; // 학생의 ObjectId (_id)
+  const { _id: teacherId } = req.user;
+  const defaultPassword = "123"; // 초기 비밀번호
+
+  try {
+    const student = await Student.findById(studentId);
+
+    if (!student) {
+      logger.warn(
+        `Student not found for password reset by teacher ${teacherId}: ${studentId}`
+      );
+      return res
+        .status(404)
+        .send({ error: "비밀번호를 초기화할 학생을 찾을 수 없습니다." });
+    }
+
+    // 추가 권한 확인 (필요 시)
+
+    student.password = defaultPassword; // pre-save 훅에서 해싱됨
+    await student.save();
+    logger.info(
+      `Student ${studentId} password reset to default by teacher ${teacherId}`
+    );
+
+    res.send({ message: '학생 비밀번호가 "123"으로 초기화되었습니다.' });
+  } catch (error) {
+    logger.error(
+      `Error resetting student ${studentId} password by teacher ${teacherId}:`,
+      {
+        error: error.message,
+        stack: error.stack,
+      }
+    );
+    res.status(500).send({ error: "비밀번호 초기화 중 오류가 발생했습니다." });
+  }
+};
+
+// 학생 계정 삭제 (교사용)
+const deleteStudentByTeacher = async (req, res) => {
+  const { studentId } = req.params; // 학생의 ObjectId (_id)
+  const { _id: teacherId } = req.user;
+
+  try {
+    const student = await Student.findByIdAndDelete(studentId);
+
+    if (!student) {
+      logger.warn(
+        `Student not found for deletion by teacher ${teacherId}: ${studentId}`
+      );
+      return res
+        .status(404)
+        .send({ error: "삭제할 학생 계정을 찾을 수 없습니다." });
+    }
+
+    // 추가 권한 확인 (필요 시)
+
+    logger.info(`Student account ${studentId} deleted by teacher ${teacherId}`);
+    res.send({ message: "학생 계정이 성공적으로 삭제되었습니다." });
+  } catch (error) {
+    logger.error(
+      `Error deleting student ${studentId} by teacher ${teacherId}:`,
+      {
+        error: error.message,
+        stack: error.stack,
+      }
+    );
+    res.status(500).send({ error: "학생 계정 삭제 중 오류가 발생했습니다." });
+  }
+};
+
+// --- 추가 끝 ---
+
 module.exports = {
   getStudents,
   getProfile,
   updateProfile,
   deleteProfile,
   getChatUsage,
+  // --- 새 컨트롤러 함수 export ---
+  getStudentByLoginId,
+  updateStudentByTeacher,
+  resetStudentPasswordByTeacher,
+  deleteStudentByTeacher,
 };

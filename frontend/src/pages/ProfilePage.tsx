@@ -494,11 +494,12 @@ const ProfilePage = () => {
                 )}
                 <TextField
                   fullWidth
-                  label="👤 이름"
+                  label="닉네임"
                   name="name"
                   value={formData.name || ""}
-                  disabled
-                  InputProps={{ readOnly: true }}
+                  onChange={handleChange}
+                  disabled={isLoading || !editMode}
+                  InputProps={{ readOnly: !editMode }}
                   variant="filled"
                   sx={{ mb: 1 }}
                 />
@@ -603,21 +604,23 @@ const ProfilePage = () => {
                 </>
               ) : (
                 <>
-                  <Button
-                    variant="outlined"
-                    color="error"
-                    startIcon={<Delete />}
-                    onClick={() =>
-                      openDialog(
-                        handleDelete,
-                        "정말로 계정을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다."
-                      )
-                    }
-                    disabled={isLoading}
-                    sx={{ borderRadius: "8px", mr: "auto" }}
-                  >
-                    계정 삭제
-                  </Button>
+                  {profile.role === "teacher" && (
+                    <Button
+                      variant="outlined"
+                      color="error"
+                      startIcon={<Delete />}
+                      onClick={() =>
+                        openDialog(
+                          handleDelete,
+                          "정말로 계정을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다."
+                        )
+                      }
+                      disabled={isLoading}
+                      sx={{ borderRadius: "8px", mr: "auto" }}
+                    >
+                      계정 삭제
+                    </Button>
+                  )}
                   {profile.role === "teacher" && (
                     <>
                       <Button

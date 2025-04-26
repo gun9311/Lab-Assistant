@@ -109,6 +109,18 @@ const ResetStudentPasswordPage = () => {
           disabled={isLoading}
           error={passwordMatchError}
           helperText={passwordMatchError ? "비밀번호가 일치하지 않습니다." : ""}
+          onKeyDown={(e) => {
+            if (
+              e.key === "Enter" &&
+              !isLoading &&
+              password &&
+              confirmPassword &&
+              !passwordMatchError
+            ) {
+              e.preventDefault();
+              handlePasswordReset();
+            }
+          }}
         />
         <Button
           fullWidth

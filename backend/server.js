@@ -42,7 +42,7 @@ mongoose
 // Express 앱 설정
 const app = express();
 
-const allowedOrigins = ["http://localhost:3000", "https://t-bot.site"];
+const allowedOrigins = ["http://localhost:3000", "https://nudgeflow.co.kr"];
 
 app.use(
   cors({
