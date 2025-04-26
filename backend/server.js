@@ -94,7 +94,6 @@ app.get("/health", async (req, res) => {
 });
 
 app.use("/api/auth", authRoutes);
-// app.use('/api/quiz', quizRoutes);
 app.use("/api/chat", chatRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/admin", adminRoutes);
