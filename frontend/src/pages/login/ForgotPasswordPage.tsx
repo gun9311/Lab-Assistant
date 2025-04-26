@@ -63,6 +63,12 @@ const ForgotPasswordPage = () => {
         disabled={isLoading}
         error={!!error}
         helperText={error}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && !isLoading && email.trim()) {
+            e.preventDefault();
+            handlePasswordReset();
+          }
+        }}
       />
       <Button
         fullWidth

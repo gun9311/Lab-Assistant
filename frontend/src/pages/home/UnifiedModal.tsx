@@ -37,6 +37,7 @@ import SchoolIcon from "@mui/icons-material/School";
 import ClassIcon from "@mui/icons-material/Class";
 import GroupIcon from "@mui/icons-material/Group";
 import { UnifiedModalSubmitData, StudentInput } from "./TeacherHomePage";
+import api from "../../utils/api";
 
 // 타입 정의
 type CreateResult = {
@@ -49,7 +50,6 @@ type UnifiedModalProps = {
   open: boolean;
   onClose: () => void;
   onSubmitCreate: (submitData: UnifiedModalSubmitData) => Promise<CreateResult>;
-  onSubmitReset: (studentId: string) => void;
   school: string | null;
 };
 
@@ -64,28 +64,27 @@ const UnifiedModal: React.FC<UnifiedModalProps> = ({
   open,
   onClose,
   onSubmitCreate,
-  onSubmitReset,
   school,
 }) => {
   const [activeTab, setActiveTab] = useState(0); // 0: 계정 생성, 1: 비밀번호 재설정
   const [commonGrade, setCommonGrade] = useState("");
   const [commonClass, setCommonClass] = useState("");
   const [studentId, setStudentId] = useState("");
-  const [uniqueIdentifier, setUniqueIdentifier] = useState(""); // 고유 식별자 상태 추가
-  const initialStudents: StudentInput[] = Array(10)
-    .fill({}) // 빈 객체로 시작
+  const [uniqueIdentifier, setUniqueIdentifier] = useState("");
+  const initialStudents: StudentInput[] = Array(15)
+    .fill({})
     .map((_, index) => ({
       name: "",
       studentId: (index + 1).toString(),
-      loginId: "", // useEffect에서 설정됨
-      password: "123", // 기본 비밀번호
+      loginId: "",
+      password: "123",
     }));
   const [students, setStudents] = useState<StudentInput[]>(initialStudents);
   const [error, setError] = useState<string>("");
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({
     grade: false,
     class: false,
-    names: Array(10).fill(false),
+    names: Array(15).fill(false),
     uniqueIdentifier: false,
   });
   const [snackbarMessage, setSnackbarMessage] = useState("");
@@ -93,8 +92,35 @@ const UnifiedModal: React.FC<UnifiedModalProps> = ({
   const [confirmModalOpen, setConfirmModalOpen] = useState(false);
   const [newStudentId, setNewStudentId] = useState<string>("");
   const [addStudentError, setAddStudentError] = useState<string>("");
-  const [isSubmitting, setIsSubmitting] = useState(false); // 로딩 상태 추가
-  const [isResetting, setIsResetting] = useState(false); // 비밀번호 재설정 로딩 상태 추가
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
+
+  // --- 학생 계정 수정 탭 관련 상태 추가 ---
+  const [searchLoginId, setSearchLoginId] = useState("");
+  const [foundStudent, setFoundStudent] = useState<any>(null);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState("");
+
+  const [isEditingStudent, setIsEditingStudent] = useState(false);
+  const [editingStudentData, setEditingStudentData] = useState<any>(null);
+  const [isUpdatingStudent, setIsUpdatingStudent] = useState(false);
+  const [updateError, setUpdateError] = useState("");
+
+  const [isResettingPassword, setIsResettingPassword] = useState(false);
+  const [resetPasswordSuccess, setResetPasswordSuccess] = useState(false);
+  const [resetPasswordError, setResetPasswordError] = useState("");
+
+  const [isDeletingStudent, setIsDeletingStudent] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+
+  const [confirmActionType, setConfirmActionType] = useState<
+    "resetPassword" | "deleteStudent" | null
+  >(null);
+  const [confirmActionTargetId, setConfirmActionTargetId] = useState<
+    string | null
+  >(null);
+  const [confirmActionModalOpen, setConfirmActionModalOpen] = useState(false);
+  // --- 추가 끝 ---
 
   const schoolPrefix = school ? school.split("초등학교")[0] : "school";
 
@@ -105,12 +131,12 @@ const UnifiedModal: React.FC<UnifiedModalProps> = ({
         return {
           ...student,
           studentId: (index + 1).toString(),
-          loginId: `${uniqueIdentifier}${schoolPrefix}${commonGrade}${commonClass}${paddedStudentId}`, // 고유 식별자 추가
+          loginId: `${uniqueIdentifier}${schoolPrefix}${commonGrade}${commonClass}${paddedStudentId}`,
           password: "123",
         };
       })
     );
-  }, [commonGrade, commonClass, schoolPrefix, uniqueIdentifier]); // uniqueIdentifier 추가
+  }, [commonGrade, commonClass, schoolPrefix, uniqueIdentifier]);
 
   const handleStudentChange = (
     index: number,
@@ -123,34 +149,28 @@ const UnifiedModal: React.FC<UnifiedModalProps> = ({
   };
 
   const handleAddStudent = () => {
-    // 입력된 번호가 있는 경우의 유효성 검사
     if (newStudentId) {
-      // 숫자만 허용하는 정규식 검사
       if (!/^\d+$/.test(newStudentId)) {
         setAddStudentError("숫자만 입력 가능합니다.");
         return;
       }
 
-      // 0으로 시작하는지 검사
       if (newStudentId.startsWith("0")) {
         setAddStudentError("0으로 시작할 수 없습니다.");
         return;
       }
 
-      // 1 이상의 숫자인지 검사
       const numId = parseInt(newStudentId, 10);
       if (numId < 1) {
         setAddStudentError("1 이상의 숫자를 입력해주세요.");
         return;
       }
 
-      // 중복 번호 검사
       if (students.some((student) => parseInt(student.studentId) === numId)) {
         setAddStudentError("이미 존재하는 번호입니다.");
         return;
       }
 
-      // 새 학생 추가
       const paddedStudentId = numId.toString().padStart(2, "0");
       const newStudent: StudentInput = {
         name: "",
@@ -158,7 +178,6 @@ const UnifiedModal: React.FC<UnifiedModalProps> = ({
         loginId: `${uniqueIdentifier}${schoolPrefix}${commonGrade}${commonClass}${paddedStudentId}`,
         password: "123",
       };
-      // 번호 순서대로 정렬되도록 수정
       const updatedStudents = [...students, newStudent].sort(
         (a, b) => parseInt(a.studentId) - parseInt(b.studentId)
       );
@@ -168,7 +187,6 @@ const UnifiedModal: React.FC<UnifiedModalProps> = ({
       return;
     }
 
-    // 번호 미입력 시 자동 번호 부여
     const maxId = Math.max(
       ...students.map((student) => parseInt(student.studentId || "0", 10))
     );
@@ -180,7 +198,6 @@ const UnifiedModal: React.FC<UnifiedModalProps> = ({
       loginId: `${uniqueIdentifier}${schoolPrefix}${commonGrade}${commonClass}${paddedStudentId}`,
       password: "123",
     };
-    // 번호 순서대로 정렬
     const updatedStudents = [...students, newStudent].sort(
       (a, b) => parseInt(a.studentId) - parseInt(b.studentId)
     );
@@ -193,14 +210,13 @@ const UnifiedModal: React.FC<UnifiedModalProps> = ({
   };
 
   const handleSubmitCreateClick = () => {
-    console.log("handleSubmitCreateClick triggered"); // 로그 추가 1 (필요하면 유지)
+    console.log("handleSubmitCreateClick triggered");
     console.log("Current values:", {
       commonGrade,
       commonClass,
       uniqueIdentifier,
-    }); // 로그 추가 2 (필요하면 유지)
+    });
 
-    // 1. 식별코드, 학년, 반 유효성 검사
     const commonFieldErrors = {
       grade: !commonGrade,
       class: !commonClass,
@@ -211,25 +227,21 @@ const UnifiedModal: React.FC<UnifiedModalProps> = ({
       !commonFieldErrors.class &&
       !commonFieldErrors.uniqueIdentifier;
 
-    // 2. 학생 이름 유효성 검사 (추가)
     const currentNameErrors = Array(students.length).fill(false);
     let namesValid = true;
     students.forEach((student, index) => {
-      // 이름이 비어있는 학생만 검사 (삭제된 행은 무시)
       if (!student.name.trim()) {
-        // trim() 추가하여 공백만 있는 경우도 잡기
         currentNameErrors[index] = true;
         namesValid = false;
       }
     });
 
-    // 3. 최종 유효성 검사 및 처리
     if (!commonFieldsValid || !namesValid) {
-      console.log("Validation failed:", { commonFieldsValid, namesValid }); // 로그 추가
+      console.log("Validation failed:", { commonFieldsValid, namesValid });
       setFieldErrors((prev) => ({
         ...prev,
-        ...commonFieldErrors, // 학년, 반, 식별코드 오류 업데이트
-        names: currentNameErrors, // 이름 오류 업데이트
+        ...commonFieldErrors,
+        names: currentNameErrors,
       }));
 
       let errorMessage = "";
@@ -238,16 +250,15 @@ const UnifiedModal: React.FC<UnifiedModalProps> = ({
       } else if (!namesValid) {
         errorMessage = "입력되지 않은 학생 이름이 있습니다.";
       } else {
-        errorMessage = "필수 정보를 모두 입력해주세요."; // 혹시 모를 경우
+        errorMessage = "필수 정보를 모두 입력해주세요.";
       }
 
       setSnackbarMessage(errorMessage);
       setSnackbarOpen(true);
-      return; // 확인 모달 열지 않고 함수 종료
+      return;
     }
 
-    // 모든 유효성 검사 통과 시 확인 모달 열기
-    console.log("Validation passed: Opening confirmation modal."); // 로그 추가 (필요하면 유지)
+    console.log("Validation passed: Opening confirmation modal.");
     setConfirmModalOpen(true);
   };
 
@@ -255,22 +266,18 @@ const UnifiedModal: React.FC<UnifiedModalProps> = ({
     setIsSubmitting(true);
     setError("");
 
-    // API로 보낼 학생 데이터 가공
     const studentSubmitData: StudentInput[] = students.map((student) => ({
-      ...student, // 기존 student 객체 복사 (name, studentId, loginId, password 등 포함)
-      // school prop이 null이면 undefined를 할당, 아니면 school 값 할당
+      ...student,
       school: school ?? undefined,
-      // commonGrade/commonClass가 빈 문자열이면 undefined 할당 (옵셔널 처리)
       grade: commonGrade || undefined,
       studentClass: commonClass || undefined,
     }));
 
-    // TeacherHomePage로 전달할 객체 생성
     const submitData: UnifiedModalSubmitData = {
       students: studentSubmitData,
       identifier: uniqueIdentifier,
-      grade: commonGrade, // TeacherHomePage prop 타입에 맞게 string 전달
-      classNum: commonClass, // TeacherHomePage prop 타입에 맞게 string 전달
+      grade: commonGrade,
+      classNum: commonClass,
     };
 
     try {
@@ -280,10 +287,6 @@ const UnifiedModal: React.FC<UnifiedModalProps> = ({
         if (result.missingNameIndexes) {
           const newNameErrors = Array(students.length).fill(false);
           result.missingNameIndexes.forEach((index) => {
-            // 주의: result.missingNameIndexes는 1부터 시작하는 번호일 수 있음
-            // students 배열 인덱스(0부터 시작)와 맞추거나,
-            // studentId 기준으로 오류 필드를 찾아야 할 수 있음.
-            // 일단 index-1로 가정.
             if (index > 0 && index <= newNameErrors.length) {
               newNameErrors[index - 1] = true;
             }
@@ -293,90 +296,272 @@ const UnifiedModal: React.FC<UnifiedModalProps> = ({
             names: newNameErrors,
           }));
         }
-        // 결과 모달 대신 UnifiedModal 내에서 Snackbar 표시
         setSnackbarMessage(result.message);
         setSnackbarOpen(true);
-        // 실패 시 확인 모달을 다시 열지 않음 (이미 닫혔거나 아래에서 닫힐 예정)
-        // 또는 실패 시 확인 모달을 닫지 않고 에러를 보여줄 수도 있음
       } else {
-        // 성공 시 UnifiedModal과 확인 모달 모두 닫기
-        handleResetStudents(); // 입력 폼 초기화
-        onClose(); // 메인 모달 닫기 (결과 모달은 TeacherHomePage에서 열림)
-        setConfirmModalOpen(false); // 확인 모달 닫기
+        handleResetStudents();
+        onClose();
+        setConfirmModalOpen(false);
       }
     } catch (e) {
-      // onSubmitCreate 내부에서 예상치 못한 에러 발생 시
       console.error("Submission failed unexpectedly:", e);
       setSnackbarMessage("계정 생성 중 예기치 못한 오류 발생");
       setSnackbarOpen(true);
     } finally {
-      setIsSubmitting(false); // <<< 로딩 상태 종료 (성공/실패 무관)
-      // 실패 시 사용자가 재시도할 수 있도록 확인 모달은 열어둘 수 있음
-      // setConfirmModalOpen(false); // 실패해도 닫으려면 여기서 닫기
-    }
-  };
-
-  const handleSubmitReset = async () => {
-    // async 추가
-    // 연속 클릭 방지 및 로딩 상태 처리
-    if (isResetting || !studentId.trim()) {
-      // 로딩 중이거나 studentId가 비었으면 실행 안함
-      return;
-    }
-    setIsResetting(true); // 로딩 시작
-    try {
-      // onSubmitReset 내부에서 API 호출이 발생한다고 가정하고 호출
-      await onSubmitReset(studentId); // Promise를 반환한다고 가정
-      // 성공 시 모달 닫기 또는 성공 메시지 표시 등은 부모 컴포넌트에서 처리될 수 있음
-      // 여기서는 일단 로딩 상태만 해제
-      // onClose(); // 필요하다면 여기서 닫기
-    } catch (error) {
-      // 에러 처리 로직 (필요시)
-      console.error("Error during password reset:", error);
-      // Snackbar 등을 이용해 사용자에게 에러 알림
-      setSnackbarMessage("비밀번호 재설정 요청 중 오류 발생");
-      setSnackbarOpen(true);
-    } finally {
-      setIsResetting(false); // 로딩 종료
+      setIsSubmitting(false);
     }
   };
 
   const handleResetStudents = () => {
-    setStudents(initialStudents);
+    setStudents(
+      Array(15)
+        .fill({})
+        .map((_, index) => ({
+          name: "",
+          studentId: (index + 1).toString(),
+          loginId: "",
+          password: "123",
+        }))
+    );
     setCommonGrade("");
     setCommonClass("");
     setUniqueIdentifier("");
     setFieldErrors({
       grade: false,
       class: false,
-      names: Array(10).fill(false),
+      names: Array(15).fill(false),
       uniqueIdentifier: false,
     });
   };
 
-  // 학년 변경 시 오류 상태 초기화
   const handleGradeChange = (value: string) => {
     setCommonGrade(value);
     setFieldErrors({
       grade: false,
       class: false,
-      names: Array(10).fill(false),
+      names: Array(15).fill(false),
       uniqueIdentifier: false,
     });
   };
 
-  // 반 변경 시 오류 상태 초기화
   const handleClassChange = (value: string) => {
     setCommonClass(value);
     setFieldErrors({
       grade: false,
       class: false,
-      names: Array(10).fill(false),
+      names: Array(15).fill(false),
       uniqueIdentifier: false,
     });
   };
 
   const isRequiredFieldsFilled = uniqueIdentifier && commonGrade && commonClass;
+
+  useEffect(() => {
+    if (!open) {
+      setActiveTab(0);
+      setSearchLoginId("");
+      setFoundStudent(null);
+      setIsSearching(false);
+      setSearchError("");
+      setIsEditingStudent(false);
+      setEditingStudentData(null);
+      setIsUpdatingStudent(false);
+      setUpdateError("");
+      setIsResettingPassword(false);
+      setResetPasswordSuccess(false);
+      setResetPasswordError("");
+      setIsDeletingStudent(false);
+      setDeleteError("");
+      setConfirmActionModalOpen(false);
+      setConfirmActionType(null);
+      setConfirmActionTargetId(null);
+      handleResetStudents();
+      setStudentId("");
+    }
+  }, [open]);
+
+  const handleSearchStudent = async () => {
+    if (!searchLoginId.trim() || isSearching) return;
+    setIsSearching(true);
+    setSearchError("");
+    setFoundStudent(null);
+    setEditingStudentData(null);
+    setIsEditingStudent(false);
+
+    try {
+      const response = await api.get(
+        `/users/teacher/student?loginId=${searchLoginId.trim()}`
+      );
+      setFoundStudent(response.data);
+      setEditingStudentData(response.data);
+      setSearchLoginId("");
+    } catch (error: any) {
+      const message =
+        error.response?.data?.error || "학생 검색 중 오류가 발생했습니다.";
+      setSearchError(message);
+      setFoundStudent(null);
+      setEditingStudentData(null);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handleEditToggle = () => {
+    if (isEditingStudent) {
+      setEditingStudentData(foundStudent);
+      setUpdateError("");
+    } else {
+    }
+    setIsEditingStudent(!isEditingStudent);
+  };
+
+  const handleEditingStudentChange = (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const { name, value } = e.target;
+    setEditingStudentData((prev: any) => ({
+      ...prev,
+      [name]: value,
+    }));
+    if (updateError) setUpdateError("");
+  };
+
+  const handleUpdateStudent = async () => {
+    if (!editingStudentData || isUpdatingStudent) return;
+
+    if (
+      !editingStudentData.name?.trim() ||
+      !editingStudentData.studentId?.trim()
+    ) {
+      setUpdateError("학생 이름과 번호는 필수 항목입니다.");
+      return;
+    }
+    if (
+      !/^\d+$/.test(editingStudentData.studentId.trim()) ||
+      parseInt(editingStudentData.studentId.trim(), 10) < 1
+    ) {
+      setUpdateError("학생 번호는 1 이상의 숫자여야 합니다.");
+      return;
+    }
+
+    setIsUpdatingStudent(true);
+    setUpdateError("");
+
+    const payload: { name?: string; studentId?: string } = {};
+    if (editingStudentData.name !== foundStudent.name) {
+      payload.name = editingStudentData.name.trim();
+    }
+    if (editingStudentData.studentId !== foundStudent.studentId) {
+      payload.studentId = editingStudentData.studentId.trim();
+    }
+
+    if (Object.keys(payload).length === 0) {
+      setIsEditingStudent(false);
+      setIsUpdatingStudent(false);
+      setSnackbarMessage("변경된 내용이 없습니다.");
+      setSnackbarOpen(true);
+      return;
+    }
+
+    try {
+      const response = await api.put(
+        `/users/teacher/student/${foundStudent._id}`,
+        payload
+      );
+      const loginIdWasUpdated = payload.studentId !== undefined;
+      setFoundStudent(response.data);
+      setEditingStudentData(response.data);
+      setIsEditingStudent(false);
+      const successMsg = loginIdWasUpdated
+        ? "학생 정보 및 로그인 아이디가 성공적으로 수정되었습니다."
+        : "학생 정보가 성공적으로 수정되었습니다.";
+      setSnackbarMessage(successMsg);
+      setSnackbarOpen(true);
+    } catch (error: any) {
+      const message =
+        error.response?.data?.error || "학생 정보 수정 중 오류가 발생했습니다.";
+      setUpdateError(message);
+      setSnackbarMessage(message);
+      setSnackbarOpen(true);
+    } finally {
+      setIsUpdatingStudent(false);
+    }
+  };
+
+  const openConfirmModal = (
+    type: "resetPassword" | "deleteStudent",
+    studentObjectId: string
+  ) => {
+    setConfirmActionType(type);
+    setConfirmActionTargetId(studentObjectId);
+    setConfirmActionModalOpen(true);
+  };
+
+  const closeConfirmModal = () => {
+    if (isResettingPassword || isDeletingStudent) return;
+    setConfirmActionModalOpen(false);
+    setConfirmActionType(null);
+    setConfirmActionTargetId(null);
+  };
+
+  const handleConfirmAction = async () => {
+    if (!confirmActionType || !confirmActionTargetId) return;
+
+    if (confirmActionType === "resetPassword") {
+      await handleResetPasswordConfirm(confirmActionTargetId);
+    } else if (confirmActionType === "deleteStudent") {
+      await handleDeleteStudentConfirm(confirmActionTargetId);
+    }
+    closeConfirmModal();
+  };
+
+  const handleResetPasswordConfirm = async (studentObjectId: string) => {
+    if (isResettingPassword) return;
+    setIsResettingPassword(true);
+    setResetPasswordError("");
+    setResetPasswordSuccess(false);
+
+    try {
+      await api.post(
+        `/users/teacher/student/${studentObjectId}/reset-password`
+      );
+      setResetPasswordSuccess(true);
+      setSnackbarMessage('학생 비밀번호가 "123"으로 초기화되었습니다.');
+      setSnackbarOpen(true);
+    } catch (error: any) {
+      const message =
+        error.response?.data?.error ||
+        "비밀번호 초기화 중 오류가 발생했습니다.";
+      setResetPasswordError(message);
+      setSnackbarMessage(message);
+      setSnackbarOpen(true);
+    } finally {
+      setIsResettingPassword(false);
+    }
+  };
+
+  const handleDeleteStudentConfirm = async (studentObjectId: string) => {
+    if (isDeletingStudent) return;
+    setIsDeletingStudent(true);
+    setDeleteError("");
+
+    try {
+      await api.delete(`/users/teacher/student/${studentObjectId}`);
+      setFoundStudent(null);
+      setEditingStudentData(null);
+      setIsEditingStudent(false);
+      setSnackbarMessage("학생 계정이 성공적으로 삭제되었습니다.");
+      setSnackbarOpen(true);
+    } catch (error: any) {
+      const message =
+        error.response?.data?.error || "학생 계정 삭제 중 오류가 발생했습니다.";
+      setDeleteError(message);
+      setSnackbarMessage(message);
+      setSnackbarOpen(true);
+    } finally {
+      setIsDeletingStudent(false);
+    }
+  };
 
   return (
     <>
@@ -389,9 +574,9 @@ const UnifiedModal: React.FC<UnifiedModalProps> = ({
             transform: "translate(-50%, -50%)",
             padding: 4,
             backgroundColor: "white",
-            width: "60%",
-            maxWidth: 1200,
-            maxHeight: "80vh",
+            width: { xs: "90%", sm: "70%", md: "60%" },
+            maxWidth: 900,
+            maxHeight: "85vh",
             overflowY: "auto",
             borderRadius: 2,
             boxShadow: 3,
@@ -399,14 +584,26 @@ const UnifiedModal: React.FC<UnifiedModalProps> = ({
         >
           <Tabs
             value={activeTab}
-            onChange={(e, newValue) => setActiveTab(newValue)}
+            onChange={(e, newValue) => {
+              setActiveTab(newValue);
+              setSearchLoginId("");
+              setFoundStudent(null);
+              setIsSearching(false);
+              setSearchError("");
+              setIsEditingStudent(false);
+              setEditingStudentData(null);
+              setUpdateError("");
+              setResetPasswordError("");
+              setDeleteError("");
+              setResetPasswordSuccess(false);
+            }}
             centered
             textColor="primary"
             indicatorColor="primary"
             sx={{ marginBottom: 3 }}
           >
             <Tab label="학생 계정 생성" />
-            <Tab label="비밀번호 찾기" />
+            <Tab label="학생 계정 수정" />
           </Tabs>
 
           {activeTab === 0 && (
@@ -496,7 +693,7 @@ const UnifiedModal: React.FC<UnifiedModalProps> = ({
                     color="success"
                     sx={{ marginLeft: 2 }}
                   >
-                    저장
+                    생성
                   </Button>
                   <Button
                     onClick={handleResetStudents}
@@ -510,7 +707,6 @@ const UnifiedModal: React.FC<UnifiedModalProps> = ({
               </Box>
 
               <Box sx={{ position: "relative" }}>
-                {/* 테이블 컨테이너 */}
                 <TableContainer
                   component={Paper}
                   sx={{
@@ -543,9 +739,8 @@ const UnifiedModal: React.FC<UnifiedModalProps> = ({
                                   가명 또는 닉네임을 사용해도 좋습니다.
                                 </Typography>
                               }
-                              arrow // 툴크 화살표 추가
+                              arrow
                             >
-                              {/* 정보 아이콘 추가 */}
                               <InfoOutlinedIcon
                                 sx={{
                                   fontSize: "1.1rem",
@@ -576,7 +771,6 @@ const UnifiedModal: React.FC<UnifiedModalProps> = ({
                                   "name",
                                   e.target.value
                                 );
-                                // 입력 시 해당 필드의 오류 상태 제거
                                 if (fieldErrors.names[index]) {
                                   const newNameErrors = [...fieldErrors.names];
                                   newNameErrors[index] = false;
@@ -684,7 +878,6 @@ const UnifiedModal: React.FC<UnifiedModalProps> = ({
                   </Table>
                 </TableContainer>
 
-                {/* 오버레이 레이어 */}
                 {!isRequiredFieldsFilled && (
                   <Box
                     sx={{
@@ -696,7 +889,7 @@ const UnifiedModal: React.FC<UnifiedModalProps> = ({
                       display: "flex",
                       flexDirection: "column",
                       alignItems: "center",
-                      justifyContent: "flex-start", // center에서 flex-start로 변경
+                      justifyContent: "flex-start",
                       paddingTop: "10vh",
                       background: "rgba(255, 255, 255, 0.3)",
                       backdropFilter: "blur(8px)",
@@ -804,34 +997,272 @@ const UnifiedModal: React.FC<UnifiedModalProps> = ({
           )}
 
           {activeTab === 1 && (
-            <Box>
-              <Typography variant="body1" gutterBottom>
-                학생 계정의 아이디를 입력하세요. 교사의 이메일로 재설정 링크가
-                전송됩니다.
-              </Typography>
-              <TextField
-                fullWidth
-                label="학생 아이디"
-                value={studentId}
-                onChange={(e) => setStudentId(e.target.value)}
-                sx={{ marginBottom: 2 }}
-                disabled={isResetting} // 로딩 중 비활성화
-              />
-              <Box display="flex" justifyContent="center">
+            <Box sx={{ mt: 2 }}>
+              <Box
+                sx={{ display: "flex", gap: 1, mb: 3, alignItems: "center" }}
+              >
+                <TextField
+                  fullWidth
+                  label="수정할 학생 아이디 검색"
+                  variant="outlined"
+                  size="small"
+                  value={searchLoginId}
+                  onChange={(e) => setSearchLoginId(e.target.value)}
+                  disabled={isSearching}
+                  error={!!searchError}
+                  helperText={searchError}
+                  onKeyDown={(e) => {
+                    if (
+                      e.key === "Enter" &&
+                      !isSearching &&
+                      searchLoginId.trim()
+                    ) {
+                      e.preventDefault();
+                      handleSearchStudent();
+                    }
+                  }}
+                />
                 <Button
-                  onClick={handleSubmitReset}
                   variant="contained"
-                  color="primary"
-                  disabled={isResetting || !studentId.trim()} // 로딩 중 또는 ID 미입력 시 비활성화
+                  onClick={handleSearchStudent}
+                  disabled={isSearching || !searchLoginId.trim()}
                   startIcon={
-                    isResetting ? (
+                    isSearching ? (
                       <CircularProgress size={20} color="inherit" />
                     ) : null
-                  } // 로딩 스피너
+                  }
                 >
-                  {isResetting ? "처리 중..." : "재설정"}
+                  검색
                 </Button>
               </Box>
+
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  mb: 3,
+                  color: "text.secondary",
+                  bgcolor: "grey.100",
+                  p: 1.5,
+                  borderRadius: 1,
+                }}
+              >
+                <InfoOutlinedIcon fontSize="small" sx={{ mr: 1 }} />
+                <Typography variant="body2">
+                  학생이 비밀번호를 잊었을 경우, 여기서 아이디로 검색 후
+                  '비밀번호 초기화' 버튼을 눌러 초기 비밀번호("123")로 재설정할
+                  수 있습니다.
+                </Typography>
+              </Box>
+
+              {foundStudent ? (
+                <Paper variant="outlined" sx={{ p: 3 }}>
+                  <Typography
+                    variant="h6"
+                    gutterBottom
+                    sx={{ mb: 2, fontWeight: "bold" }}
+                  >
+                    학생 정보
+                  </Typography>
+                  <Box
+                    sx={{
+                      display: "grid",
+                      gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)" },
+                      gap: 2,
+                      mb: 3,
+                    }}
+                  >
+                    <TextField
+                      label="아이디"
+                      value={foundStudent.loginId}
+                      disabled
+                      InputProps={{ readOnly: true }}
+                      variant="filled"
+                      size="small"
+                    />
+                    <TextField
+                      label="학교"
+                      value={foundStudent.school}
+                      disabled
+                      InputProps={{ readOnly: true }}
+                      variant="filled"
+                      size="small"
+                    />
+                    <TextField
+                      label="학년"
+                      value={foundStudent.grade + "학년"}
+                      disabled
+                      InputProps={{ readOnly: true }}
+                      variant="filled"
+                      size="small"
+                    />
+                    <TextField
+                      label="반"
+                      value={foundStudent.class + "반"}
+                      disabled
+                      InputProps={{ readOnly: true }}
+                      variant="filled"
+                      size="small"
+                    />
+
+                    <TextField
+                      label="이름"
+                      name="name"
+                      value={
+                        isEditingStudent
+                          ? editingStudentData.name
+                          : foundStudent.name
+                      }
+                      onChange={handleEditingStudentChange}
+                      disabled={!isEditingStudent || isUpdatingStudent}
+                      InputProps={{ readOnly: !isEditingStudent }}
+                      variant={isEditingStudent ? "outlined" : "filled"}
+                      size="small"
+                      error={!!updateError && updateError.includes("이름")}
+                    />
+                    <Tooltip
+                      title={
+                        isEditingStudent ? (
+                          <Typography sx={{ fontSize: "0.875rem" }}>
+                            번호를 변경하면 로그인 아이디(loginId)도
+                            <br />
+                            자동으로 변경됩니다.
+                          </Typography>
+                        ) : (
+                          ""
+                        )
+                      }
+                      arrow
+                      placement="top"
+                      disableHoverListener={!isEditingStudent}
+                      disableFocusListener={!isEditingStudent}
+                      disableTouchListener={!isEditingStudent}
+                    >
+                      <TextField
+                        label="번호"
+                        name="studentId"
+                        value={
+                          isEditingStudent
+                            ? editingStudentData.studentId
+                            : foundStudent.studentId
+                        }
+                        onChange={handleEditingStudentChange}
+                        disabled={!isEditingStudent || isUpdatingStudent}
+                        InputProps={{ readOnly: !isEditingStudent }}
+                        variant={isEditingStudent ? "outlined" : "filled"}
+                        type="number"
+                        size="small"
+                        error={
+                          !!updateError &&
+                          (updateError.includes("번호") ||
+                            updateError.includes("아이디"))
+                        }
+                        helperText={
+                          updateError &&
+                          (updateError.includes("번호") ||
+                            updateError.includes("아이디"))
+                            ? updateError
+                            : ""
+                        }
+                      />
+                    </Tooltip>
+                  </Box>
+
+                  <Box
+                    sx={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      flexWrap: "wrap",
+                      gap: 1,
+                    }}
+                  >
+                    <Box sx={{ display: "flex", gap: 1 }}>
+                      {isEditingStudent ? (
+                        <>
+                          <Button
+                            variant="contained"
+                            color="primary"
+                            onClick={handleUpdateStudent}
+                            disabled={isUpdatingStudent}
+                            startIcon={
+                              isUpdatingStudent ? (
+                                <CircularProgress size={20} color="inherit" />
+                              ) : null
+                            }
+                          >
+                            저장
+                          </Button>
+                          <Button
+                            variant="outlined"
+                            color="secondary"
+                            onClick={handleEditToggle}
+                            disabled={isUpdatingStudent}
+                          >
+                            취소
+                          </Button>
+                        </>
+                      ) : (
+                        <Button
+                          variant="outlined"
+                          color="primary"
+                          onClick={handleEditToggle}
+                        >
+                          정보 수정
+                        </Button>
+                      )}
+                    </Box>
+                    <Box sx={{ display: "flex", gap: 1 }}>
+                      <Button
+                        variant="outlined"
+                        color="warning"
+                        onClick={() =>
+                          openConfirmModal("resetPassword", foundStudent._id)
+                        }
+                        disabled={
+                          isResettingPassword ||
+                          isDeletingStudent ||
+                          isEditingStudent
+                        }
+                        startIcon={
+                          isResettingPassword ? (
+                            <CircularProgress size={20} color="inherit" />
+                          ) : null
+                        }
+                      >
+                        비밀번호 초기화
+                      </Button>
+                      <Button
+                        variant="contained"
+                        color="error"
+                        onClick={() =>
+                          openConfirmModal("deleteStudent", foundStudent._id)
+                        }
+                        disabled={
+                          isDeletingStudent ||
+                          isResettingPassword ||
+                          isEditingStudent
+                        }
+                        startIcon={
+                          isDeletingStudent ? (
+                            <CircularProgress size={20} color="inherit" />
+                          ) : null
+                        }
+                      >
+                        계정 삭제
+                      </Button>
+                    </Box>
+                  </Box>
+                </Paper>
+              ) : (
+                !isSearching && (
+                  <Typography
+                    color="text.secondary"
+                    sx={{ textAlign: "center", mt: 4 }}
+                  >
+                    검색 결과가 없습니다.
+                  </Typography>
+                )
+              )}
             </Box>
           )}
 
@@ -843,7 +1274,15 @@ const UnifiedModal: React.FC<UnifiedModalProps> = ({
           >
             <Alert
               onClose={() => setSnackbarOpen(false)}
-              severity="error"
+              severity={
+                snackbarMessage.includes("성공") ||
+                snackbarMessage.includes("초기화") ||
+                snackbarMessage.includes("삭제")
+                  ? "success"
+                  : snackbarMessage.includes("없습")
+                  ? "info"
+                  : "error"
+              }
               variant="filled"
               sx={{ width: "100%" }}
             >
@@ -853,14 +1292,12 @@ const UnifiedModal: React.FC<UnifiedModalProps> = ({
         </Box>
       </Modal>
 
-      {/* 확인 모달 (디자인 개선) */}
       <Modal
         open={confirmModalOpen}
         onClose={() => !isSubmitting && setConfirmModalOpen(false)}
-        aria-labelledby="confirm-modal-title"
-        aria-describedby="confirm-modal-description"
+        aria-labelledby="create-confirm-modal-title"
+        aria-describedby="create-confirm-modal-description"
       >
-        {/* 로딩 중에는 닫기 방지 */}
         <Box
           sx={{
             position: "absolute",
@@ -869,24 +1306,30 @@ const UnifiedModal: React.FC<UnifiedModalProps> = ({
             transform: "translate(-50%, -50%)",
             bgcolor: "background.paper",
             boxShadow: 24,
-            p: 4, // 패딩 유지
-            borderRadius: 2, // 모서리 둥글게 유지
-            width: { xs: "90%", sm: 450 }, // 반응형 너비 조정
-            outline: "none", // 포커스 아웃라인 제거
+            p: 4,
+            borderRadius: 2,
+            width: { xs: "90%", sm: 450 },
+            outline: "none",
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !isSubmitting) {
+              handleConfirmedSubmit();
+            }
           }}
         >
           <Box sx={{ display: "flex", alignItems: "center", mb: 2 }}>
             <InfoOutlinedIcon color="primary" sx={{ mr: 1.5 }} />
-            <Typography id="confirm-modal-title" variant="h6" component="h2">
+            <Typography
+              id="create-confirm-modal-title"
+              variant="h6"
+              component="h2"
+            >
               계정 생성 확인
             </Typography>
           </Box>
-
-          <Typography id="confirm-modal-description" sx={{ mb: 3 }}>
+          <Typography id="create-confirm-modal-description" sx={{ mb: 3 }}>
             아래 정보로 학생 계정을 생성하시겠습니까?
           </Typography>
-
-          {/* 확인 정보 리스트 */}
           <List
             dense
             sx={{ mb: 3, bgcolor: "grey.50", borderRadius: 1, p: 1.5 }}
@@ -925,16 +1368,13 @@ const UnifiedModal: React.FC<UnifiedModalProps> = ({
               <ListItemText
                 primary="학생 수"
                 secondary={`${students.filter((s) => s.name).length}명`}
-              />{" "}
-              {/* 이름 입력된 학생 수 */}
+              />
             </ListItem>
           </List>
-
-          {/* 버튼 영역 */}
           <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 2 }}>
             <Button
               onClick={() => setConfirmModalOpen(false)}
-              variant="text" // Text 버튼으로 변경
+              variant="text"
               color="inherit"
               disabled={isSubmitting}
             >
@@ -943,15 +1383,96 @@ const UnifiedModal: React.FC<UnifiedModalProps> = ({
             <Button
               onClick={handleConfirmedSubmit}
               variant="contained"
-              color="primary" // 주요 액션 색상
+              color="primary"
               disabled={isSubmitting}
               startIcon={
                 isSubmitting ? (
                   <CircularProgress size={20} color="inherit" />
                 ) : null
-              } // 로딩 스피너 추가
+              }
             >
               {isSubmitting ? "생성 중..." : "확인 및 생성"}
+            </Button>
+          </Box>
+        </Box>
+      </Modal>
+
+      <Modal
+        open={confirmActionModalOpen}
+        onClose={closeConfirmModal}
+        aria-labelledby="action-confirm-modal-title"
+        aria-describedby="action-confirm-modal-description"
+      >
+        <Box
+          sx={{
+            position: "absolute",
+            top: "50%",
+            left: "50%",
+            transform: "translate(-50%, -50%)",
+            bgcolor: "background.paper",
+            boxShadow: 24,
+            p: 4,
+            borderRadius: 2,
+            width: { xs: "90%", sm: 400 },
+            outline: "none",
+          }}
+          onKeyDown={(e) => {
+            if (
+              e.key === "Enter" &&
+              !(isResettingPassword || isDeletingStudent)
+            ) {
+              handleConfirmAction();
+            }
+          }}
+        >
+          <Typography
+            id="action-confirm-modal-title"
+            variant="h6"
+            component="h2"
+            sx={{ mb: 2, fontWeight: "bold" }}
+          >
+            {confirmActionType === "resetPassword"
+              ? "비밀번호 초기화 확인"
+              : "계정 삭제 확인"}
+          </Typography>
+          <Typography id="action-confirm-modal-description" sx={{ mb: 3 }}>
+            {confirmActionType === "resetPassword"
+              ? `정말로 ${
+                  foundStudent?.name || "해당"
+                } 학생의 비밀번호를 "123"으로 초기화하시겠습니까?`
+              : `정말로 ${
+                  foundStudent?.name || "해당"
+                } 학생의 계정을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`}
+          </Typography>
+          <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 2 }}>
+            <Button
+              onClick={closeConfirmModal}
+              variant="text"
+              color="inherit"
+              disabled={isResettingPassword || isDeletingStudent}
+            >
+              취소
+            </Button>
+            <Button
+              onClick={handleConfirmAction}
+              variant="contained"
+              color={
+                confirmActionType === "resetPassword" ? "warning" : "error"
+              }
+              disabled={isResettingPassword || isDeletingStudent}
+              startIcon={
+                isResettingPassword || isDeletingStudent ? (
+                  <CircularProgress size={20} color="inherit" />
+                ) : null
+              }
+            >
+              {confirmActionType === "resetPassword"
+                ? isResettingPassword
+                  ? "초기화 중..."
+                  : "초기화"
+                : isDeletingStudent
+                ? "삭제 중..."
+                : "삭제"}
             </Button>
           </Box>
         </Box>

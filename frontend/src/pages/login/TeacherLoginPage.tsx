@@ -107,6 +107,17 @@ const TeacherLoginPage = () => {
           onChange={(e) => setPassword(e.target.value)}
           sx={{ mb: 2, fontSize: "1rem" }}
           disabled={isLoading}
+          onKeyDown={(e) => {
+            if (
+              e.key === "Enter" &&
+              !isLoading &&
+              email.trim() &&
+              password.trim()
+            ) {
+              e.preventDefault();
+              handleLogin();
+            }
+          }}
         />
         <Button
           fullWidth

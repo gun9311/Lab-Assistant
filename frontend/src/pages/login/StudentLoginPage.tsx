@@ -159,6 +159,17 @@ const StudentLoginPage = () => {
           onChange={(e) => setPassword(e.target.value)}
           sx={{ mb: 2 }}
           disabled={isLoading}
+          onKeyDown={(e) => {
+            if (
+              e.key === "Enter" &&
+              !isLoading &&
+              loginId.trim() &&
+              password.trim()
+            ) {
+              e.preventDefault();
+              handleLogin();
+            }
+          }}
         />
         <Button
           fullWidth
