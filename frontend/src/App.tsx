@@ -30,7 +30,6 @@ import {
   NotificationProvider,
   useNotificationContext,
 } from "./context/NotificationContext";
-// Firebase import
 import { requestPermissionAndGetToken, onMessageListener } from "./firebase"; // 수정된 함수 import
 // import ManageQuizzesPage from "./components/teacher/quiz/ManageQuizzes"; // 주석 처리
 // import CreateQuizPage from "./components/teacher/quiz/CreateQuiz"; // 주석 처리
