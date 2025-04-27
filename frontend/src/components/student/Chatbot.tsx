@@ -104,7 +104,8 @@ const Chatbot: React.FC<ChatbotProps> = ({
           content: currentMsg.content + nextChar,
         };
 
-        typingTimeoutRef.current = setTimeout(typeCharacter, 30);
+        const randomDelay = Math.floor(Math.random() * 30) + 20;
+        typingTimeoutRef.current = setTimeout(typeCharacter, randomDelay);
 
         return [
           ...prevChatHistory.slice(0, currentBotMsgIndex),
@@ -112,6 +113,7 @@ const Chatbot: React.FC<ChatbotProps> = ({
           ...prevChatHistory.slice(currentBotMsgIndex + 1),
         ];
       } else {
+        setIsResponding(false);
         currentBotMessageIdRef.current = null;
         targetBotContentRef.current = "";
         if (typingTimeoutRef.current) {
@@ -203,40 +205,9 @@ const Chatbot: React.FC<ChatbotProps> = ({
         const { bot, isFinal } = data;
 
         if (isFinal) {
-          setIsResponding(false);
-          const messageIdToFinalize = currentBotMessageIdRef.current;
-          const finalContent = targetBotContentRef.current;
-
-          if (typingTimeoutRef.current) {
-            clearTimeout(typingTimeoutRef.current);
-            typingTimeoutRef.current = null;
-          }
-
-          currentBotMessageIdRef.current = null;
-          targetBotContentRef.current = "";
-
-          if (messageIdToFinalize !== null) {
-            setChatHistory((prev) =>
-              prev.map((msg) =>
-                msg.id === messageIdToFinalize
-                  ? { ...msg, content: finalContent }
-                  : msg
-              )
-            );
-          } else if (
-            bot !== undefined &&
-            bot !== null &&
-            typeof bot === "string" &&
-            bot.trim()
-          ) {
-            const newMsgId = messageIdCounter.current++;
-            const newBotMessage: ChatMessage = {
-              id: newMsgId,
-              sender: "챗봇",
-              content: bot,
-            };
-            setChatHistory((prev) => [...prev, newBotMessage]);
-          }
+          console.log(
+            "[Chatbot] Received isFinal=true. Typing animation will continue."
+          );
         } else if (
           bot !== undefined &&
           bot !== null &&
@@ -281,6 +252,12 @@ const Chatbot: React.FC<ChatbotProps> = ({
         setIsResponding(false);
         setErrorAlertOpen(true);
         setLimitExceededError(null);
+        if (typingTimeoutRef.current) {
+          clearTimeout(typingTimeoutRef.current);
+          typingTimeoutRef.current = null;
+        }
+        currentBotMessageIdRef.current = null;
+        targetBotContentRef.current = "";
       }
     };
 
