@@ -3,12 +3,12 @@
   "name": "넛지EDU",
   "icons": [
     {
-      "src": "nudge-logo.png",
+      "src": "nudge_logo_192.png",
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "nudge-logo.png",
+      "src": "nudge_logo_512.png",
       "sizes": "512x512",
       "type": "image/png"
     }

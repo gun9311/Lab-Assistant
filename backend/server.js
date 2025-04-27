@@ -32,6 +32,8 @@ const cron = require("node-cron");
 const redisClient = require("./utils/redisClient");
 const cors = require("cors");
 const KahootQuizSession = require("./models/KahootQuizSession");
+const { DateTime } = require("luxon"); // luxon 추가
+const timeRoutes = require("./routes/timeRoutes"); // 새로 추가
 
 // MongoDB 연결
 mongoose
@@ -102,6 +104,7 @@ app.use("/api/quiz-results", quizResultsRoutes);
 app.use("/api/report", reportRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/kahoot-quiz", kahootQuizRoutes); // 카훗 스타일 퀴즈 서비스 라우트 추가
+app.use("/api/time", timeRoutes); // 새로 추가
 
 // HTTP 서버 시작
 const server = app.listen(process.env.PORT || 5000, () => {
@@ -143,6 +146,51 @@ wss.on("connection", (ws, req) => {
     }
 
     ws.user = user;
+    logger.info(
+      `WebSocket connection attempt by user: ${user._id}, role: ${user.role}`
+    );
+
+    if (user.role === "student") {
+      // --- 하드코딩된 시간 설정 ---
+      const startHour = 9; // 오전 9시
+      const endHour = 15; // 오후 3시 (15시 전까지 허용)
+      const serverTimezone = "Asia/Seoul"; // 시간대 고정
+      // --- 하드코딩 끝 ---
+
+      try {
+        const now = DateTime.now().setZone(serverTimezone);
+        const currentHour = now.hour;
+        const isAvailable = currentHour >= startHour && currentHour < endHour;
+
+        if (!isAvailable) {
+          logger.warn(
+            `Student ${user._id} WebSocket connection rejected due to unavailable time. Current hour: ${currentHour} (Timezone: ${serverTimezone})`
+          );
+          ws.send(
+            JSON.stringify({
+              error: "service_unavailable_time",
+              message: `서비스 이용 가능 시간이 아닙니다. (이용 시간: ${startHour}:00 ~ ${endHour}:00)`,
+            })
+          );
+          ws.close();
+          return;
+        }
+      } catch (timeError) {
+        logger.error(
+          `Error checking service time for student ${user._id} WebSocket:`,
+          timeError
+        );
+        ws.send(
+          JSON.stringify({
+            error: "time_check_error",
+            message: "서비스 시간 확인 중 오류 발생",
+          })
+        );
+        ws.close();
+        return;
+      }
+    }
+
     logger.info(`WebSocket connection established for user: ${user._id}`);
 
     // 세션 PIN으로 레디스에서 세션 조회
@@ -185,6 +233,15 @@ wss.on("connection", (ws, req) => {
           "WebSocket connection closed due to missing sessionId or subject"
         );
       }
+    } else {
+      const errorMessage = JSON.stringify({
+        error: "Missing sessionId or subject",
+      });
+      ws.send(errorMessage); // 세션 ID 또는 주제가 없는 경우
+      ws.close();
+      logger.warn(
+        "WebSocket connection closed due to missing sessionId or subject"
+      );
     }
   });
 });
