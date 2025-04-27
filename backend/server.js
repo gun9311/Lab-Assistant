@@ -72,11 +72,11 @@ app.use(bodyParser.json());
 // 헬스체크 엔드포인트 추가 (라우트 설정 전에 추가)
 app.get("/health", async (req, res) => {
   try {
-    // 1. MongoDB 연결 확인
+    // MongoDB 연결 확인
+    if (mongoose.connection.readyState !== 1) {
+      throw new Error("MongoDB not connected");
+    }
     await mongoose.connection.db.admin().ping();
-
-    // 2. Redis 연결 확인
-    await redisClient.ping();
 
     // 모든 서비스 정상
     res.status(200).json({
