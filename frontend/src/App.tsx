@@ -1,6 +1,12 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Route, Routes, Navigate } from "react-router-dom";
-import { CssBaseline, ThemeProvider, Snackbar, Alert } from "@mui/material";
+import {
+  CssBaseline,
+  ThemeProvider,
+  Snackbar,
+  Alert,
+  Box,
+} from "@mui/material";
 import HomePage from "./pages/home/HomePage";
 import TeacherRegisterPage from "./pages/register/TeacherRegisterPage";
 import StudentRegisterPage from "./pages/register/StudentRegisterPage";
@@ -41,6 +47,8 @@ import ResetPasswordPage from "./pages/login/ResetPasswordPage";
 import ResetStudentPasswordPage from "./pages/login/ResetStudentPasswordPage";
 import axios from "axios";
 import ComingSoon from "./components/common/ComingSoon"; // ComingSoon 임포트 추가
+import ServiceUnavailable from "./components/ServiceUnavailable"; // 새로 만든 컴포넌트 import
+import api from "./utils/api"; // 인증된 API 요청용 인스턴스 (또는 apiNoAuth 사용)
 
 // NotificationPayload 타입 정의
 type NotificationPayload = {
@@ -96,6 +104,58 @@ const RedirectToHome: React.FC = () => {
   }, []);
 
   return null;
+};
+
+// 서버 시간 상태 확인 함수 (API 호출 방식으로 변경)
+const checkServerTimeAvailability = async (): Promise<boolean> => {
+  try {
+    // 백엔드의 시간 상태 확인 API 호출
+    const response = await api.get("/time/status");
+    // API 응답에서 isAvailable 값 반환
+    return response.data.isAvailable;
+  } catch (error: any) {
+    console.error("Error checking server time availability:", error);
+    // API 호출 실패 시 (네트워크, 서버 오류, 인증 오류 등)
+    // 안전하게 서비스 이용 불가로 간주
+    return false;
+  }
+};
+
+// 학생 전용 라우트를 감싸는 컴포넌트 (시간 체크 포함)
+const StudentRouteGuard: React.FC<{ children: React.ReactElement }> = ({
+  children,
+}) => {
+  const [isServiceAvailable, setIsServiceAvailable] = useState<boolean | null>(
+    null
+  ); // null: 로딩 중
+
+  const checkAvailability = useCallback(async () => {
+    const available = await checkServerTimeAvailability();
+    setIsServiceAvailable(available);
+  }, []);
+
+  useEffect(() => {
+    checkAvailability();
+    // 선택적: 주기적으로 시간 상태 다시 확인 (예: 1분마다)
+    const intervalId = setInterval(checkAvailability, 60 * 1000);
+    return () => clearInterval(intervalId);
+  }, [checkAvailability]);
+
+  if (isServiceAvailable === null) {
+    // 로딩 상태 표시 (선택적)
+    return (
+      <Box
+        display="flex"
+        justifyContent="center"
+        alignItems="center"
+        height="100vh"
+      >
+        <p>시간 확인 중...</p>
+      </Box>
+    );
+  }
+
+  return isServiceAvailable ? children : <ServiceUnavailable />;
 };
 
 const AppContent: React.FC = () => {
@@ -162,7 +222,14 @@ const AppContent: React.FC = () => {
           <Route
             path="/student"
             element={
-              <PrivateRoute roles={["student"]} element={<StudentHomePage />} />
+              <PrivateRoute
+                roles={["student"]}
+                element={
+                  <StudentRouteGuard>
+                    <StudentHomePage />
+                  </StudentRouteGuard>
+                }
+              />
             }
           />
           <Route
@@ -177,12 +244,59 @@ const AppContent: React.FC = () => {
               <PrivateRoute roles={["admin"]} element={<AdminHomePage />} />
             }
           />
-          <Route path="/profile" element={<ProfilePage />} />
-          <Route path="/notifications" element={<NotificationsPage />} />
+          <Route
+            path="/profile"
+            element={
+              role === "student" ? (
+                <PrivateRoute
+                  roles={["student", "teacher"]}
+                  element={
+                    <StudentRouteGuard>
+                      <ProfilePage />
+                    </StudentRouteGuard>
+                  }
+                />
+              ) : (
+                <PrivateRoute
+                  roles={["student", "teacher"]}
+                  element={<ProfilePage />}
+                />
+              )
+            }
+          />
+          <Route
+            path="/notifications"
+            element={
+              role === "student" ? (
+                <PrivateRoute
+                  roles={["student", "teacher"]}
+                  element={
+                    <StudentRouteGuard>
+                      <NotificationsPage />
+                    </StudentRouteGuard>
+                  }
+                />
+              ) : (
+                <PrivateRoute
+                  roles={["student", "teacher"]}
+                  element={<NotificationsPage />}
+                />
+              )
+            }
+          />
           <Route
             path="/my-quizzes"
             // element={<MyQuizzesPage setIsQuizMode={setIsQuizMode} />} // 기존 컴포넌트 주석 처리
-            element={<ComingSoon />} // ComingSoon 컴포넌트로 대체
+            element={
+              <PrivateRoute
+                roles={["student"]}
+                element={
+                  <StudentRouteGuard>
+                    <ComingSoon />
+                  </StudentRouteGuard>
+                }
+              />
+            }
           />
           <Route
             path="/manage-quizzes"
@@ -206,9 +320,17 @@ const AppContent: React.FC = () => {
           {/* 퀴즈 세션 페이지 */}
           <Route
             path="/quiz-session"
-            element={<StudentQuizSessionPage />}
-          />{" "}
-          {/* 학생 퀴즈 세션 페이지 */}
+            element={
+              <PrivateRoute
+                roles={["student"]}
+                element={
+                  <StudentRouteGuard>
+                    <StudentQuizSessionPage />
+                  </StudentRouteGuard>
+                }
+              />
+            }
+          />
           <Route
             path="/reset-student-password"
             element={
@@ -316,7 +438,7 @@ const App: React.FC = () => {
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           {/* 모든 다른 경로를 /로 리다이렉트 */}
-          <Route path="*" element={<RedirectToHome />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       )}
     </ThemeProvider>

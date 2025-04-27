@@ -38,7 +38,9 @@ self.addEventListener('install', (event) => {
           './',
           './index.html',
           './manifest.json',
-          './nudge-logo.png', // 새로운 이미지 경로로 업데이트
+          // './nudge-logo.png', // 새로운 이미지 경로로 업데이트
+          './nudge_logo_192.png', // 새로운 이미지 경로로 업데이트
+          './nudge_logo_512.png', // 새로운 이미지 경로로 업데이트
           assets.files['main.js'],
           assets.files['main.css']
         ];
