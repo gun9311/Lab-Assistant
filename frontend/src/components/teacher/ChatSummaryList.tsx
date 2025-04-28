@@ -190,10 +190,28 @@ const ChatSummaryList: React.FC<ChatSummaryListProps> = ({
   ) => {
     const studentLines = text
       .split("\n")
-      .filter((line) => line.startsWith("You:"))
-      .map((line) => line.replace(/^You:/, "학생:"))
-      .join("\n");
-    return <HighlightedText text={studentLines} highlight={highlight} />;
+      .filter((line) => line.startsWith("You:"));
+
+    return (
+      <>
+        {studentLines.map((line, index) => {
+          const prefix = "학생:";
+          const content = line.replace(/^You:\s*/, "");
+          return (
+            <Box
+              component="div"
+              key={index}
+              sx={{ mb: index < studentLines.length - 1 ? 0.5 : 0 }}
+            >
+              <Typography component="span" fontWeight="bold" sx={{ mr: 0.5 }}>
+                {prefix}
+              </Typography>
+              <HighlightedText text={content} highlight={highlight} />
+            </Box>
+          );
+        })}
+      </>
+    );
   };
 
   const formatAndHighlightSummaryText = (text: string, highlight: string) => {
@@ -202,19 +220,27 @@ const ChatSummaryList: React.FC<ChatSummaryListProps> = ({
       <>
         {lines.map((line, index) => {
           const isStudentLine = line.startsWith("You:");
-          const formattedLine = line
-            .replace(/^You:/, "학생:")
-            .replace(/^Bot:/, "챗봇:");
+          const isBotLine = line.startsWith("Bot:");
+          const prefix = isStudentLine ? "학생:" : isBotLine ? "챗봇:" : "";
+          const content = line.replace(/^(You:|Bot:)\s*/, "");
 
           return (
-            <React.Fragment key={index}>
-              {isStudentLine && highlight.trim() ? (
-                <HighlightedText text={formattedLine} highlight={highlight} />
-              ) : (
-                formattedLine
+            <Box
+              component="div"
+              key={index}
+              sx={{ mb: index < lines.length - 1 ? 0.5 : 0 }}
+            >
+              {prefix && (
+                <Typography component="span" fontWeight="bold" sx={{ mr: 0.5 }}>
+                  {prefix}
+                </Typography>
               )}
-              {index < lines.length - 1 && <br />}
-            </React.Fragment>
+              {isStudentLine && highlight.trim() ? (
+                <HighlightedText text={content} highlight={highlight} />
+              ) : (
+                <span>{content}</span>
+              )}
+            </Box>
           );
         })}
       </>
