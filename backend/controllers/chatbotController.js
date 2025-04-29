@@ -7,12 +7,17 @@ const { OpenAI } = require("openai");
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const Student = require("../models/Student");
 const { format } = require("date-fns");
+const { SQSClient, SendMessageCommand } = require("@aws-sdk/client-sqs");
 
 let clients = {};
 
 const DAILY_LIMIT = 15;
 const MONTHLY_LIMIT = 150;
 const RECENT_HISTORY_COUNT = 4; // Redis에 저장할 최근 대화 기록 수
+
+// SQS 클라이언트 설정 (리전 및 자격 증명은 환경에 맞게 설정)
+const sqsClient = new SQSClient({ region: process.env.SQS_REGION }); // 예: 'ap-northeast-2'
+const queueUrl = process.env.CHAT_QUEUE_URL; // 환경 변수에서 SQS 큐 URL 가져오기
 
 // PII 마스킹 함수 (2.5단계)
 function maskPII(text) {
@@ -557,7 +562,9 @@ const handleWebSocketConnection = async (ws, userId, subject) => {
       }
 
       const recentHistory = chatHistory.slice(-RECENT_HISTORY_COUNT);
-      const systemMessageContent = `너는 초등학생을 위한 친절하고 **매우 안전한** AI 학습 튜터야. 현재 **${grade}학년** 학생의 ${subject} ${unit ? `${unit} 단원 ` : ""}${topic} 학습을 돕고 있어. 
+      const systemMessageContent = `너는 초등학생을 위한 친절하고 **매우 안전한** AI 학습 튜터야. 현재 **${grade}학년** 학생의 ${subject} ${
+        unit ? `${unit} 단원 ` : ""
+      }${topic} 학습을 돕고 있어. 
       **학습 배경은 대한민국이며, 한국 초등학생의 눈높이에 맞춰야 해.** 다음 원칙을 **반드시** 지켜야 해:
 
       ---
@@ -599,7 +606,7 @@ const handleWebSocketConnection = async (ws, userId, subject) => {
       * 필요시 목록(*, 숫자)과 강조(**굵게**)를 마크다운으로 사용.
       * 이모지는 꼭 필요할 때만 사용합니다.
       
-      `;  
+      `;
 
       let messages;
 
@@ -777,8 +784,61 @@ const handleDisconnection = async (
   ws,
   chatHistory
 ) => {
-  await saveChatSummaryInternal(userId, subject, chatHistory);
+  // --- SQS 메시지 전송 로직 추가 ---
+  try {
+    if (
+      !chatHistory ||
+      !Array.isArray(chatHistory) ||
+      chatHistory.length === 0
+    ) {
+      logger.info(
+        `No chat history to save for user ${userId}, skipping SQS message.`
+      );
+    } else {
+      // SQS 메시지 본문 생성 (JSON 형태 권장)
+      const summaryText = chatHistory
+        .map((msg) => `You: ${msg.user}\nBot: ${msg.bot}`)
+        .join("\n");
 
+      if (summaryText.trim()) {
+        const messageBody = JSON.stringify({
+          userId: userId.toString(), // ObjectId는 문자열로 변환
+          subject: subject,
+          summaryText: summaryText,
+          disconnectedAt: new Date().toISOString(), // 필요 시 추가 정보
+        });
+
+        const command = new SendMessageCommand({
+          QueueUrl: queueUrl,
+          MessageBody: messageBody,
+          // 필요 시 MessageGroupId, MessageDeduplicationId (FIFO 큐 사용 시) 추가
+        });
+
+        await sqsClient.send(command);
+        logger.info(
+          `Successfully sent chat summary message to SQS for user ${userId}, subject ${subject}`
+        );
+      } else {
+        logger.info(
+          `Empty summary generated for user ${userId}, skipping SQS message.`
+        );
+      }
+    }
+  } catch (error) {
+    logger.error(
+      `Failed to send chat summary message to SQS for user ${userId}:`,
+      {
+        error: error.message,
+        stack: error.stack,
+        userId,
+        subject,
+      }
+    );
+    // SQS 전송 실패 시 어떻게 처리할지 정책 결정 필요 (예: 재시도, 별도 로깅 등)
+  }
+  // --- SQS 메시지 전송 로직 끝 ---
+
+  // 클라이언트 정리 로직 (기존과 동일)
   delete clients[clientId];
   logger.info(
     `Client ${clientId} removed from memory. Total active connections: ${
@@ -787,8 +847,22 @@ const handleDisconnection = async (
   );
 
   if (ws.readyState === ws.OPEN || ws.readyState === ws.CLOSING) {
-    ws.terminate(); // WebSocket 연결 상태가 열려있거나 닫히는 중일 때만 terminate 호출
+    ws.terminate();
     logger.info(`WebSocket connection for client ${clientId} terminated.`);
+  }
+
+  // Redis의 최근 기록 삭제 (선택적 - 워커가 처리 후 삭제해도 됨)
+  const chatHistoryKey = `chatHistories:${userId}`;
+  try {
+    await redisClient.del(chatHistoryKey);
+    logger.info(
+      `Cleared recent chat history from Redis for user ${userId} on disconnect.`
+    );
+  } catch (redisDelError) {
+    logger.warn(
+      `Could not clear recent history from Redis for user ${userId}:`,
+      redisDelError
+    );
   }
 };
 
