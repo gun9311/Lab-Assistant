@@ -7,17 +7,15 @@ const { OpenAI } = require("openai");
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const Student = require("../models/Student");
 const { format } = require("date-fns");
-const { SQSClient, SendMessageCommand } = require("@aws-sdk/client-sqs");
+const pLimit = require("p-limit");
+
+const dbWriteLimit = pLimit(7);
 
 let clients = {};
 
 const DAILY_LIMIT = 15;
 const MONTHLY_LIMIT = 150;
 const RECENT_HISTORY_COUNT = 4; // Redis에 저장할 최근 대화 기록 수
-
-// SQS 클라이언트 설정 (리전 및 자격 증명은 환경에 맞게 설정)
-const sqsClient = new SQSClient({ region: process.env.SQS_REGION }); // 예: 'ap-northeast-2'
-const queueUrl = process.env.CHAT_QUEUE_URL; // 환경 변수에서 SQS 큐 URL 가져오기
 
 // PII 마스킹 함수 (2.5단계)
 function maskPII(text) {
@@ -784,61 +782,7 @@ const handleDisconnection = async (
   ws,
   chatHistory
 ) => {
-  // --- SQS 메시지 전송 로직 추가 ---
-  try {
-    if (
-      !chatHistory ||
-      !Array.isArray(chatHistory) ||
-      chatHistory.length === 0
-    ) {
-      logger.info(
-        `No chat history to save for user ${userId}, skipping SQS message.`
-      );
-    } else {
-      // SQS 메시지 본문 생성 (JSON 형태 권장)
-      const summaryText = chatHistory
-        .map((msg) => `You: ${msg.user}\nBot: ${msg.bot}`)
-        .join("\n");
-
-      if (summaryText.trim()) {
-        const messageBody = JSON.stringify({
-          userId: userId.toString(), // ObjectId는 문자열로 변환
-          subject: subject,
-          summaryText: summaryText,
-          disconnectedAt: new Date().toISOString(), // 필요 시 추가 정보
-        });
-
-        const command = new SendMessageCommand({
-          QueueUrl: queueUrl,
-          MessageBody: messageBody,
-          // 필요 시 MessageGroupId, MessageDeduplicationId (FIFO 큐 사용 시) 추가
-        });
-
-        await sqsClient.send(command);
-        logger.info(
-          `Successfully sent chat summary message to SQS for user ${userId}, subject ${subject}`
-        );
-      } else {
-        logger.info(
-          `Empty summary generated for user ${userId}, skipping SQS message.`
-        );
-      }
-    }
-  } catch (error) {
-    logger.error(
-      `Failed to send chat summary message to SQS for user ${userId}:`,
-      {
-        error: error.message,
-        stack: error.stack,
-        userId,
-        subject,
-      }
-    );
-    // SQS 전송 실패 시 어떻게 처리할지 정책 결정 필요 (예: 재시도, 별도 로깅 등)
-  }
-  // --- SQS 메시지 전송 로직 끝 ---
-
-  // 클라이언트 정리 로직 (기존과 동일)
+  // 클라이언트 정리 로직 먼저 수행 (선택적)
   delete clients[clientId];
   logger.info(
     `Client ${clientId} removed from memory. Total active connections: ${
@@ -851,7 +795,29 @@ const handleDisconnection = async (
     logger.info(`WebSocket connection for client ${clientId} terminated.`);
   }
 
-  // Redis의 최근 기록 삭제 (선택적 - 워커가 처리 후 삭제해도 됨)
+  // *** DB 저장 로직을 dbWriteLimit으로 감싸서 호출 ***
+  if (chatHistory && chatHistory.length > 0) {
+    logger.info(
+      `Queueing chat summary save for user ${userId}, subject ${subject}. Pending tasks: ${dbWriteLimit.pendingCount}`
+    );
+    // limit 함수는 Promise를 반환하며, 내부 함수 실행을 스케줄링함
+    dbWriteLimit(() => saveChatSummaryInternal(userId, subject, chatHistory))
+      .then(() => {
+        // 성공 로깅 (선택적, saveChatSummaryInternal 내부 로그로 충분할 수 있음)
+        logger.debug(`DB write task completed successfully for user ${userId}`);
+      })
+      .catch((error) => {
+        // saveChatSummaryInternal에서 throw된 에러 처리 (이미 내부에서 로깅됨)
+        logger.error(
+          `DB write task failed for user ${userId} after being queued:`,
+          { message: error?.message }
+        );
+      });
+  } else {
+    logger.info(`No chat history for ${userId}, skipping save task.`);
+  }
+
+  // Redis의 최근 기록 삭제
   const chatHistoryKey = `chatHistories:${userId}`;
   try {
     await redisClient.del(chatHistoryKey);
@@ -935,7 +901,7 @@ const saveChatSummaryInternal = async (userId, subject, chatHistory) => {
 
     await chatSummaryDoc.save();
     logger.info(
-      `Chat summary saved successfully from memory for student ${userId}, subject '${subject}'.`
+      `Chat summary saved successfully for student ${userId}, subject '${subject}'.`
     );
 
     try {
@@ -945,11 +911,10 @@ const saveChatSummaryInternal = async (userId, subject, chatHistory) => {
     }
   } catch (error) {
     logger.error(
-      `Failed to save chat summary from memory for student ${userId}, subject '${subject}':`,
+      `Failed to save chat summary for student ${userId}, subject '${subject}':`,
       {
         error: error.message,
         stack: error.stack,
-        redisKey: chatHistoryKey,
       }
     );
   }
