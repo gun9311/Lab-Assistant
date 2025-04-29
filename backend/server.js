@@ -151,46 +151,46 @@ wss.on("connection", (ws, req) => {
     );
 
      // 학생 시간 제한 로직 시작 - 임시 비활성화
-    // if (user.role === "student") {
-    //   // --- 하드코딩된 시간 설정 ---
-    //   const startHour = 8; // 오전 9시
-    //   const endHour = 23; // 오후 3시 (15시 전까지 허용)
-    //   const serverTimezone = "Asia/Seoul"; // 시간대 고정
-    //   // --- 하드코딩 끝 ---
+    if (user.role === "student") {
+      // --- 하드코딩된 시간 설정 ---
+      const startHour = 8; // 오전 9시
+      const endHour = 23; // 오후 3시 (15시 전까지 허용)
+      const serverTimezone = "Asia/Seoul"; // 시간대 고정
+      // --- 하드코딩 끝 ---
 
-    //   try {
-    //     const now = DateTime.now().setZone(serverTimezone);
-    //     const currentHour = now.hour;
-    //     const isAvailable = currentHour >= startHour && currentHour < endHour;
+      try {
+        const now = DateTime.now().setZone(serverTimezone);
+        const currentHour = now.hour;
+        const isAvailable = currentHour >= startHour && currentHour < endHour;
 
-    //     if (!isAvailable) {
-    //       logger.warn(
-    //         `Student ${user._id} WebSocket connection rejected due to unavailable time. Current hour: ${currentHour} (Timezone: ${serverTimezone})`
-    //       );
-    //       ws.send(
-    //         JSON.stringify({
-    //           error: "service_unavailable_time",
-    //           message: `서비스 이용 가능 시간이 아닙니다. (이용 시간: ${startHour}:00 ~ ${endHour}:00)`,
-    //         })
-    //       );
-    //       ws.close();
-    //       return;
-    //     }
-    //   } catch (timeError) {
-    //     logger.error(
-    //       `Error checking service time for student ${user._id} WebSocket:`,
-    //       timeError
-    //     );
-    //     ws.send(
-    //       JSON.stringify({
-    //         error: "time_check_error",
-    //         message: "서비스 시간 확인 중 오류 발생",
-    //       })
-    //     );
-    //     ws.close();
-    //     return;
-    //   }
-    // }
+        if (!isAvailable) {
+          logger.warn(
+            `Student ${user._id} WebSocket connection rejected due to unavailable time. Current hour: ${currentHour} (Timezone: ${serverTimezone})`
+          );
+          ws.send(
+            JSON.stringify({
+              error: "service_unavailable_time",
+              message: `서비스 이용 가능 시간이 아닙니다. (이용 시간: ${startHour}:00 ~ ${endHour}:00)`,
+            })
+          );
+          ws.close();
+          return;
+        }
+      } catch (timeError) {
+        logger.error(
+          `Error checking service time for student ${user._id} WebSocket:`,
+          timeError
+        );
+        ws.send(
+          JSON.stringify({
+            error: "time_check_error",
+            message: "서비스 시간 확인 중 오류 발생",
+          })
+        );
+        ws.close();
+        return;
+      }
+    }
     // 학생 시간 제한 로직 끝 - 임시 비활성화
 
     logger.info(`WebSocket connection established for user: ${user._id}`);
