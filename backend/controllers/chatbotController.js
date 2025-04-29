@@ -7,7 +7,7 @@ const { OpenAI } = require("openai");
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const Student = require("../models/Student");
 const { format } = require("date-fns");
-const pLimit = require("p-limit");
+const pLimit = require("p-limit").default;
 
 const dbWriteLimit = pLimit(7);
 
