@@ -125,7 +125,7 @@ const checkServerTimeAvailability = async (): Promise<boolean> => {
 const StudentRouteGuard: React.FC<{ children: React.ReactElement }> = ({
   children,
 }) => {
-  /* // 시간 체크 로직 시작 - 임시 비활성화
+  // 시간 체크 로직 시작 - 임시 비활성화
   const [isServiceAvailable, setIsServiceAvailable] = useState<boolean | null>(
     null
   ); // null: 로딩 중
@@ -157,10 +157,10 @@ const StudentRouteGuard: React.FC<{ children: React.ReactElement }> = ({
   }
 
   return isServiceAvailable ? children : <ServiceUnavailable />;
-  */ // 시간 체크 로직 끝 - 임시 비활성화
+  // 시간 체크 로직 끝 - 임시 비활성화
 
   // 시간 체크 로직 비활성화 시 항상 children 렌더링
-  return children;
+  // return children;
 };
 
 const AppContent: React.FC = () => {

@@ -9,8 +9,8 @@ const checkServiceTime = (req, res, next) => {
   }
 
   // --- 하드코딩된 시간 설정 ---
-  const startHour = 9; // 오전 9시
-  const endHour = 15; // 오후 3시 (15시 전까지 허용)
+  const startHour = 8; // 오전 9시
+  const endHour = 23; // 오후 3시 (15시 전까지 허용)
   const serverTimezone = "Asia/Seoul"; // 시간대 고정
   // --- 하드코딩 끝 ---
 

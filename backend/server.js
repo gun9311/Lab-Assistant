@@ -150,7 +150,7 @@ wss.on("connection", (ws, req) => {
       `WebSocket connection attempt by user: ${user._id}, role: ${user.role}`
     );
 
-    /* // 학생 시간 제한 로직 시작 - 임시 비활성화
+     // 학생 시간 제한 로직 시작 - 임시 비활성화
     if (user.role === "student") {
       // --- 하드코딩된 시간 설정 ---
       const startHour = 9; // 오전 9시
@@ -191,7 +191,7 @@ wss.on("connection", (ws, req) => {
         return;
       }
     }
-    */ // 학생 시간 제한 로직 끝 - 임시 비활성화
+    // 학생 시간 제한 로직 끝 - 임시 비활성화
 
     logger.info(`WebSocket connection established for user: ${user._id}`);
 

@@ -357,7 +357,7 @@ const HomePage = () => {
           </Typography>
         </Stack>
       </Box>
-      <Box sx={{ position: "absolute", top: 16, right: 16, zIndex: 2 }}>
+      {/* <Box sx={{ position: "absolute", top: 16, right: 16, zIndex: 2 }}>
         <Link to="/admin-login" style={{ textDecoration: "none" }}>
           <Button
             variant="text"
@@ -368,7 +368,7 @@ const HomePage = () => {
             }
           ></Button>
         </Link>
-      </Box>
+      </Box> */}
       <Dialog open={loginOpen} onClose={handleLoginClose}>
         <DialogTitle>계정 유형을 선택하세요.</DialogTitle>
         <DialogContent>
