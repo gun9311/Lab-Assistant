@@ -126,41 +126,41 @@ const StudentRouteGuard: React.FC<{ children: React.ReactElement }> = ({
   children,
 }) => {
   // 시간 체크 로직 시작 - 임시 비활성화
-  const [isServiceAvailable, setIsServiceAvailable] = useState<boolean | null>(
-    null
-  ); // null: 로딩 중
+  // const [isServiceAvailable, setIsServiceAvailable] = useState<boolean | null>(
+  //   null
+  // ); // null: 로딩 중
 
-  const checkAvailability = useCallback(async () => {
-    const available = await checkServerTimeAvailability();
-    setIsServiceAvailable(available);
-  }, []);
+  // const checkAvailability = useCallback(async () => {
+  //   const available = await checkServerTimeAvailability();
+  //   setIsServiceAvailable(available);
+  // }, []);
 
-  useEffect(() => {
-    checkAvailability();
-    // 선택적: 주기적으로 시간 상태 다시 확인 (예: 1분마다)
-    const intervalId = setInterval(checkAvailability, 60 * 1000);
-    return () => clearInterval(intervalId);
-  }, [checkAvailability]);
+  // useEffect(() => {
+  //   checkAvailability();
+  //   // 선택적: 주기적으로 시간 상태 다시 확인 (예: 1분마다)
+  //   const intervalId = setInterval(checkAvailability, 60 * 1000);
+  //   return () => clearInterval(intervalId);
+  // }, [checkAvailability]);
 
-  if (isServiceAvailable === null) {
-    // 로딩 상태 표시 (선택적)
-    return (
-      <Box
-        display="flex"
-        justifyContent="center"
-        alignItems="center"
-        height="100vh"
-      >
-        <p>시간 확인 중...</p>
-      </Box>
-    );
-  }
+  // if (isServiceAvailable === null) {
+  //   // 로딩 상태 표시 (선택적)
+  //   return (
+  //     <Box
+  //       display="flex"
+  //       justifyContent="center"
+  //       alignItems="center"
+  //       height="100vh"
+  //     >
+  //       <p>시간 확인 중...</p>
+  //     </Box>
+  //   );
+  // }
 
-  return isServiceAvailable ? children : <ServiceUnavailable />;
+  // return isServiceAvailable ? children : <ServiceUnavailable />;
   // 시간 체크 로직 끝 - 임시 비활성화
 
   // 시간 체크 로직 비활성화 시 항상 children 렌더링
-  // return children;
+  return children;
 };
 
 const AppContent: React.FC = () => {
