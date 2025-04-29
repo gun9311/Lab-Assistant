@@ -1,0 +1,15 @@
+{
+  "name": "lambda-chat-worker",
+  "version": "1.0.0",
+  "description": "Lambda function to process chat summaries from SQS",
+  "main": "index.js",
+  "private": true,
+  "dependencies": {
+    "@aws-sdk/client-sqs": "^3.622.0",
+    "mongoose": "^8.5.2",
+    "winston": "^3.14.2"
+  },
+  "scripts": {
+    "package": "zip -r ../lambda-chat-worker.zip ."
+  }
+}
