@@ -1,5 +1,6 @@
 require("dotenv").config();
 const { OpenAI } = require("openai");
+const config = require("../config"); // 설정 파일 로드
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -19,11 +20,11 @@ const getNLPResponse = async function* (messages) {
     // );
 
     const response = await openai.chat.completions.create({
-      model: "gpt-4.1-nano",
+      model: config.openAI.MODEL,
       messages: messages, // 전달받은 messages를 그대로 사용합니다.
       stream: true,
-      max_tokens: 1000,
-      temperature: 0.7,
+      max_tokens: config.openAI.MAX_TOKENS,
+      temperature: config.openAI.TEMPERATURE,
     });
 
     //console.log("[nlpService] OpenAI stream initiated");

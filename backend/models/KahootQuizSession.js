@@ -1,29 +1,62 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 const Schema = mongoose.Schema;
 
-const KahootQuizSessionSchema = new Schema({
-    quizContent: { type: mongoose.Schema.Types.ObjectId, ref: 'KahootQuizContent', required: true }, // 참조하는 퀴즈 콘텐츠
-    teacher: { type: mongoose.Schema.Types.ObjectId, ref: 'Teacher', required: true }, // 세션을 시작한 교사
-    isTeamMode: { type: Boolean, default: false }, // 팀 모드 여부
-    teams: [{
-      teamName: { type: String, required: true }, // 팀 이름
-      members: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Student', required: true }], // 팀에 속한 학생들
-      teamScore: { type: Number, default: 0 } // 팀의 총 점수
-    }],
-    participants: [{
-      student: { type: mongoose.Schema.Types.ObjectId, ref: 'Student', required: true }, // 참가한 학생
-      score: { type: Number, default: 0 }, // 학생의 점수 (개인 점수)
-      responses: [{
-        question: { type: mongoose.Schema.Types.ObjectId, ref: 'KahootQuizContent.questions' }, // 학생이 응답한 질문
-        answer: { type: String }, // 학생이 제출한 답변
-        isCorrect: { type: Boolean }, // 응답의 정답 여부
-        responseTime: { type: Number } // 응답 시간(초 단위)
-      }]
-    }],
-    status: { type: String, enum: ['ongoing', 'completed'], default: 'ongoing' }, // 퀴즈 상태 (진행 중, 완료)
-    startedAt: { type: Date, default: Date.now }, // 퀴즈 시작 시간
-    endedAt: { type: Date }, // 퀴즈 종료 시간
-    pin: { type: String, required: true } // 세션에 사용되는 PIN 추가
+// 세션 내에 저장될 질문 스냅샷을 위한 스키마 정의
+const QuestionSnapshotSchema = new Schema({
+  originalQuestionId: { type: mongoose.Schema.Types.ObjectId }, // 원본 KahootQuizContent.questions의 _id (참조용, 선택적)
+  questionText: { type: String, required: true },
+  questionType: {
+    type: String,
+    enum: ["multiple-choice", "true-false"],
+    required: true,
+  },
+  options: [
+    {
+      text: { type: String },
+      imageUrl: { type: String },
+      // 스냅샷 시점의 옵션 _id도 저장하고 싶다면 추가 가능
+      // originalOptionId: { type: mongoose.Schema.Types.ObjectId }
+    },
+  ],
+  correctAnswer: { type: String, required: true }, // 정답 옵션의 인덱스 또는 값 (원본 스키마와 동일하게 유지)
+  timeLimit: { type: Number, default: 30 },
+  imageUrl: { type: String },
+  // 여기에 추가적으로 스냅샷 시점에 필요한 Question 관련 필드가 있다면 포함
 });
 
-module.exports = mongoose.model('KahootQuizSession', KahootQuizSessionSchema);
+const KahootQuizSessionSchema = new Schema({
+  teacher: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Teacher",
+    required: true,
+  },
+  pin: { type: String, required: true, unique: true }, // 세션 식별용 PIN
+  startedAt: { type: Date, default: Date.now }, // 세션 시작 시간
+
+  // 원본 퀴즈의 메타데이터 스냅샷
+  grade: { type: Number, required: true },
+  subject: { type: String, required: true },
+  semester: { type: String, required: true },
+  unit: { type: String, required: true },
+  // originalQuizImageUrl: { type: String }, // 필요시
+
+  // 사용된 질문들의 스냅샷 (가장 중요)
+  questionsSnapshot: [QuestionSnapshotSchema],
+
+  // (선택적) 세션 시작 시 팀 모드 설정 및 팀 구성 정보
+  isTeamMode: { type: Boolean, default: false },
+  initialTeams: [
+    // 필드명 변경 제안
+    {
+      teamName: { type: String, required: true },
+      memberStudentIds: [
+        { type: mongoose.Schema.Types.ObjectId, ref: "Student" },
+      ],
+    },
+  ],
+
+  // (선택적) 세션 시작 시점에 참여를 "시도"했거나 "초대된" 학생 ID 목록 (만약 필요하다면)
+  // initialParticipantStudentIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Student' }],
+});
+
+module.exports = mongoose.model("KahootQuizSession", KahootQuizSessionSchema);

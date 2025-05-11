@@ -20,20 +20,13 @@ const adminRoutes = require("./routes/adminRoutes");
 const subjectRoutes = require("./routes/subjectRoutes");
 const reportRoutes = require("./routes/reportRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
-const {
-  handleWebSocketConnection,
-} = require("./controllers/chatbotController");
-const {
-  handleTeacherWebSocketConnection,
-  handleStudentWebSocketConnection,
-} = require("./controllers/kahootQuizController"); // Kahoot 웹소켓 핸들러 추가
 const ChatSummary = require("./models/ChatSummary");
 const cron = require("node-cron");
 const redisClient = require("./utils/redisClient");
 const cors = require("cors");
-const KahootQuizSession = require("./models/KahootQuizSession");
-const { DateTime } = require("luxon"); // luxon 추가
 const timeRoutes = require("./routes/timeRoutes"); // 새로 추가
+const config = require("./config"); // 설정 파일 로드
+const { handleNewWebSocketConnection } = require("./websocketInitialSetup"); // 수정
 
 // MongoDB 연결
 mongoose
@@ -44,12 +37,12 @@ mongoose
 // Express 앱 설정
 const app = express();
 
-const allowedOrigins = ["http://localhost:3000", "https://nudgeflow.co.kr"];
+const { ALLOWED_ORIGINS } = config.serverConfig; // 설정값 사용
 
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (allowedOrigins.includes(origin) || !origin) {
+      if (ALLOWED_ORIGINS.includes(origin) || !origin) {
         callback(null, true);
       } else {
         callback(new Error("Not allowed by CORS"));
@@ -107,163 +100,34 @@ app.use("/api/kahoot-quiz", kahootQuizRoutes); // 카훗 스타일 퀴즈 서비
 app.use("/api/time", timeRoutes); // 새로 추가
 
 // HTTP 서버 시작
-const server = app.listen(process.env.PORT || 5000, () => {
-  logger.info(`Server running on port ${process.env.PORT || 5000}`);
+const serverPort = process.env.PORT || config.serverConfig.DEFAULT_PORT; // 수정됨
+const server = app.listen(serverPort, () => {
+  // 수정됨
+  logger.info(`Server running on port ${serverPort}`); // 수정됨
 });
 
 // 웹소켓 서버 생성
 const wss = new WebSocketServer({ server });
 
-// 웹소켓 서버 생성
-wss.on("connection", (ws, req) => {
-  const urlParams = new URLSearchParams(req.url.split("?")[1]);
-  const token = urlParams.get("token");
-  const pin = urlParams.get("pin");
-  const subject = urlParams.get("subject");
-
-  // JWT 토큰이 없는 경우 연결 종료 및 오류 메시지 전송
-  if (!token) {
-    const errorMessage = JSON.stringify({ error: "Missing token" });
-    ws.send(errorMessage);
-    ws.close();
-    logger.warn("WebSocket connection closed due to missing token");
-    return;
-  }
-
-  // JWT 검증
-  jwt.verify(token, process.env.JWT_SECRET, async (err, user) => {
-    if (err) {
-      const errorMessage = JSON.stringify({
-        error: "Invalid or expired token",
-      });
-      ws.send(errorMessage); // 클라이언트에게 오류 메시지 전송
-      ws.close();
-      logger.error(
-        "WebSocket connection closed due to JWT verification error:",
-        err
-      );
-      return;
-    }
-
-    ws.user = user;
-    logger.info(
-      `WebSocket connection attempt by user: ${user._id}, role: ${user.role}`
-    );
-
-     // 학생 시간 제한 로직 시작 - 임시 비활성화
-    if (user.role === "student") {
-      // --- 하드코딩된 시간 설정 ---
-      const startHour = 8; // 오전 9시
-      const endHour = 23; // 오후 3시 (15시 전까지 허용)
-      const serverTimezone = "Asia/Seoul"; // 시간대 고정
-      // --- 하드코딩 끝 ---
-
-      try {
-        const now = DateTime.now().setZone(serverTimezone);
-        const currentHour = now.hour;
-        const isAvailable = currentHour >= startHour && currentHour < endHour;
-
-        if (!isAvailable) {
-          logger.warn(
-            `Student ${user._id} WebSocket connection rejected due to unavailable time. Current hour: ${currentHour} (Timezone: ${serverTimezone})`
-          );
-          ws.send(
-            JSON.stringify({
-              error: "service_unavailable_time",
-              message: `서비스 이용 가능 시간이 아닙니다. (이용 시간: ${startHour}:00 ~ ${endHour}:00)`,
-            })
-          );
-          ws.close();
-          return;
-        }
-      } catch (timeError) {
-        logger.error(
-          `Error checking service time for student ${user._id} WebSocket:`,
-          timeError
-        );
-        ws.send(
-          JSON.stringify({
-            error: "time_check_error",
-            message: "서비스 시간 확인 중 오류 발생",
-          })
-        );
-        ws.close();
-        return;
-      }
-    }
-    // 학생 시간 제한 로직 끝 - 임시 비활성화
-
-    logger.info(`WebSocket connection established for user: ${user._id}`);
-
-    // 세션 PIN으로 레디스에서 세션 조회
-    if (subject) {
-      logger.info("채팅 웹소켓 분기");
-      handleWebSocketConnection(ws, user._id, subject);
-    } else if (pin) {
-      let session = await redisClient.get(`session:${pin}`);
-      // logger.info('퀴즈 웹소켓 분기');
-      // 세션이 레디스에 없으면 에러 반환
-      if (!session) {
-        ws.send(JSON.stringify({ error: "Session not found" }));
-        logger.warn(`Session not found for pin: ${pin}`);
-        ws.close();
-        return;
-      }
-
-      if (session) {
-        // 세션 참여 처리
-        logger.info(`User ${user._id} attempting to join session ${pin}`); // session._id로 수정
-        if (user.role === "teacher") {
-          logger.info("교사 퀴즈 웹소켓 분기");
-          handleTeacherWebSocketConnection(ws, user._id, pin); // session._id로 수정
-        } else if (user.role === "student") {
-          logger.info("학생 퀴즈 웹소켓 분기");
-          handleStudentWebSocketConnection(ws, user._id, pin); // session._id로 수정
-        } else {
-          const errorMessage = JSON.stringify({ error: "Invalid user role" });
-          ws.send(errorMessage); // 역할이 잘못된 경우도 클라이언트에 오류 메시지 전송
-          ws.close();
-          logger.warn("Invalid user role, connection closed");
-        }
-      } else {
-        const errorMessage = JSON.stringify({
-          error: "Missing sessionId or subject",
-        });
-        ws.send(errorMessage); // 세션 ID 또는 주제가 없는 경우
-        ws.close();
-        logger.warn(
-          "WebSocket connection closed due to missing sessionId or subject"
-        );
-      }
-    } else {
-      const errorMessage = JSON.stringify({
-        error: "Missing sessionId or subject",
-      });
-      ws.send(errorMessage); // 세션 ID 또는 주제가 없는 경우
-      ws.close();
-      logger.warn(
-        "WebSocket connection closed due to missing sessionId or subject"
-      );
-    }
-  });
-});
+// 웹소켓 서버 연결 처리 (수정)
+wss.on("connection", handleNewWebSocketConnection);
 
 // 크론 작업 설정 (채팅 요약 데이터 삭제)
-cron.schedule("0 0 * * *", async () => {
-  logger.info("Running removeOldSummaries at midnight");
-  try {
-    const days = 7;
-    // 기존: const chatSummaries = await ChatSummary.find();
-    // 변경: ChatSummary.find().cursor() 사용하여 메모리 효율성 증대
-    const cursor = ChatSummary.find().cursor();
+// cron.schedule("0 0 * * *", async () => {
+//   logger.info("Running removeOldSummaries at midnight");
+//   try {
+//     const days = 7;
+//     // 기존: const chatSummaries = await ChatSummary.find();
+//     // 변경: ChatSummary.find().cursor() 사용하여 메모리 효율성 증대
+//     const cursor = ChatSummary.find().cursor();
 
-    // 기존: for (const chatSummary of chatSummaries) {
-    // 변경: for await...of 구문으로 커서 처리
-    for await (const chatSummary of cursor) {
-      await chatSummary.removeOldSummaries(days);
-    }
-    logger.info("Old summaries removed successfully");
-  } catch (error) {
-    logger.error("Error removing old summaries:", error);
-  }
-});
+//     // 기존: for (const chatSummary of chatSummaries) {
+//     // 변경: for await...of 구문으로 커서 처리
+//     for await (const chatSummary of cursor) {
+//       await chatSummary.removeOldSummaries(days);
+//     }
+//     logger.info("Old summaries removed successfully");
+//   } catch (error) {
+//     logger.error("Error removing old summaries:", error);
+//   }
+// });

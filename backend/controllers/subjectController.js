@@ -1,4 +1,5 @@
 const Subject = require("../models/Subject");
+const logger = require("../utils/logger"); // G_TOKEN_REPLACEMENT_
 
 // 과목 추가
 const addSubject = async (req, res) => {
@@ -8,6 +9,7 @@ const addSubject = async (req, res) => {
     await subject.save();
     res.status(201).send(subject);
   } catch (error) {
+    logger.error("과목 추가에 실패했습니다.", error); // G_TOKEN_REPLACEMENT_
     res.status(400).send({ error: "과목 추가에 실패했습니다." });
   }
 };
@@ -18,6 +20,7 @@ const getSubjects = async (req, res) => {
     const subjects = await Subject.find();
     res.status(200).send(subjects);
   } catch (error) {
+    logger.error("과목 정보를 불러오는데 실패했습니다.", error); // G_TOKEN_REPLACEMENT_
     res.status(500).send({ error: "과목 정보를 불러오는데 실패했습니다." });
   }
 };
@@ -63,7 +66,7 @@ const getUnits = async (req, res) => {
       return res.status(400).send({ error: "잘못된 파라미터입니다." });
     }
   } catch (error) {
-    console.error("Failed to fetch units:", error);
+    logger.error("Failed to fetch units:", error); // G_TOKEN_REPLACEMENT_
     res.status(500).send({ error: "단원 정보를 불러오는데 실패했습니다." });
   }
 };
@@ -85,7 +88,7 @@ const addUnits = async (req, res) => {
     await subjectDoc.save();
     res.status(200).send(subjectDoc);
   } catch (error) {
-    console.error("Error adding units:", error);
+    logger.error("Error adding units:", error); // G_TOKEN_REPLACEMENT_
     res.status(500).send({ error: "단원 추가에 실패했습니다." });
   }
 };
@@ -117,7 +120,7 @@ const addUnitRating = async (req, res) => {
     await subject.save();
     res.status(200).send(subject);
   } catch (error) {
-    console.error("Error adding unit rating:", error);
+    logger.error("Error adding unit rating:", error); // G_TOKEN_REPLACEMENT_
     res.status(500).send({ error: "단원 평어 추가에 실패했습니다." });
   }
 };

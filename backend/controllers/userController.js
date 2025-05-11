@@ -3,9 +3,10 @@ const Student = require("../models/Student");
 const bcrypt = require("bcryptjs");
 const { format } = require("date-fns");
 const logger = require("../utils/logger");
+const config = require("../config"); // 설정 파일 로드
+const chatUsageService = require("../services/chatUsageService"); // chatUsageService 임포트
 
-const DAILY_LIMIT = 15;
-const MONTHLY_LIMIT = 150;
+const { DAILY_LIMIT, MONTHLY_LIMIT } = config.chatLimits; // 설정값 사용
 
 // Helper function to extract school prefix (consistent with frontend logic)
 const getSchoolPrefix = (schoolName) => {
@@ -325,53 +326,56 @@ const getChatUsage = async (req, res) => {
   }
 
   try {
-    // 1. 학생 정보 조회 (DB 업데이트 없음)
-    const student = await Student.findById(_id).select(
-      "dailyChatCount lastChatDay monthlyChatCount lastChatMonth" // 필요한 필드만 선택
-    );
+    // chatUsageService를 사용하여 사용량 확인 및 필요한 경우 DB 업데이트
+    const usageInfo = await chatUsageService.checkAndUpdateUsageOnInit(_id);
 
-    if (!student) {
-      logger.warn(`Student not found for getChatUsage: ${_id}`);
+    if (usageInfo.errorType === "user_not_found") {
+      logger.warn(
+        `[UserController] Student not found for getChatUsage: ${_id}`
+      );
       return res.status(404).send({ error: "학생 프로필을 찾을 수 없습니다." });
     }
-
-    const today = format(new Date(), "yyyy-MM-dd");
-    const thisMonth = format(new Date(), "yyyy-MM");
-
-    // 2. 사용자에게 보여줄 값 계산
-    let displayDailyCount = student.dailyChatCount;
-    let displayMonthlyCount = student.monthlyChatCount;
-
-    if (student.lastChatDay !== today) {
-      displayDailyCount = 0; // 오늘 사용량은 0으로 간주
-    }
-    if (student.lastChatMonth !== thisMonth) {
-      displayMonthlyCount = 0; // 이번 달 사용량은 0으로 간주
-      // 월이 바뀌면 일일 카운트도 0으로 간주해야 함 (어제 기록이므로)
-      if (student.lastChatDay !== today) {
-        // 만약 어제 데이터면서 월도 바뀌었다면, 일일 카운트도 0이어야 함.
-        displayDailyCount = 0;
-      }
+    if (
+      usageInfo.errorType &&
+      usageInfo.errorType !== "daily_limit_exceeded" &&
+      usageInfo.errorType !== "monthly_limit_exceeded"
+    ) {
+      // "daily_limit_exceeded" 또는 "monthly_limit_exceeded"는 사용량 표시를 위해 정상 처리
+      // 그 외 서비스 내부 오류 (예: usage_check_error) 는 에러로 간주
+      logger.error(
+        `[UserController] Error from chatUsageService for student ${_id}: ${usageInfo.errorType}`
+      );
+      return res.status(500).send({
+        error: "채팅 사용량을 불러오는데 실패했습니다. (서비스 오류)",
+      });
     }
 
-    // 3. 남은 횟수 계산
+    // 서비스에서 반환된 최신 dailyCount와 monthlyCount 사용
+    const displayDailyCount = usageInfo.dailyCount;
+    const displayMonthlyCount = usageInfo.monthlyCount;
+
+    // 남은 횟수 계산
     const dailyRemaining = Math.max(0, DAILY_LIMIT - displayDailyCount);
     const monthlyRemaining = Math.max(0, MONTHLY_LIMIT - displayMonthlyCount);
 
-    // 4. 응답 전송
+    // 응답 전송
     res.send({
       dailyLimit: DAILY_LIMIT,
       monthlyLimit: MONTHLY_LIMIT,
-      dailyCount: displayDailyCount, // DB값이 아닌 계산된 값 사용
-      monthlyCount: displayMonthlyCount, // DB값이 아닌 계산된 값 사용
+      dailyCount: displayDailyCount,
+      monthlyCount: displayMonthlyCount,
       dailyRemaining,
       monthlyRemaining,
     });
   } catch (error) {
-    logger.error(`Error fetching chat usage for student ${_id}:`, {
-      error: error.message,
-      stack: error.stack,
-    });
+    // chatUsageService.checkAndUpdateUsageOnInit 내부에서 발생할 수 있는 예외 처리
+    logger.error(
+      `[UserController] Error fetching chat usage for student ${_id}:`,
+      {
+        error: error.message,
+        stack: error.stack,
+      }
+    );
     res.status(500).send({
       error: "채팅 사용량을 불러오는데 실패했습니다. 나중에 다시 시도해주세요.",
     });

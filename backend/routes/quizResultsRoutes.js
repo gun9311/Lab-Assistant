@@ -8,9 +8,9 @@ const router = express.Router();
 router.get('/', auth('student'), getQuizResults);
 
 // 교사가 특정 학생의 퀴즈 결과 내역 가져오기
-router.get('/:studentId', auth('teacher'), getQuizResultsByStudentId);
+router.get("/:studentId", auth(["student", "teacher"]), getQuizResultsByStudentId);
 
 // 특정 퀴즈의 상세 데이터 가져오기
-router.get('/details/:quizId/:studentId', auth(["student", "teacher"]), getQuizDetails);
+router.get('/details/:sessionId/:studentId', auth(["student", "teacher"]), getQuizDetails);
 
 module.exports = router;

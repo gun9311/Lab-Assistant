@@ -75,6 +75,7 @@ const googleLogin = async (req, res) => {
       school: teacher.school,
     });
   } catch (error) {
+    logger.error("Error during login:", error);
     res.status(400).send({ error: "Google login failed" });
   }
 };
@@ -186,7 +187,7 @@ const login = async (req, res) => {
       .set(user._id.toString(), refreshToken, "EX", 7 * 24 * 60 * 60)
       .then(() => {})
       .catch((err) => {
-        console.error("Failed to save refresh token in Redis:", err);
+        logger.error("Failed to save refresh token in Redis:", err);
       });
 
     const response = {
@@ -206,7 +207,7 @@ const login = async (req, res) => {
 
     res.send(response);
   } catch (error) {
-    console.error("Error during login:", error);
+    logger.error("Error during login:", error);
     res.status(500).send({ error: "Internal server error" });
   }
 };
