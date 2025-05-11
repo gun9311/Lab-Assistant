@@ -36,7 +36,7 @@ import api from "../../../utils/api";
 
 interface QuizResult {
   _id: string;
-  quizId: string; // 퀴즈 ID 추가
+  sessionId: string; // 퀴즈 ID 추가
   subject: string;
   semester: string;
   unit: string;
@@ -76,7 +76,7 @@ const QuizResults: React.FC<QuizResultsProps> = ({
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [noData, setNoData] = useState<boolean>(false);
-  const [expandedQuizId, setExpandedQuizId] = useState<string | null>(null);
+  const [expandedSessionId, setExpandedSessionId] = useState<string | null>(null);
   const [quizDetails, setQuizDetails] = useState<QuizDetail[]>([]);
 
   const theme = useTheme();
@@ -111,7 +111,7 @@ const QuizResults: React.FC<QuizResultsProps> = ({
         setLoading(true);
         try {
           const response = await api.get(`/quiz-results/${studentId}`);
-          // console.log('API 호출 성공:', response.data);
+          console.log('API 호출 성공:', response.data);
           setQuizResults(response.data);
           setNoData(response.data.length === 0);
         } catch (err) {
@@ -147,10 +147,10 @@ const QuizResults: React.FC<QuizResultsProps> = ({
     return <Typography>Error: {error}</Typography>;
   }
 
-  const fetchQuizDetails = async (quizId: string) => {
+  const fetchQuizDetails = async (sessionId: string) => {
     try {
       const response = await api.get(
-        `/quiz-results/details/${quizId}/${studentId}`
+        `/quiz-results/details/${sessionId}/${studentId}`
       );
       setQuizDetails(response.data);
     } catch (err) {
@@ -162,12 +162,12 @@ const QuizResults: React.FC<QuizResultsProps> = ({
   // setExpandedQuizId(prev => (prev === quizId ? null : quizId));
   // };
 
-  const toggleQuizDetails = (quizId: string) => {
-    if (expandedQuizId === quizId) {
-      setExpandedQuizId(null);
+  const toggleQuizDetails = (sessionId: string) => {
+    if (expandedSessionId === sessionId) {
+      setExpandedSessionId(null);
     } else {
-      setExpandedQuizId(quizId);
-      fetchQuizDetails(quizId);
+      setExpandedSessionId(sessionId);
+      fetchQuizDetails(sessionId);
     }
   };
 
@@ -211,11 +211,11 @@ const QuizResults: React.FC<QuizResultsProps> = ({
 
                     <TableCell align="center">
                       <IconButton
-                        onClick={() => toggleQuizDetails(result.quizId)}
+                        onClick={() => toggleQuizDetails(result.sessionId)}
                         color="primary"
                         aria-label="view details"
                       >
-                        {expandedQuizId === result.quizId ? (
+                        {expandedSessionId === result.sessionId ? (
                           <VisibilityOff />
                         ) : (
                           <Visibility />
@@ -229,7 +229,7 @@ const QuizResults: React.FC<QuizResultsProps> = ({
                       sx={{ padding: 0, borderBottom: "none" }}
                     >
                       <Collapse
-                        in={expandedQuizId === result.quizId}
+                        in={expandedSessionId === result.sessionId}
                         timeout="auto"
                         unmountOnExit
                       >

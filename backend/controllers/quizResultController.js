@@ -1,83 +1,111 @@
-const QuizResult = require('../models/QuizResult');
-const KahootQuizContent = require('../models/KahootQuizContent');
+const QuizResult = require("../models/QuizResult");
+const KahootQuizSession = require("../models/KahootQuizSession");
+const logger = require("../utils/logger"); // G_TOKEN_REPLACEMENT_
 
 const getQuizResults = async (req, res) => {
   try {
-    const quizResults = await QuizResult.find({ studentId: req.user._id })
-      .select('quizId subject semester unit score createdAt'); // 기본 정보만 선택
+    const quizResults = await QuizResult.find({
+      studentId: req.user._id,
+    })
+      .select("sessionId subject semester unit score createdAt")
+      .sort({ createdAt: -1 });
+
     res.status(200).json(quizResults);
   } catch (error) {
-    console.error('Failed to fetch quiz results:', error);
-    res.status(500).send({ error: 'Failed to fetch quiz results' });
+    logger.error("Failed to fetch quiz results for user:", error);
+    res.status(500).send({ error: "Failed to fetch quiz results" });
   }
 };
 
 const getQuizResultsByStudentId = async (req, res) => {
-  // console.log('퀴즈결과 호출');
   try {
     const { studentId } = req.params;
     const quizResults = await QuizResult.find({ studentId })
-      .select('quizId subject semester unit score createdAt'); // 기본 정보만 선택
+      .select("sessionId subject semester unit score createdAt")
+      .sort({ createdAt: -1 });
+
     res.status(200).json(quizResults);
   } catch (error) {
-    console.error('Failed to fetch quiz results by student ID:', error);
-    res.status(500).send({ error: 'Failed to fetch quiz results' });
+    logger.error("Failed to fetch quiz results by student ID:", error);
+    res.status(500).send({ error: "Failed to fetch quiz results" });
   }
 };
 
-// 새로운 API 엔드포인트 추가
 const getQuizDetails = async (req, res) => {
   try {
-    const { quizId } = req.params;
-    const { studentId } = req.params;    
-    
-    // 퀴즈 결과에서 학생의 답변과 정답 여부 가져오기
-    const quizResult = await QuizResult.findOne({ quizId, studentId })
-      .select('results');
+    const { sessionId } = req.params;
+    const studentId = req.user._id;
+
+    const quizResult = await QuizResult.findOne({ sessionId, studentId });
 
     if (!quizResult) {
-      return res.status(404).json({ error: 'Quiz result not found' });
+      return res
+        .status(404)
+        .json({
+          error: "해당 세션에 대한 학생의 퀴즈 결과를 찾을 수 없습니다.",
+        });
     }
 
-    // 퀴즈 콘텐츠에서 문제의 텍스트와 정답 가져오기
-    const quizContent = await KahootQuizContent.findById(quizId)
-      .select('questions');
+    const kahootQuizSession = await KahootQuizSession.findById(
+      sessionId
+    ).select("questionsSnapshot");
 
-
-    if (!quizContent) {
-      return res.status(404).json({ error: 'Quiz content not found' });
+    if (!kahootQuizSession || !kahootQuizSession.questionsSnapshot) {
+      return res
+        .status(404)
+        .json({ error: "퀴즈 세션 정보 또는 문제 스냅샷을 찾을 수 없습니다." });
     }
 
-    // 문제와 학생의 답변을 조합하여 반환
-    const detailedResults = quizResult.results.map(result => {
-      const question = quizContent.questions.find(q => q._id.equals(result.questionId));
+    const questionsSnapshot = kahootQuizSession.questionsSnapshot;
 
-      if (!question || !question.options[result.studentAnswer]) {
+    const detailedResults = quizResult.results.map((result) => {
+      const questionFromSnapshot = questionsSnapshot.find((q) =>
+        q._id.equals(result.questionId)
+      );
+
+      if (!questionFromSnapshot) {
         return {
-          questionText: question ? question.questionText : '문제를 찾을 수 없음',
-          correctAnswer: question ? question.options[question.correctAnswer]?.text : '정답을 찾을 수 없음',
-          studentAnswer: '답변 없음',
-          isCorrect: result.isCorrect
+          questionId: result.questionId,
+          questionText: "질문을 찾을 수 없음 (스냅샷에 없음)",
+          correctAnswer: "N/A",
+          studentAnswer: "N/A",
+          isCorrect: result.isCorrect,
         };
       }
 
-      const correctAnswerIndex = parseInt(question.correctAnswer, 10);
-      const studentAnswerIndex = parseInt(result.studentAnswer, 10);
-      const correctAnswerText = question.options[correctAnswerIndex]?.text || '텍스트 없음';
-      const studentAnswerText = question.options[studentAnswerIndex]?.text || '텍스트 없음';
+      let studentAnswerText = "답변 없음";
+      if (
+        result.studentAnswer !== null &&
+        result.studentAnswer !== undefined &&
+        result.studentAnswer !== -1
+      ) {
+        studentAnswerText =
+          questionFromSnapshot.options[result.studentAnswer]?.text ||
+          `선택지 (${result.studentAnswer}) 없음`;
+      } else if (result.studentAnswer === -1) {
+        studentAnswerText = "시간 초과";
+      }
+
+      const correctAnswerText =
+        questionFromSnapshot.options[
+          parseInt(questionFromSnapshot.correctAnswer, 10)
+        ]?.text || "정답 선택지 없음";
 
       return {
-        questionText: question.questionText,
+        questionId: questionFromSnapshot._id,
+        questionText: questionFromSnapshot.questionText,
         correctAnswer: correctAnswerText,
         studentAnswer: studentAnswerText,
-        isCorrect: result.isCorrect
+        isCorrect: result.isCorrect,
       };
     });
 
     res.status(200).json(detailedResults);
   } catch (error) {
-    console.error('Failed to fetch quiz details:', error);
-    res.status(500).send({ error: 'Failed to fetch quiz details' });
+    logger.error("Failed to fetch quiz details:", error);
+    res
+      .status(500)
+      .send({ error: "퀴즈 상세 정보를 가져오는데 실패했습니다." });
   }
 };
 

@@ -1,14 +1,15 @@
 const winston = require("winston");
+const config = require("../config"); // 설정 파일 로드
 
 const logger = winston.createLogger({
-  level: "warn", // 환경 변수로 로그 레벨 설정 가능하도록 변경
+  level: config.loggerConfig.LEVEL, // 수정됨, 환경 변수로 로그 레벨 설정 가능하도록 변경
   format: winston.format.combine(
-    winston.format.timestamp({ format: "YYYY-MM-DD HH:mm:ss" }), // 타임스탬프 형식 지정
+    winston.format.timestamp({ format: config.loggerConfig.TIMESTAMP_FORMAT }), // 수정됨, 타임스탬프 형식 지정
     winston.format.errors({ stack: true }), // 에러 스택 트레이스 포함
     winston.format.splat(),
     winston.format.json() // JSON 형식으로 로그 출력
   ),
-  defaultMeta: { service: "backend-server" }, // 모든 로그에 서비스 이름 메타데이터 추가 (선택적)
+  defaultMeta: { service: config.loggerConfig.DEFAULT_META_SERVICE }, // 수정됨, 모든 로그에 서비스 이름 메타데이터 추가 (선택적)
   transports: [
     new winston.transports.Console({
       format: winston.format.combine(
