@@ -37,10 +37,10 @@ import {
   useNotificationContext,
 } from "./context/NotificationContext";
 import { requestPermissionAndGetToken, onMessageListener } from "./firebase"; // 수정된 함수 import
-// import ManageQuizzesPage from "./components/teacher/quiz/ManageQuizzes"; // 주석 처리
-// import CreateQuizPage from "./components/teacher/quiz/CreateQuiz"; // 주석 처리
-// import EditQuizPage from "./components/teacher/quiz/EditQuiz"; // 주석 처리
-// import QuizSessionPage from "./components/teacher/quiz/QuizSession"; // 주석 처리
+import ManageQuizzesPage from "./components/teacher/quiz/ManageQuizzes"; // 주석 처리
+import CreateQuizPage from "./components/teacher/quiz/CreateQuiz"; // 주석 처리
+import EditQuizPage from "./components/teacher/quiz/EditQuiz"; // 주석 처리
+import QuizSessionPage from "./components/teacher/quiz/QuizSession"; // 주석 처리
 import StudentQuizSessionPage from "./components/student/quiz/StudentQuizSession";
 import ForgotPasswordPage from "./pages/login/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/login/ResetPasswordPage";
@@ -138,7 +138,7 @@ const StudentRouteGuard: React.FC<{ children: React.ReactElement }> = ({
   useEffect(() => {
     checkAvailability();
     // 선택적: 주기적으로 시간 상태 다시 확인 (예: 1분마다)
-    const intervalId = setInterval(checkAvailability, 60 * 1000);
+    const intervalId = setInterval(checkAvailability, 3600 * 1000);
     return () => clearInterval(intervalId);
   }, [checkAvailability]);
 
@@ -313,14 +313,14 @@ const AppContent: React.FC = () => {
               />
             }
           />
-          {/* <Route path="/create-quiz" element={<CreateQuizPage />} /> */}{" "}
+          <Route path="/create-quiz" element={<CreateQuizPage />} />{" "}
           {/* 퀴즈 생성 페이지 주석 처리 */}
-          {/* <Route path="/edit-quiz/:quizId" element={<EditQuizPage />} /> */}{" "}
+          <Route path="/edit-quiz/:quizId" element={<EditQuizPage />} />{" "}
           {/* 퀴즈 수정 페이지 주석 처리 */}
           <Route
             path="/start-quiz-session"
-            // element={<QuizSessionPage setIsQuizMode={setIsQuizMode} />} // 기존 컴포넌트 주석 처리
-            element={<ComingSoon />} // ComingSoon 컴포넌트로 대체
+            element={<QuizSessionPage setIsQuizMode={setIsQuizMode} />} // 기존 컴포넌트 주석 처리
+            // element={<ComingSoon />} // ComingSoon 컴포넌트로 대체
           />{" "}
           {/* 퀴즈 세션 페이지 */}
           <Route
@@ -328,11 +328,7 @@ const AppContent: React.FC = () => {
             element={
               <PrivateRoute
                 roles={["student"]}
-                element={
-                  <StudentRouteGuard>
-                    <StudentQuizSessionPage />
-                  </StudentRouteGuard>
-                }
+                element={<StudentQuizSessionPage />}
               />
             }
           />
