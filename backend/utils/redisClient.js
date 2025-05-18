@@ -18,15 +18,26 @@ redisClient.on("error", (err) =>
     stack: err?.stack,
   })
 ); // logger 사용, 에러 객체 전달
-redisClient
-  .connect()
-  .then(() => logger.info("Connected to Redis")) // logger 사용
-  .catch((err) =>
+
+// Pub/Sub 전용 클라이언트 생성
+const subscriberClient = redisClient.duplicate();
+
+(async () => {
+  try {
+    await redisClient.connect();
+    logger.info("Connected to Redis (Main Client)");
+    await subscriberClient.connect();
+    logger.info("Connected to Redis (Subscriber Client)");
+  } catch (err) {
     logger.error("Failed to connect to Redis:", {
       message: err?.message || err.toString(),
       stack: err?.stack,
-    })
-  ); // logger 사용, 에러 객체 전달
+    });
+  }
+})();
 
-// 4. 함수 대신 생성된 redisClient 인스턴스를 직접 내보냅니다.
-module.exports = redisClient;
+// 4. 생성된 redisClient 인스턴스와 subscriberClient 인스턴스를 내보냅니다.
+module.exports = {
+  redisClient,
+  subscriberClient,
+};

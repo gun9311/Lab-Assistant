@@ -1,5 +1,5 @@
 const logger = require("../utils/logger");
-const redisClient = require("../utils/redisClient"); // Redis 클라이언트 직접 사용
+const {redisClient} = require("../utils/redisClient"); // Redis 클라이언트 직접 사용
 const config = require("../config");
 
 const { RECENT_HISTORY_COUNT } = config.chatLimits;

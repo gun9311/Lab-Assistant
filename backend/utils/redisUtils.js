@@ -1,4 +1,4 @@
-const redisClient = require("./redisClient"); // 기존 Redis 클라이언트 인스턴스
+const { redisClient } = require("./redisClient"); // 기존 Redis 클라이언트 인스턴스
 const logger = require("./logger");
 
 /**
@@ -43,7 +43,43 @@ const redisJsonSet = async (key, data, options = null) => {
   }
 };
 
+/**
+ * Redis에서 여러 키에 해당하는 값들을 한 번의 MGET 명령으로 가져와 JSON으로 파싱합니다.
+ * 각 키에 대해 값이 없거나 파싱에 실패하면 배열 내 해당 위치에 null을 포함합니다.
+ * @param {string[]} keys - 조회할 Redis 키들의 배열
+ * @returns {Promise<Array<Object|null>>} 파싱된 JSON 객체들의 배열 또는 null (MGET 실패 시)
+ */
+const redisJsonMGet = async (keys) => {
+  if (!keys || keys.length === 0) {
+    return [];
+  }
+  try {
+    const jsonDatas = await redisClient.mGet(keys);
+    if (jsonDatas) {
+      return jsonDatas.map((jsonData, index) => {
+        if (jsonData) {
+          try {
+            return JSON.parse(jsonData);
+          } catch (error) {
+            logger.error(
+              `Error parsing JSON from Redis MGET for key ${keys[index]}:`,
+              error
+            );
+            return null; // 개별 항목 파싱 오류 시 null
+          }
+        }
+        return null; // 키에 해당하는 데이터가 없는 경우
+      });
+    }
+    return keys.map(() => null); // MGET 결과가 null이나 undefined인 경우 (이론상 발생하기 어려움)
+  } catch (error) {
+    logger.error(`Error executing MGET for keys ${keys.join(", ")}:`, error);
+    return null; // MGET 자체 오류 시 null 반환
+  }
+};
+
 module.exports = {
   redisJsonGet,
   redisJsonSet,
+  redisJsonMGet,
 };

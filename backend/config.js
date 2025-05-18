@@ -10,7 +10,7 @@ module.exports = {
   },
   studentServiceHours: {
     START_HOUR: 9, // 오전 8시
-    END_HOUR: 15, // 오후 11시 (23시 전까지 허용)
+    END_HOUR: 18, // 오후 11시 (23시 전까지 허용)
     SERVER_TIMEZONE: "Asia/Seoul",
   },
   openAI: {
