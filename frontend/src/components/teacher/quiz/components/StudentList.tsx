@@ -28,6 +28,10 @@ interface StudentListComponentProps {
   handleNextQuestion: () => void;
   handleEndQuiz: () => void;
   handleViewResults: () => void;
+  // Add new props for loading states
+  isProcessingNextQuestion: boolean;
+  isProcessingEndQuiz: boolean;
+  isProcessingViewResults: boolean;
 }
 
 const StudentListComponent: React.FC<StudentListComponentProps> = ({
@@ -40,6 +44,10 @@ const StudentListComponent: React.FC<StudentListComponentProps> = ({
   handleNextQuestion,
   handleEndQuiz,
   handleViewResults,
+  // Destructure new props
+  isProcessingNextQuestion,
+  isProcessingEndQuiz,
+  isProcessingViewResults,
 }) => {
   const sortedStudents = [...students].sort(
     (a, b) => (a.rank ?? Infinity) - (b.rank ?? Infinity)
@@ -172,6 +180,7 @@ const StudentListComponent: React.FC<StudentListComponentProps> = ({
                 color="primary"
                 onClick={handleNextQuestion}
                 startIcon={<ArrowForwardIos />}
+                disabled={isProcessingNextQuestion}
                 sx={{
                   fontSize: "1.5vw",
                   padding: "1vh 2vw",
@@ -187,7 +196,7 @@ const StudentListComponent: React.FC<StudentListComponentProps> = ({
                   },
                 }}
               >
-                다음 문제
+                {isProcessingNextQuestion ? "처리중..." : "다음 문제"}
               </Button>
             )}
             {isLastQuestion && showEndButtons && (
@@ -195,6 +204,7 @@ const StudentListComponent: React.FC<StudentListComponentProps> = ({
                 <Button
                   variant="contained"
                   onClick={handleEndQuiz}
+                  disabled={isProcessingEndQuiz}
                   sx={{
                     fontSize: "1.5vw",
                     padding: "1vh 2vw",
@@ -210,12 +220,13 @@ const StudentListComponent: React.FC<StudentListComponentProps> = ({
                     },
                   }}
                 >
-                  결과 저장 및 종료
+                  {isProcessingEndQuiz ? "처리중..." : "결과 저장 및 종료"}
                 </Button>
 
                 <Button
                   variant="outlined"
                   onClick={handleViewResults}
+                  disabled={isProcessingViewResults}
                   sx={{
                     fontSize: "1.5vw",
                     padding: "1vh 2vw",
@@ -231,7 +242,7 @@ const StudentListComponent: React.FC<StudentListComponentProps> = ({
                     },
                   }}
                 >
-                  결과 자세히 보기
+                  {isProcessingViewResults ? "처리중..." : "결과 자세히 보기"}
                 </Button>
               </>
             )}

@@ -6,7 +6,7 @@ import { DotLottieReact } from "@lottiefiles/dotlottie-react"; // Lottie 임포�
 const ServiceUnavailable: React.FC = () => {
   // --- 하드코딩된 시간 설정 ---
   const startHour = 9; // 오전 9시
-  const endHour = 15; // 오후 3시
+  const endHour = 6; // 오후 3시
   // --- 하드코딩 끝 ---
 
   return (

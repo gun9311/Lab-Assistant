@@ -88,6 +88,9 @@ const StudentQuizSessionPage: React.FC = () => {
   const selectedCharacterRef = useRef<number | string | null>(
     selectedCharacter
   );
+  const [isProcessingCharacterSelection, setIsProcessingCharacterSelection] =
+    useState<boolean>(false); // 로딩 상태 추가
+  const isCharacterFinalizedByServer = useRef(false); // 새로운 ref 추가
 
   useEffect(() => {
     selectedCharacterRef.current = selectedCharacter;
@@ -106,11 +109,11 @@ const StudentQuizSessionPage: React.FC = () => {
     socket.onopen = () => {
       console.log("웹소켓 연결 성공");
       const message = JSON.stringify({ type: "getTakenCharacters" });
-      console.log("메시지 준비 완료:", message);
+      // console.log("메시지 준비 완료:", message); // 로그 레벨 조정
 
       try {
         socket.send(message);
-        console.log(`메시지 전송: ${message}`);
+        // console.log(`메시지 전송: ${message}`); // 로그 레벨 조정
       } catch (error) {
         console.error("메시지 전송 중 오류 발생:", error);
       }
@@ -132,8 +135,20 @@ const StudentQuizSessionPage: React.FC = () => {
         return;
       }
 
+      console.log("Received message from server:", parsedData);
+      setIsProcessingCharacterSelection(false);
+
       if (parsedData.type === "takenCharacters") {
-        // 서버로부터 받은 선택된 캐릭터 목록을 기존 목록에 추가
+        console.log(
+          "[takenCharacters] Received. Current states before processing:",
+          {
+            isCharacterFinalizedByServer_ref:
+              isCharacterFinalizedByServer.current,
+            selectedCharacterRef_current: selectedCharacterRef.current,
+            parsedData_takenCharacters: parsedData.takenCharacters,
+          }
+        );
+
         setTakenCharacters((prev) => {
           const updatedSet = new Set(prev);
           parsedData.takenCharacters.forEach((index: number) => {
@@ -142,15 +157,108 @@ const StudentQuizSessionPage: React.FC = () => {
           return updatedSet;
         });
 
-        // 현재 선택된 캐릭터가 이미 선택된 상태라면 초기화
-        if (
-          selectedCharacterRef.current !== null &&
-          parsedData.takenCharacters.includes(selectedCharacterRef.current)
-        ) {
-          setSelectedCharacter(null);
+        // 서버로부터 캐릭터 확정 응답을 받은 후에는 takenCharacters 메시지가 selectedCharacter를 바꾸지 않도록 함
+        if (isCharacterFinalizedByServer.current) {
+          console.log(
+            "[takenCharacters] Character is FINALIZED by server. Skipping setSelectedCharacter(null)."
+          );
+        } else {
+          // 아직 서버로부터 최종 확정을 받기 전 (사용자가 UI에서 캐릭터를 고르는 중)
+          if (
+            selectedCharacterRef.current !== null &&
+            parsedData.takenCharacters.includes(selectedCharacterRef.current)
+          ) {
+            console.log(
+              `[takenCharacters] Character NOT FINALIZED. Current selection ${selectedCharacterRef.current} is in takenCharacters. Setting selectedCharacter to null.`
+            );
+            setSelectedCharacter(null);
+          }
         }
-      }
-      if (parsedData.type === "quizStartingSoon") {
+      } else if (parsedData.type === "characterSelected") {
+        const characterIndex =
+          parseInt(parsedData.character.replace("character", "")) - 1;
+        setTakenCharacters((prev) => new Set(prev).add(characterIndex));
+
+        // 내가 캐릭터 선택 요청을 보내고 서버의 최종 확정(Acknowledged)을 기다리는 동안,
+        // 나 자신의 선택에 대한 브로드캐스트가 먼저 도착해서 selectedCharacter를 null로 만들지 않도록 한다.
+        // isCharacterFinalizedByServer.current가 true가 된 이후에는 다른 사람의 선택이 내 캐릭터 상태를 바꾸지 않아야 한다.
+        // 이 블록은 이제 단순히 다른 사람이 어떤 캐릭터를 가져갔는지(takenCharacters)만 업데이트하고,
+        // 현재 학생의 selectedCharacter 상태는 건드리지 않는다.
+        // 내 캐릭터 선택이 중복되거나 문제가 있다면, characterAcknowledged 메시지나 에러 메시지를 통해 처리될 것이다.
+        console.log(
+          `[characterSelected broadcast] Char ${characterIndex} taken. Current local selection: ${selectedCharacterRef.current}. Finalized by server: ${isCharacterFinalizedByServer.current}`
+        );
+      } else if (parsedData.type === "characterAcknowledged") {
+        console.log("Character selection acknowledged by server:", parsedData);
+        setIsProcessingCharacterSelection(false);
+        setIsCharacterConfirmed(true);
+        isCharacterFinalizedByServer.current = true; // 이 시점부터 내 캐릭터는 서버가 확정한 것.
+        setIsWaitingForQuizStart(true);
+
+        if (parsedData.character) {
+          const characterIdentifier = parsedData.character;
+          const match = characterIdentifier.match(/\d+/);
+          if (match) {
+            const characterNumber = parseInt(match[0], 10);
+            const characterIndex = characterNumber - 1;
+            if (
+              !isNaN(characterIndex) &&
+              characterIndex >= 0 &&
+              characterIndex < characterImages.length
+            ) {
+              setSelectedCharacter(characterIndex); // 서버가 확정한 값으로 설정
+              console.log(
+                `Set selectedCharacter to index ${characterIndex} from server value ${characterIdentifier}`
+              );
+            } else {
+              // 이 경우는 selectedCharacter를 변경하지 않거나, 에러 처리가 필요할 수 있음
+              console.warn(
+                `Could not parse valid character index from server: ${characterIdentifier}. Local selection: ${selectedCharacterRef.current}`
+              );
+              // 만약 selectedCharacterRef.current에 유효한 값이 있다면 그것을 유지하거나,
+              // 아니면 서버 에러로 간주하고 캐릭터 선택 화면으로 돌려보내는 등의 처리가 필요.
+              // 여기서는 일단 로컬 선택을 믿어본다.
+              if (
+                selectedCharacterRef.current !== null &&
+                typeof selectedCharacterRef.current === "number"
+              ) {
+                setSelectedCharacter(selectedCharacterRef.current);
+              }
+            }
+          } else {
+            console.warn(
+              `Character string from server does not contain a number: ${characterIdentifier}. Local selection: ${selectedCharacterRef.current}`
+            );
+            if (
+              selectedCharacterRef.current !== null &&
+              typeof selectedCharacterRef.current === "number"
+            ) {
+              setSelectedCharacter(selectedCharacterRef.current);
+            }
+          }
+        } else {
+          // characterAcknowledged 메시지에 character 필드가 없는 경우
+          // 이것은 서버가 학생의 현재 선택을 "그대로 인정한다"는 의미일 수도 있고,
+          // 아니면 오류일 수도 있다. 여기서는 학생이 UI에서 선택한 값을 유지하도록 한다.
+          if (
+            selectedCharacterRef.current !== null &&
+            typeof selectedCharacterRef.current === "number"
+          ) {
+            setSelectedCharacter(selectedCharacterRef.current);
+            console.warn(
+              `characterAcknowledged received without character. Using locally selected: ${selectedCharacterRef.current}`
+            );
+          } else {
+            // 이 경우는 심각한 오류일 수 있으므로, 사용자에게 알리거나 캐릭터 선택을 다시 유도해야 할 수 있다.
+            console.error(
+              "characterAcknowledged received without character, and no local selection to fallback. Character might not be set."
+            );
+            // 필요하다면 여기서 캐릭터 선택 UI로 돌려보내는 로직 추가
+            // setIsCharacterConfirmed(false);
+            // isCharacterFinalizedByServer.current = false;
+          }
+        }
+      } else if (parsedData.type === "quizStartingSoon") {
         setIsQuizStarting(true);
         setIsWaitingForQuizStart(false);
       } else if (parsedData.type === "preparingNextQuestion") {
@@ -164,7 +272,6 @@ const StudentQuizSessionPage: React.FC = () => {
         setIsQuizStarting(false);
         setIsPreparingNextQuestion(false);
         setCurrentQuestion(parsedData);
-        // setTimeLeft(parsedData.timeLimit);
         setEndTime(parsedData.endTime);
         setSelectedAnswer(null);
         setStartTime(Date.now());
@@ -183,20 +290,18 @@ const StudentQuizSessionPage: React.FC = () => {
         setIsFeedbackReceived(true);
       } else if (parsedData.error === "Character already taken") {
         alert("이미 선택된 캐릭터입니다. 다른 캐릭터를 선택하세요.");
-      } else if (parsedData.type === "characterSelected") {
-        const characterIndex =
-          parseInt(parsedData.character.replace("character", "")) - 1;
-        setTakenCharacters((prev) => new Set(prev).add(characterIndex));
-        // 현재 선택된 캐릭터가 비활성화된 캐릭터라면 선택 해제
-        console.log(selectedCharacterRef.current, characterIndex);
-        if (selectedCharacterRef.current === characterIndex) {
-          console.log("selectedCharacter same");
-          setSelectedCharacter(null);
-        }
+        setSelectedCharacter(null);
+        setIsCharacterConfirmed(false); // UI를 다시 캐릭터 선택으로
+        isCharacterFinalizedByServer.current = false; // 서버 확정 취소
+        setIsWaitingForQuizStart(false);
       } else if (parsedData.type === "quizCompleted") {
         navigate(`/quiz-result/${pin}`);
       } else if (parsedData.type === "sessionEnded") {
         navigate("/my-quizzes");
+      } else if (parsedData.error) {
+        alert(`오류: ${parsedData.error}`);
+        setIsCharacterConfirmed(false);
+        setIsWaitingForQuizStart(false);
       }
     };
 
@@ -292,8 +397,10 @@ const StudentQuizSessionPage: React.FC = () => {
     if (
       webSocket &&
       webSocket.readyState === WebSocket.OPEN &&
-      selectedCharacter !== null
+      selectedCharacter !== null &&
+      !isProcessingCharacterSelection // 처리 중이 아닐 때만 요청
     ) {
+      setIsProcessingCharacterSelection(true); // 요청 시작 시 로딩 상태 true
       const characterIndex =
         typeof selectedCharacter === "number"
           ? selectedCharacter
@@ -304,9 +411,6 @@ const StudentQuizSessionPage: React.FC = () => {
       });
       webSocket.send(message);
       console.log(`캐릭터 선택 메시지 전송: ${message}`);
-      setIsCharacterConfirmed(true); // 캐릭터 선택 완료 상태 설정
-      setIsReady(true); // 준비 완료 상태 설정
-      setIsWaitingForQuizStart(true); // 퀴즈 시작 대기 상태 설정
     }
   };
 
@@ -434,15 +538,22 @@ const StudentQuizSessionPage: React.FC = () => {
                     "linear-gradient(45deg, #FF8E53 30%, #FE6B8B 90%)",
                 },
               }}
-              disabled={selectedCharacter === null}
+              disabled={
+                selectedCharacter === null || isProcessingCharacterSelection
+              }
             >
-              Ready
+              {isProcessingCharacterSelection ? (
+                <CircularProgress size={24} sx={{ color: "white" }} />
+              ) : (
+                "Ready"
+              )}
             </Button>
           </Box>
         ) : (
           <>
             <WaitingScreenComponent
-              isReady={isReady}
+              // isReady={isReady} // isReady는 더 이상 직접 관리하지 않거나, isCharacterConfirmed로 대체 가능
+              isReady={isCharacterConfirmed} // isCharacterConfirmed를 준비 상태로 간주
               isQuizStarting={isQuizStarting}
               isWaitingForQuizStart={isWaitingForQuizStart}
               isPreparingNextQuestion={isPreparingNextQuestion}
