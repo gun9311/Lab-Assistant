@@ -6,7 +6,7 @@ const config = require("./config");
 const { initializeChatConnection } = require("./handlers/chatbotWebSocketHandler");
 const { handleTeacherWebSocketConnection } = require("./handlers/kahootTeacherWebSocketHandler");
 const { handleStudentWebSocketConnection } = require("./handlers/kahootStudentWebSocketHandler");
-const redisClient = require("./utils/redisClient"); // Kahoot에서 Redis 사용 시 필요할 수 있음
+const {redisClient} = require("./utils/redisClient"); // Kahoot에서 Redis 사용 시 필요할 수 있음
 
 const { START_HOUR, END_HOUR, SERVER_TIMEZONE } = config.studentServiceHours;
 

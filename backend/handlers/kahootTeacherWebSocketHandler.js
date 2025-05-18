@@ -1,7 +1,7 @@
 // 교사 웹소켓 핸들러
 const KahootQuizSession = require("../models/KahootQuizSession");
 const QuizResult = require("../models/QuizResult");
-const redisClient = require("../utils/redisClient");
+const { redisClient } = require("../utils/redisClient");
 const logger = require("../utils/logger");
 const WebSocket = require("ws");
 const {
@@ -9,28 +9,37 @@ const {
   broadcastToStudents,
   broadcastToActiveStudents,
   setupKeepAlive,
+  subscribeToPinChannels,
+  unsubscribeFromPinChannels,
 } = require("./kahootShared");
 const {
   getSessionKey,
   getSessionQuestionsKey,
-  getParticipantKeysPattern,
-  getWaitingStudentsKey,
+  getSessionStudentIdsSetKey,
+  getParticipantKey,
+  getSessionTakenCharactersSetKey,
 } = require("../utils/redisKeys");
-const { redisJsonGet, redisJsonSet } = require("../utils/redisUtils");
+const {
+  redisJsonGet,
+  redisJsonSet,
+  redisJsonMGet,
+} = require("../utils/redisUtils");
 
 // 내부 헬퍼 함수: 세션 리소스 정리
+// 이 함수는 퀴즈 세션 종료 시 관련된 Redis 데이터 삭제, 학생 연결 종료 등의 정리 작업을 수행합니다.
+// KahootQuizSession 문서는 DB에서 삭제하지 않고 보존합니다.
 async function _cleanupSessionResources(pin, ws, options = {}) {
   const {
-    notifyStudents = true,
-    closeStudentSockets = true,
-    closeTeacherSocket = false,
+    notifyStudents = true, // true일 경우 학생들에게 세션 종료 알림
+    closeStudentSockets = true, // true일 경우 학생 웹소켓 연결 강제 종료
+    closeTeacherSocket = false, // true일 경우 교사 웹소켓 연결 강제 종료 (일반적으로는 불필요)
   } = options;
 
   logger.info(`Starting cleanup for session PIN: ${pin}`);
 
   // 1. 학생들에게 알림 및 연결 종료 (옵션)
   if (notifyStudents) {
-    broadcastToStudents(pin, {
+    await broadcastToStudents(pin, {
       type: "sessionEnded",
       message: "퀴즈가 종료되었습니다.",
     });
@@ -50,24 +59,58 @@ async function _cleanupSessionResources(pin, ws, options = {}) {
     logger.info(`Closed student WebSockets for session ${pin}.`);
   }
 
-  // 2. Redis 데이터 삭제 (메타데이터, 참여자, 대기열, 문제 스냅샷)
+  // 2. Redis 데이터 삭제
   try {
-    await redisClient.del(getSessionKey(pin));
-    await redisClient.del(getSessionQuestionsKey(pin));
-    const participantKeys = await redisClient.keys(
-      getParticipantKeysPattern(pin)
-    );
-    if (participantKeys.length > 0) {
-      await Promise.all(participantKeys.map((key) => redisClient.del(key)));
+    const sessionKey = getSessionKey(pin);
+    const questionsKey = getSessionQuestionsKey(pin);
+    const studentIdsSetKey = getSessionStudentIdsSetKey(pin);
+    const takenCharactersSetKey = getSessionTakenCharactersSetKey(pin);
+
+    const keysToDeleteInitially = [
+      sessionKey,
+      questionsKey,
+      takenCharactersSetKey,
+    ];
+
+    // 학생 ID Set에서 모든 학생 ID를 가져와 각 참여자 데이터 키를 삭제
+    const studentIds = await redisClient.sMembers(studentIdsSetKey);
+    if (studentIds && studentIds.length > 0) {
+      const participantKeysToDelete = studentIds.map((sid) =>
+        getParticipantKey(pin, sid)
+      );
+      keysToDeleteInitially.push(...participantKeysToDelete);
     }
-    await redisClient.del(getWaitingStudentsKey(pin));
-    logger.info(`Deleted Redis data for session ${pin}.`);
+
+    // 마지막으로 학생 ID Set 자체를 삭제 목록에 추가
+    keysToDeleteInitially.push(studentIdsSetKey);
+
+    // 중복 제거 (혹시 모를 경우 대비)
+    const finalKeysToDelete = [...new Set(keysToDeleteInitially)];
+
+    if (finalKeysToDelete.length > 0) {
+      const deletedCount = await redisClient.del(finalKeysToDelete); // 배열을 직접 전달
+      logger.info(
+        `Attempted to delete ${finalKeysToDelete.length} Redis keys for session ${pin}. Successfully deleted ${deletedCount} keys.`
+      );
+      if (deletedCount < finalKeysToDelete.length) {
+        logger.warn(
+          `Not all keys were deleted for session ${pin}. Expected ${finalKeysToDelete.length}, got ${deletedCount}. Some keys might have already been deleted or did not exist.`
+        );
+        // 어떤 키가 삭제되지 않았는지 확인하려면, 삭제 시도 전에 각 키의 존재 여부를 EXISTS로 확인하거나,
+        // 삭제 후 다시 MGET 등으로 확인하는 추가 로직이 필요하나, 여기서는 단순화합니다.
+      }
+    } else {
+      logger.info(`No Redis keys found to delete for session ${pin}.`);
+    }
   } catch (redisError) {
-    logger.error(`Error deleting Redis data for session ${pin}:`, redisError);
+    logger.error(
+      `Error during Redis data cleanup for session ${pin}:`, // 에러 메시지 수정
+      redisError
+    );
   }
 
   // 3. DB에서 KahootQuizSession 문서 삭제 로직은 완전히 제거됨.
-  //    KahootQuizSession 문서는 항상 보존됨.
+  //    KahootQuizSession 문서는 퀴즈 기록 및 분석을 위해 항상 보존됨.
   logger.info(
     `KahootQuizSession document in DB for PIN ${pin} is preserved (no deletion during cleanup).`
   );
@@ -97,19 +140,42 @@ async function _saveQuizResults(
     `Attempting to save quiz results for PIN: ${pin}. For unexpected close: ${forUnexpectedClose}`
   );
   try {
-    const participantKeys = await redisClient.keys(
-      getParticipantKeysPattern(pin)
-    );
-    const allParticipantsData = await Promise.all(
-      participantKeys.map(async (key) => await redisJsonGet(key))
-    );
-    const allParticipants = allParticipantsData.filter((p) => p);
+    const studentIdsSetKey = getSessionStudentIdsSetKey(pin);
+    const studentIds = await redisClient.sMembers(studentIdsSetKey);
+
+    let allParticipants = [];
+    if (studentIds && studentIds.length > 0) {
+      const participantKeys = studentIds.map((sid) =>
+        getParticipantKey(pin, sid)
+      );
+      const participantDataArray = await redisJsonMGet(participantKeys); // MGET 사용
+
+      if (participantDataArray) {
+        allParticipants = participantDataArray.filter((pData, index) => {
+          if (pData) {
+            return true;
+          } else {
+            logger.warn(
+              `Participant data for studentId ${studentIds[index]} was null or invalid (MGET) during quiz results saving, PIN: ${pin}.`
+            );
+            return false;
+          }
+        });
+      } else {
+        logger.error(
+          `Failed to get participant data array via MGET for quiz results saving, PIN: ${pin}.`
+        );
+        // MGET 실패 시, 빈 배열로 계속 진행하거나 오류를 반환할 수 있음.
+        // 여기서는 빈 allParticipants로 진행되어 "No participants with results to save"로 처리될 것임.
+      }
+    }
+
     logger.info(
       `Fetched ${allParticipants.length} participants for result processing for session PIN: ${pin}`
     );
 
     const kahootQuizSessionMongoId = sessionStateToUse.sessionId;
-    const { subject, semester, unit /*, teacherId */ } = sessionStateToUse; // teacherId는 QuizResult 스키마 확인 후
+    const { subject, semester, unit /*, teacherId */ } = sessionStateToUse;
 
     if (
       !kahootQuizSessionMongoId ||
@@ -127,13 +193,12 @@ async function _saveQuizResults(
       return false;
     }
 
-    const totalQuestions = questionContent.length; // 전체 문제 수
-    let resultsSavedCount = 0;
+    const totalQuestions = questionContent.length;
+    let resultsSavedOrUpdatedCount = 0;
 
     if (allParticipants.length > 0) {
       for (let participant of allParticipants) {
         if (!participant.student || !participant.responses) {
-          // responses가 없거나 비어있을 수 있음
           logger.warn(
             `Skipping participant with no student ID or responses: ${JSON.stringify(
               participant
@@ -151,43 +216,49 @@ async function _saveQuizResults(
             (correctAnswersCount / totalQuestions) * 100
           );
         } else {
-          studentScore = 0; // 문제가 없는 경우 0점 처리
+          studentScore = 0;
         }
 
-        const newQuizResultData = {
+        const query = {
           studentId: participant.student,
           sessionId: kahootQuizSessionMongoId,
-          subject: subject,
-          semester: semester,
-          unit: unit,
-          results: participant.responses.map((r) => ({
-            questionId: r.question,
-            studentAnswer: r.answer,
-            isCorrect: r.isCorrect,
-          })),
-          score: studentScore, // 100점 만점 환산 점수 (반올림)
-          // teacherId: teacherId, // QuizResult 스키마 확인 후
-          // pin: pin, // QuizResult 스키마 확인 후
-          // createdAt: new Date(), // QuizResult 스키마에 default 있음.
-          // endedAt: new Date(), // QuizResult 스키마 확인 후
-          // notes: forUnexpectedClose ? "..." : "...", // QuizResult 스키마 확인 후
+        };
+
+        const update = {
+          $set: {
+            subject: subject,
+            semester: semester,
+            unit: unit,
+            results: participant.responses.map((r) => ({
+              questionId: r.question,
+              studentAnswer: r.answer,
+              isCorrect: r.isCorrect,
+            })),
+            score: studentScore,
+            endedAt: new Date(),
+          },
+        };
+
+        const options = {
+          upsert: true,
+          new: true,
+          setDefaultsOnInsert: true,
         };
 
         try {
-          const newQuizResult = new QuizResult(newQuizResultData);
-          await newQuizResult.save();
-          resultsSavedCount++;
+          await QuizResult.findOneAndUpdate(query, update, options);
+          resultsSavedOrUpdatedCount++;
         } catch (dbError) {
           logger.error(
-            `Error saving QuizResult for student ${participant.student}, session ${kahootQuizSessionMongoId}, PIN ${pin}:`,
+            `Error saving/updating QuizResult for student ${participant.student}, session ${kahootQuizSessionMongoId}, PIN ${pin}:`,
             dbError
           );
         }
       }
       logger.info(
-        `${resultsSavedCount} QuizResult documents created/updated for SessionID (Mongo): ${kahootQuizSessionMongoId}, PIN: ${pin}. Unexpected: ${forUnexpectedClose}`
+        `${resultsSavedOrUpdatedCount} QuizResult documents created/updated for SessionID (Mongo): ${kahootQuizSessionMongoId}, PIN: ${pin}. Unexpected: ${forUnexpectedClose}`
       );
-      return resultsSavedCount > 0;
+      return resultsSavedOrUpdatedCount > 0;
     } else {
       logger.info(
         `No participants with results to save for SessionID (Mongo): ${kahootQuizSessionMongoId}, PIN: ${pin}.`
@@ -195,8 +266,9 @@ async function _saveQuizResults(
       return false;
     }
   } catch (dbError) {
+    // 이 catch는 주로 sMembers 또는 MGET 외의 로직에서 발생하는 오류를 잡음
     logger.error(
-      `Error saving new QuizResult for SessionID (Mongo) ${sessionStateToUse.sessionId}, PIN: ${pin}:`,
+      `Error during QuizResult saving process for SessionID (Mongo) ${sessionStateToUse?.sessionId}, PIN: ${pin}:`,
       dbError
     );
     return false;
@@ -207,71 +279,127 @@ async function _saveQuizResults(
 async function _handleStartQuiz(pin, ws, currentSessionState, questionContent) {
   logger.info(`Handling startQuiz for session PIN: ${pin}`);
 
-  // Redis 세션 메타데이터 업데이트
-  currentSessionState.currentQuestionIndex = 0;
-  currentSessionState.isQuestionActive = true;
-  currentSessionState.quizStarted = true; // 퀴즈 시작됨
-  currentSessionState.quizEndedByTeacher = false; // 아직 교사가 종료 안함
+  const lockKey = `lock:teacher:startquiz:${pin}`;
+  let lockAcquired = false;
 
-  if (questionContent && questionContent.length > 0) {
-    currentSessionState.currentQuestionId = questionContent[0]._id
-      ? questionContent[0]._id.toString()
-      : null;
-  } else {
-    logger.error(
-      `No questions found in questionContent for pin: ${pin} when starting quiz.`
+  try {
+    const result = await redisClient.set(lockKey, "locked", "EX", 5, "NX"); // 10초 타임아웃
+    lockAcquired = result === "OK";
+
+    if (!lockAcquired) {
+      logger.warn(
+        `[StartQuiz] Could not acquire lock for PIN ${pin}. Start quiz action likely in progress.`
+      );
+      ws.send(
+        JSON.stringify({
+          type: "error",
+          message:
+            "퀴즈 시작 요청이 이미 처리 중입니다. 잠시 후 다시 시도해주세요.",
+        })
+      );
+      return;
+    }
+
+    // currentSessionState는 메시지 핸들러 시작 시점에서 가져왔으므로,
+    // 락을 획득한 후 최신 상태를 다시 한번 가져오는 것이 더 안전할 수 있습니다.
+    // 다만, 이 함수는 교사 요청에 의해서만 호출되므로, 아주 짧은 시간 내 동시 요청 가능성은 낮습니다.
+    // 여기서는 일단 기존 currentSessionState를 사용하되, 필요시 재조회 로직 추가 가능.
+    // 최신 상태를 다시 읽어오려면:
+    // currentSessionState = await redisJsonGet(getSessionKey(pin));
+    // if (!currentSessionState) { /* ... 오류 처리 ... */ return; }
+
+    if (currentSessionState.quizStarted) {
+      logger.warn(
+        `Attempted to start quiz for PIN: ${pin}, but quiz has already started. Ignoring duplicate request (lock acquired but state already set).`
+      );
+      // 이미 시작된 경우, 클라이언트에게 혼란을 주지 않기 위해 별도 메시지를 보내지 않거나,
+      // "이미 시작됨" 상태를 명확히 전달할 수 있습니다. 여기서는 추가 메시지 없이 반환.
+      return;
+    }
+
+    // Redis 세션 메타데이터 업데이트
+    currentSessionState.currentQuestionIndex = 0; // 첫 번째 문제로 설정
+    currentSessionState.isQuestionActive = true; // 질문 활성화 상태로 변경
+    currentSessionState.quizStarted = true; // 퀴즈가 시작되었음을 표시
+    currentSessionState.quizEndedByTeacher = false; // 교사가 아직 종료하지 않음
+
+    if (questionContent && questionContent.length > 0) {
+      currentSessionState.currentQuestionId = questionContent[0]._id
+        ? questionContent[0]._id.toString()
+        : null;
+    } else {
+      logger.error(
+        `No questions found in questionContent for pin: ${pin} when starting quiz.`
+      );
+      ws.send(
+        JSON.stringify({ type: "error", message: "No questions to start." })
+      );
+      return; // 락은 finally에서 해제됩니다.
+    }
+
+    const sessionMetadataKey = getSessionKey(pin);
+    await redisJsonSet(sessionMetadataKey, currentSessionState); // 업데이트된 상태 Redis에 저장
+    logger.info(
+      `Session state updated in Redis for startQuiz (currentQuestionIndex: 0) for PIN: ${pin}`
     );
-    ws.send(
-      JSON.stringify({ type: "error", message: "No questions to start." })
-    );
-    return;
-  }
 
-  const sessionMetadataKey = getSessionKey(pin);
-  await redisJsonSet(sessionMetadataKey, currentSessionState); // 업데이트된 상태 Redis에 저장
-  logger.info(
-    `Session state updated in Redis for startQuiz (currentQuestionIndex: 0) for PIN: ${pin}`
-  );
+    const firstQuestion = questionContent[0];
+    const readyMessage = {
+      type: "quizStartingSoon",
+      message: "퀴즈가 곧 시작됩니다",
+      totalQuestions: questionContent.length,
+    };
 
-  const firstQuestion = questionContent[0];
-  const readyMessage = {
-    type: "quizStartingSoon",
-    message: "퀴즈가 곧 시작됩니다",
-    totalQuestions: questionContent.length,
-  };
+    ws.send(JSON.stringify(readyMessage));
+    await broadcastToActiveStudents(pin, readyMessage);
 
-  ws.send(JSON.stringify(readyMessage));
-  broadcastToActiveStudents(pin, readyMessage);
+    setTimeout(async () => {
+      // setTimeout 콜백 내에서는 currentSessionState가 이전 상태일 수 있으므로,
+      // 필요하다면 Redis에서 다시 읽어오거나, 주요 상태 변경은 setTimeout 바깥에서 완료해야 합니다.
+      // 여기서는 endTime 계산 등은 즉시 실행되므로 큰 문제는 없을 수 있습니다.
+      const currentTime = Date.now();
+      const timeLimit = firstQuestion.timeLimit * 1000;
+      const bufferTime = 2000;
+      const endTime = currentTime + timeLimit + bufferTime;
 
-  setTimeout(async () => {
-    const currentTime = Date.now();
-    const timeLimit = firstQuestion.timeLimit * 1000;
-    const bufferTime = 2000;
-    const endTime = currentTime + timeLimit + bufferTime;
+      ws.send(
+        JSON.stringify({
+          type: "quizStarted",
+          questionId: firstQuestion._id,
+          currentQuestion: firstQuestion,
+          questionNumber: 1,
+          totalQuestions: questionContent.length,
+          endTime: endTime,
+        })
+      );
 
-    ws.send(
-      JSON.stringify({
-        type: "quizStarted",
+      const questionOptions = firstQuestion.options.map((option) => ({
+        text: option.text,
+        imageUrl: option.imageUrl,
+      }));
+      await broadcastToActiveStudents(pin, {
+        type: "newQuestionOptions",
         questionId: firstQuestion._id,
-        currentQuestion: firstQuestion,
-        questionNumber: 1,
-        totalQuestions: questionContent.length,
+        options: questionOptions,
         endTime: endTime,
-      })
-    );
-
-    const questionOptions = firstQuestion.options.map((option) => ({
-      text: option.text,
-      imageUrl: option.imageUrl,
-    }));
-    broadcastToActiveStudents(pin, {
-      type: "newQuestionOptions",
-      questionId: firstQuestion._id,
-      options: questionOptions,
-      endTime: endTime,
-    });
-    logger.info(`Quiz started for session PIN: ${pin}, first question sent.`);
-  }, 3000);
+      });
+      logger.info(`Quiz started for session PIN: ${pin}, first question sent.`);
+    }, 3000);
+  } catch (error) {
+    logger.error(`Error in _handleStartQuiz for PIN ${pin}:`, error);
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.send(
+        JSON.stringify({
+          type: "error",
+          message: "퀴즈 시작 중 오류가 발생했습니다.",
+        })
+      );
+    }
+  } finally {
+    if (lockAcquired) {
+      await redisClient.del(lockKey);
+    }
+  }
 }
 
 // Helper function for 'nextQuestion' message
@@ -285,104 +413,269 @@ async function _handleNextQuestion(
   logger.info(
     `Handling nextQuestion for session PIN: ${pin}, current index from Redis: ${currentQuestionIndex}`
   );
-  const newQuestionIndex = currentQuestionIndex + 1;
 
-  const participantKeys = await redisClient.keys(
-    getParticipantKeysPattern(pin)
-  );
-  await Promise.all(
-    participantKeys.map(async (key) => {
-      const participant = await redisJsonGet(key);
-      if (participant) {
-        participant.hasSubmitted = false;
-        await redisJsonSet(key, participant, { EX: 3600 });
-      }
-    })
-  );
-  logger.info(`Participant 'hasSubmitted' reset for session PIN: ${pin}`);
+  const lockKey = `lock:teacher:nextquestion:${pin}`;
+  let lockAcquired = false;
 
-  await redisClient.expire(getSessionQuestionsKey(pin), 3600); // 질문 스냅샷 TTL 갱신
-  logger.info(
-    `Questions snapshot expiration refreshed for session PIN: ${pin}`
-  );
+  try {
+    const result = await redisClient.set(lockKey, "locked", "EX", 5, "NX");
+    lockAcquired = result === "OK";
 
-  if (newQuestionIndex < questionContent.length) {
-    const nextQuestion = questionContent[newQuestionIndex];
-
-    // Redis 세션 메타데이터 업데이트
-    currentSessionState.currentQuestionIndex = newQuestionIndex;
-    currentSessionState.isQuestionActive = true;
-    currentSessionState.currentQuestionId = nextQuestion._id
-      ? nextQuestion._id.toString()
-      : null;
-
-    const sessionMetadataKey = getSessionKey(pin);
-    await redisJsonSet(sessionMetadataKey, currentSessionState); // 업데이트된 상태 Redis에 저장
-    logger.info(
-      `Session state updated in Redis for nextQuestion (idx: ${newQuestionIndex}) for PIN: ${pin}`
-    );
-
-    const isLastQuestion = newQuestionIndex === questionContent.length - 1;
-    const readyMessage = {
-      type: "preparingNextQuestion",
-      message: isLastQuestion
-        ? "마지막 문제입니다..."
-        : "다음 문제가 곧 출제됩니다...",
-      isLastQuestion: isLastQuestion,
-    };
-    ws.send(JSON.stringify(readyMessage));
-    broadcastToActiveStudents(pin, readyMessage);
-    logger.info(
-      `Sent 'preparingNextQuestion' for session PIN: ${pin}. Is last: ${isLastQuestion}`
-    );
-
-    setTimeout(() => {
-      const currentTime = Date.now();
-      const timeLimit = nextQuestion.timeLimit * 1000;
-      const bufferTime = 2000;
-      const endTime = currentTime + timeLimit + bufferTime;
+    if (!lockAcquired) {
+      logger.warn(
+        `[NextQuestion] Could not acquire lock for PIN ${pin}. Next question action likely in progress.`
+      );
       ws.send(
         JSON.stringify({
-          type: "newQuestion",
-          questionId: nextQuestion._id,
-          currentQuestion: nextQuestion,
-          questionNumber: newQuestionIndex + 1,
-          totalQuestions: questionContent.length,
-          isLastQuestion: isLastQuestion,
-          endTime: endTime,
+          type: "error",
+          message:
+            "다음 질문 요청이 이미 처리 중입니다. 잠시 후 다시 시도해주세요.",
         })
       );
+      return;
+    }
 
-      const questionOptions = nextQuestion.options.map((option) => ({
-        text: option.text,
-        imageUrl: option.imageUrl,
-      }));
-      broadcastToActiveStudents(pin, {
-        type: "newQuestionOptions",
-        questionId: nextQuestion._id,
-        endTime: endTime,
-        options: questionOptions,
-        isLastQuestion: isLastQuestion,
+    // 락 획득 후 최신 세션 상태를 다시 읽어오는 것을 고려할 수 있습니다.
+    // currentSessionState = await redisJsonGet(getSessionKey(pin));
+    // if (!currentSessionState) { /* ... 오류 처리 ... */ return; }
+    // const currentQuestionIndex = currentSessionState.currentQuestionIndex; // 업데이트된 인덱스 사용
+
+    if (currentSessionState.isQuestionActive) {
+      logger.warn(
+        `Attempted to move to next question for PIN: ${pin}, but current question (index: ${currentQuestionIndex}) is still active. Ignoring duplicate request (lock acquired but state already set).`
+      );
+      return;
+    }
+
+    const newQuestionIndex = currentSessionState.currentQuestionIndex + 1; // currentSessionState 직접 사용
+
+    if (newQuestionIndex >= questionContent.length) {
+      logger.info(
+        `No more questions available to proceed to for session PIN: ${pin}. Current index: ${currentSessionState.currentQuestionIndex}, Total questions: ${questionContent.length}. Waiting for 'endQuiz'.`
+      );
+      ws.send(
+        JSON.stringify({
+          type: "info",
+          message: "All questions have been presented. Please end the quiz.",
+        })
+      );
+      return;
+    }
+
+    const studentIdsSetKey = getSessionStudentIdsSetKey(pin);
+    let studentIdsForUpdate = [];
+
+    try {
+      studentIdsForUpdate = await redisClient.sMembers(studentIdsSetKey);
+    } catch (error) {
+      logger.error(
+        `Error fetching student IDs from Set for nextQuestion, PIN: ${pin}. Error:`,
+        error
+      );
+      ws.send(
+        JSON.stringify({
+          type: "error",
+          message: "다음 질문 준비 중 오류가 발생했습니다 (참여자 ID 조회).",
+        })
+      );
+      return;
+    }
+
+    if (studentIdsForUpdate.length > 0) {
+      const updatePromises = studentIdsForUpdate.map(async (sid) => {
+        const participantKey = getParticipantKey(pin, sid);
+        // Optimistic update: Get and then set.
+        // For higher concurrency, consider a Lua script or a different approach if this becomes a bottleneck.
+        const participant = await redisJsonGet(participantKey);
+        if (participant) {
+          participant.hasSubmitted = false;
+          await redisJsonSet(participantKey, participant, { EX: 3600 });
+          return { studentId: sid, status: "success" };
+        } else {
+          // 참가자 데이터가 없는 경우, 오류로 처리하거나 경고 로깅.
+          logger.warn(
+            `Participant data not found for student ID: ${sid} during nextQuestion hasSubmitted reset for PIN: ${pin}.`
+          );
+          return { studentId: sid, status: "not_found" };
+        }
+      });
+
+      const resultsSettled = await Promise.allSettled(updatePromises);
+      let successCount = 0;
+      resultsSettled.forEach((result, index) => {
+        const sid = studentIdsForUpdate[index];
+        if (
+          result.status === "fulfilled" &&
+          result.value.status === "success"
+        ) {
+          successCount++;
+        } else if (
+          result.status === "fulfilled" &&
+          result.value.status === "not_found"
+        ) {
+          // 이미 위에서 경고 로깅됨
+        } else {
+          logger.error(
+            `Failed to reset hasSubmitted for participant with student ID ${sid}, PIN: ${pin}. Reason:`,
+            result.reason || result.value // result.value가 에러 객체일 수 있음
+          );
+        }
       });
       logger.info(
-        `Sent 'newQuestion' and 'newQuestionOptions' for question index ${newQuestionIndex}, session PIN: ${pin}`
+        `Participant 'hasSubmitted' reset attempt for session PIN: ${pin}. Total IDs: ${studentIdsForUpdate.length}, Successful: ${successCount}`
       );
-    }, 3000);
-  } else {
+    } else {
+      logger.info(
+        `No participants found (no student IDs in Set) to reset 'hasSubmitted' for session PIN: ${pin}`
+      );
+    }
+
+    await redisClient.expire(getSessionQuestionsKey(pin), 3600); // 질문 스냅샷 TTL 갱신
     logger.info(
-      `All questions have been sent for session PIN: ${pin}. Waiting for 'endQuiz' message.`
+      `Questions snapshot expiration refreshed for session PIN: ${pin}`
     );
+
+    // newQuestionIndex는 위에서 currentSessionState.currentQuestionIndex + 1 로 이미 계산됨
+    if (newQuestionIndex < questionContent.length) {
+      const nextQuestion = questionContent[newQuestionIndex];
+
+      // Redis 세션 메타데이터 업데이트
+      currentSessionState.currentQuestionIndex = newQuestionIndex;
+      currentSessionState.isQuestionActive = true;
+      currentSessionState.currentQuestionId = nextQuestion._id
+        ? nextQuestion._id.toString()
+        : null;
+
+      const sessionMetadataKey = getSessionKey(pin);
+      await redisJsonSet(sessionMetadataKey, currentSessionState); // 업데이트된 상태 Redis에 저장
+      logger.info(
+        `Session state updated in Redis for nextQuestion (idx: ${newQuestionIndex}) for PIN: ${pin}`
+      );
+
+      const isLastQuestion = newQuestionIndex === questionContent.length - 1;
+      const readyMessage = {
+        type: "preparingNextQuestion",
+        message: isLastQuestion
+          ? "마지막 문제입니다..."
+          : "다음 문제가 곧 출제됩니다...",
+        isLastQuestion: isLastQuestion,
+      };
+      ws.send(JSON.stringify(readyMessage));
+      await broadcastToActiveStudents(pin, readyMessage);
+      logger.info(
+        `Sent 'preparingNextQuestion' for session PIN: ${pin}. Is last: ${isLastQuestion}`
+      );
+
+      setTimeout(async () => {
+        const currentTime = Date.now();
+        const timeLimit = nextQuestion.timeLimit * 1000;
+        const bufferTime = 2000;
+        const endTime = currentTime + timeLimit + bufferTime;
+        ws.send(
+          JSON.stringify({
+            type: "newQuestion",
+            questionId: nextQuestion._id,
+            currentQuestion: nextQuestion,
+            questionNumber: newQuestionIndex + 1,
+            totalQuestions: questionContent.length,
+            isLastQuestion: isLastQuestion,
+            endTime: endTime,
+          })
+        );
+
+        const questionOptions = nextQuestion.options.map((option) => ({
+          text: option.text,
+          imageUrl: option.imageUrl,
+        }));
+        await broadcastToActiveStudents(pin, {
+          type: "newQuestionOptions",
+          questionId: nextQuestion._id,
+          endTime: endTime,
+          options: questionOptions,
+          isLastQuestion: isLastQuestion,
+        });
+        logger.info(
+          `Sent 'newQuestion' and 'newQuestionOptions' for question index ${newQuestionIndex}, session PIN: ${pin}`
+        );
+      }, 3000);
+    } else {
+      // 이 경우는 이미 위에서 처리되었어야 함 (newQuestionIndex >= questionContent.length)
+      logger.info(
+        `All questions have been sent for session PIN: ${pin}. Waiting for 'endQuiz' message.`
+      );
+    }
+  } catch (error) {
+    logger.error(`Error in _handleNextQuestion for PIN ${pin}:`, error);
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.send(
+        JSON.stringify({
+          type: "error",
+          message: "다음 질문 진행 중 오류가 발생했습니다.",
+        })
+      );
+    }
+  } finally {
+    if (lockAcquired) {
+      await redisClient.del(lockKey);
+    }
   }
 }
 
 // Helper function for 'endQuiz' message
 async function _handleEndQuiz(pin, ws, currentSessionState, questionContent) {
   logger.info(`Handling endQuiz for session PIN: ${pin}`);
+
+  const lockKey = `lock:teacher:endquiz:${pin}`;
+  let lockAcquired = false;
+
   try {
+    const result = await redisClient.set(lockKey, "locked", "EX", 10, "NX"); // 정리 작업이 있을 수 있으므로 조금 더 긴 타임아웃 (20초)
+    lockAcquired = result === "OK";
+
+    if (!lockAcquired) {
+      logger.warn(
+        `[EndQuiz] Could not acquire lock for PIN ${pin}. End quiz action likely in progress.`
+      );
+      // 이미 종료 중이거나 종료된 상태일 수 있으므로, 사용자에게 오류보다는 상태 메시지를 전달하는 것이 나을 수 있음
+      ws.send(
+        JSON.stringify({
+          type: "info", // 또는 error
+          message: "퀴즈 종료 요청이 이미 처리 중이거나 완료되었습니다.",
+        })
+      );
+      return;
+    }
+
+    // 락 획득 후 최신 세션 상태를 다시 읽어오는 것을 고려합니다.
+    // 특히 quizEndedByTeacher 상태를 확인하기 위해.
+    const freshSessionState = await redisJsonGet(getSessionKey(pin));
+    if (!freshSessionState) {
+      logger.error(
+        `[EndQuiz] Critical: Session state not found in Redis for PIN: ${pin} after acquiring lock. Aborting.`
+      );
+      // ws.send(...); // 오류 메시지 전송
+      return;
+    }
+    // currentSessionState 대신 freshSessionState 사용
+    if (freshSessionState.quizEndedByTeacher) {
+      logger.warn(
+        `[EndQuiz] Quiz for PIN: ${pin} was already marked as ended by teacher. Ignoring duplicate request.`
+      );
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(
+          JSON.stringify({
+            type: "info",
+            message: "퀴즈가 이미 종료되었습니다.",
+          })
+        );
+      }
+      return;
+    }
+
     // 1. Redis 세션 메타데이터에 교사가 종료했음을 표시
-    currentSessionState.quizEndedByTeacher = true;
-    currentSessionState.isQuestionActive = false; // 더 이상 질문 활성 아님
-    await redisJsonSet(getSessionKey(pin), currentSessionState);
+    freshSessionState.quizEndedByTeacher = true; // 교사가 명시적으로 퀴즈를 종료했음을 Redis에 기록
+    freshSessionState.isQuestionActive = false; // 더 이상 질문이 활성 상태가 아님
+    await redisJsonSet(getSessionKey(pin), freshSessionState);
     logger.info(
       `Session state updated in Redis: quizEndedByTeacher=true for PIN: ${pin}`
     );
@@ -390,7 +683,7 @@ async function _handleEndQuiz(pin, ws, currentSessionState, questionContent) {
     // 2. 퀴즈 결과 저장 (MongoDB의 KahootQuizSession은 업데이트하지 않음)
     const resultsSaved = await _saveQuizResults(
       pin,
-      currentSessionState,
+      freshSessionState, // 업데이트된 freshSessionState 사용
       questionContent,
       false // false: forUnexpectedClose 아님
     );
@@ -417,10 +710,11 @@ async function _handleEndQuiz(pin, ws, currentSessionState, questionContent) {
     }
 
     // 4. 세션 리소스 정리 (Redis 데이터 등. KahootQuizSession DB 문서는 보존됨)
+    // _cleanupSessionResources는 내부적으로 학생들에게 알림을 보낼 수 있으므로, 교사에게 sessionEnded 메시지 발송 후에 호출.
     await _cleanupSessionResources(pin, ws, {
       notifyStudents: true,
       closeStudentSockets: true,
-      closeTeacherSocket: true,
+      closeTeacherSocket: true, // 명시적으로 교사 소켓을 닫도록 요청 (락이 해제된 후 실제 닫힘)
     });
     logger.info(
       `Session ${pin} ended by teacher. Resources cleaned up. KahootQuizSession in DB preserved.`
@@ -435,71 +729,208 @@ async function _handleEndQuiz(pin, ws, currentSessionState, questionContent) {
         })
       );
     }
+  } finally {
+    if (lockAcquired) {
+      await redisClient.del(lockKey);
+    }
+  }
+}
+
+// 새로운 헬퍼 함수: 교사 연결 종료 시 자동 결과 저장 처리
+// 교사 웹소켓 연결이 예기치 않게 종료되었을 때, 특정 조건 만족 시 퀴즈 결과를 자동으로 저장합니다.
+async function _handleAutoSaveOnTeacherDisconnect(
+  pin,
+  currentSessionOnClose,
+  questionContent,
+  sessionMetadataKey
+) {
+  if (currentSessionOnClose && questionContent && questionContent.length > 0) {
+    // 자동 저장 조건:
+    const quizWasStarted = currentSessionOnClose.quizStarted === true; // 1. 퀴즈가 한 번이라도 시작되었어야 함
+    const allQuestionsWerePresented =
+      currentSessionOnClose.currentQuestionIndex >= // 2. 모든 문제가 한 번 이상 출제되었어야 함
+      questionContent.length - 1;
+    const quizNotExplicitlyEndedByTeacher =
+      currentSessionOnClose.quizEndedByTeacher !== true; // 3. 교사가 명시적으로 퀴즈를 종료하지 않았어야 함
+
+    if (
+      quizWasStarted &&
+      allQuestionsWerePresented &&
+      quizNotExplicitlyEndedByTeacher
+    ) {
+      logger.info(
+        `Teacher WebSocket for PIN ${pin} closed. Conditions met for auto-saving results (started, all presented, not explicitly ended by teacher).`
+      );
+      try {
+        const resultsSaved = await _saveQuizResults(
+          pin,
+          currentSessionOnClose,
+          questionContent,
+          true // forUnexpectedClose = true
+        );
+        if (resultsSaved) {
+          logger.info(
+            `Results saved for PIN ${pin} due to unexpected teacher disconnect.`
+          );
+        } else {
+          logger.warn(
+            `Results not saved or no results to save for PIN ${pin} on unexpected disconnect.`
+          );
+        }
+      } catch (error) {
+        logger.error(
+          `Error attempting to save results on teacher disconnect for PIN ${pin}:`,
+          error
+        );
+      }
+    } else {
+      logger.info(
+        `Teacher WebSocket closed for PIN ${pin}. Conditions for auto-saving results NOT met (started: ${quizWasStarted}, allPresented: ${allQuestionsWerePresented}, notExplicitlyEnded: ${quizNotExplicitlyEndedByTeacher}). Session metadata from Redis key: ${sessionMetadataKey}`
+      );
+    }
+  } else {
+    logger.warn(
+      `Cannot determine if results should be saved for PIN ${pin} on close; session data from Redis (key: ${sessionMetadataKey}) or question content missing.`
+    );
   }
 }
 
 // Helper function for 'viewDetailedResults' message
 async function _handleViewDetailedResults(pin, ws, currentSessionState) {
   logger.info(`Handling viewDetailedResults for session PIN: ${pin}`);
-  // 이 함수는 주로 Redis의 참여자 데이터를 기반으로 결과를 보여주므로,
-  // KahootQuizSession 스키마 변경의 직접적인 영향은 적음.
-  // 다만, 결과 화면에서 원본 질문 내용을 보여줘야 한다면,
-  // 핸들러 메모리에 있는 questionContent (세션 스냅샷)를 활용.
-  const participantKeys = await redisClient.keys(
-    getParticipantKeysPattern(pin)
+
+  const studentIdsSetKey = getSessionStudentIdsSetKey(pin);
+  let studentIdsForResults = [];
+
+  try {
+    studentIdsForResults = await redisClient.sMembers(studentIdsSetKey);
+  } catch (error) {
+    logger.error(
+      `Error fetching student IDs from Set for detailed results, PIN: ${pin}. Error:`,
+      error
+    );
+    ws.send(
+      JSON.stringify({
+        type: "error",
+        message:
+          "상세 결과를 가져오는 중 오류가 발생했습니다 (참여자 ID 조회).",
+      })
+    );
+    return;
+  }
+
+  if (studentIdsForResults.length === 0) {
+    logger.info(
+      `No participants found (no student IDs in Set) for detailed results, PIN: ${pin}.`
+    );
+    ws.send(
+      JSON.stringify({
+        type: "detailedResults",
+        results: [],
+      })
+    );
+    return;
+  }
+
+  const participantKeys = studentIdsForResults.map((sid) =>
+    getParticipantKey(pin, sid)
   );
-  const participantsResultsData = await Promise.all(
-    participantKeys.map(async (key) => {
-      const participant = await redisJsonGet(key);
-      if (!participant) return null;
-      return {
-        studentId: participant.student,
-        name: participant.name,
-        score: participant.score,
-        responses: participant.responses.map((response) => ({
-          questionId: response.question, // 스냅샷 질문 ID
-          answer: response.answer,
-          isCorrect: response.isCorrect,
-        })),
-      };
-    })
-  );
-  const validResults = participantsResultsData.filter((r) => r);
+  const participantsDataArray = await redisJsonMGet(participantKeys); // MGET 사용
+  const validResults = [];
+
+  if (participantsDataArray) {
+    participantsDataArray.forEach((participant, index) => {
+      if (participant) {
+        validResults.push({
+          studentId: participant.student,
+          name: participant.name,
+          score: participant.score,
+          responses: participant.responses.map((response) => ({
+            questionId: response.question,
+            answer: response.answer,
+            isCorrect: response.isCorrect,
+          })),
+        });
+      } else {
+        logger.error(
+          // 개별 참여자 데이터 조회 실패는 오류로 로깅
+          `Failed to process participant data (null or invalid from MGET) for student ID ${studentIdsForResults[index]}, PIN: ${pin}, during detailed results.`
+        );
+        // 실패한 참여자는 결과에서 제외하거나, 오류 상태로 포함할 수 있음. 여기서는 제외.
+      }
+    });
+  } else {
+    logger.error(
+      `Failed to get participant data array via MGET for detailed results, PIN: ${pin}.`
+    );
+    ws.send(
+      JSON.stringify({
+        type: "error",
+        message: "상세 결과 데이터 조회 중 오류가 발생했습니다 (MGET 실패).",
+      })
+    );
+    return;
+  }
 
   ws.send(
     JSON.stringify({
       type: "detailedResults",
       results: validResults,
-      // 필요하다면 여기서 questionContent (문제 스냅샷 전체)를 함께 보내서
-      // 클라이언트가 각 questionId에 해당하는 문제 텍스트 등을 표시할 수 있도록 함.
-      // quizQuestions: questionContent, // 예시
     })
   );
-  logger.info(`Sent detailedResults to teacher for session PIN: ${pin}`);
+  logger.info(
+    `Sent detailedResults to teacher for session PIN: ${pin}. Found ${studentIdsForResults.length} student IDs, processed ${validResults.length} successfully.`
+  );
 }
 
 exports.handleTeacherWebSocketConnection = async (ws, teacherId, pin) => {
+  // kahootClients 초기화 시 subscribedChannels Set도 준비
   if (!kahootClients[pin]) {
     kahootClients[pin] = {
       teacher: null,
       students: {},
+      subscribedChannels: new Set(), // Set 초기화
     };
+  }
+  // 교사 웹소켓은 하나만 존재한다고 가정, students 객체는 학생 핸들러에서 관리
+  if (!kahootClients[pin].subscribedChannels) {
+    // 방어 코드
+    kahootClients[pin].subscribedChannels = new Set();
   }
 
   kahootClients[pin].teacher = ws;
-  logger.info(`Teacher connected to session: ${pin}`);
+  logger.info(
+    `Teacher ${teacherId} connected to session: ${pin}. Local clients for pin: ${
+      Object.keys(kahootClients[pin].students || {}).length
+    } students, teacher: ${!!kahootClients[pin].teacher}.`
+  );
 
   setupKeepAlive(ws, pin, "Teacher");
 
+  // --- BEGIN MODIFICATION: PIN 채널 구독 ---
+  try {
+    await subscribeToPinChannels(pin); // 해당 PIN의 채널들 구독 시도
+  } catch (subError) {
+    logger.error(
+      `[ConnectTeacher] Error subscribing to PIN channels for ${pin}, teacher ${teacherId}:`,
+      subError
+    );
+    // 구독 실패 시 교사 연결 처리 방안 결정 필요 (예: 연결 종료)
+    // ws.send(JSON.stringify({ type: "error", message: "Subscription error. Please try again." }));
+    // ws.close(); // ws.on('close')가 호출되면서 unsubscribe 시도됨
+    // return;
+  }
+  // --- END MODIFICATION: PIN 채널 구독 ---
+
   const sessionMetadataKey = getSessionKey(pin);
-  let sessionFromRedis = await redisJsonGet(sessionMetadataKey); // 변수명 변경: session -> sessionFromRedis
+  let sessionFromRedis = await redisJsonGet(sessionMetadataKey);
 
   if (!sessionFromRedis) {
     logger.error(
       `Session metadata not found in Redis for pin: ${pin} on teacher connect.`
     );
     ws.send(JSON.stringify({ error: "Session data not found, cannot start." }));
-    ws.close();
+    ws.close(); // ws.on('close')가 호출되면서 unsubscribe 시도됨
     return;
   }
 
@@ -510,10 +941,9 @@ exports.handleTeacherWebSocketConnection = async (ws, teacherId, pin) => {
     logger.warn(
       `Questions snapshot not found in Redis for pin: ${pin}. Attempting to load from DB.`
     );
-    // sessionFromRedis.sessionId 는 MongoDB의 KahootQuizSession의 _id임
     if (sessionFromRedis.sessionId) {
       const dbSession = await KahootQuizSession.findById(
-        sessionFromRedis.sessionId // 여기서 KahootQuizSession 모델 사용
+        sessionFromRedis.sessionId
       ).select("questionsSnapshot");
       if (dbSession && dbSession.questionsSnapshot) {
         questionContent = dbSession.questionsSnapshot.map((q) => q.toObject());
@@ -544,85 +974,110 @@ exports.handleTeacherWebSocketConnection = async (ws, teacherId, pin) => {
   }
 
   ws.on("close", async () => {
-    logger.info(`Teacher WebSocket for pin ${pin} closed.`);
-    const currentSessionOnClose = await redisJsonGet(sessionMetadataKey);
+    logger.info(
+      `Teacher WebSocket for pin ${pin} (teacherId: ${teacherId}) closed.`
+    );
 
-    let cleanupOptions = {
-      notifyStudents: true,
-      closeStudentSockets: true,
-      closeTeacherSocket: false,
-    };
-
-    if (
-      currentSessionOnClose &&
-      questionContent && // 핸들러 스코프에 로드된 문제 스냅샷
-      questionContent.length > 0
-    ) {
-      const quizWasStarted = currentSessionOnClose.quizStarted === true;
-      const allQuestionsWerePresented =
-        currentSessionOnClose.currentQuestionIndex >=
-        questionContent.length - 1;
-      // 교사가 명시적으로 종료하지 않았는지 Redis 상태로 확인
-      const quizNotExplicitlyEndedByTeacher =
-        currentSessionOnClose.quizEndedByTeacher !== true;
-
-      if (
-        quizWasStarted &&
-        allQuestionsWerePresented &&
-        quizNotExplicitlyEndedByTeacher
-      ) {
-        logger.info(
-          `Teacher WebSocket for PIN ${pin} closed. Conditions met for auto-saving results (started, all presented, not explicitly ended by teacher).`
-        );
-        try {
-          // true: forUnexpectedClose
-          const resultsSaved = await _saveQuizResults(
-            pin,
-            currentSessionOnClose,
-            questionContent,
-            true
-          );
-          if (resultsSaved) {
-            logger.info(
-              `Results saved for PIN ${pin} due to unexpected teacher disconnect.`
-            );
-          } else {
-            logger.warn(
-              `Results not saved or no results to save for PIN ${pin} on unexpected disconnect.`
-            );
-          }
-        } catch (error) {
-          logger.error(
-            `Error attempting to save results on teacher disconnect for PIN ${pin}:`,
-            error
-          );
-        }
-      } else {
-        logger.info(
-          `Teacher WebSocket closed for PIN ${pin}. Conditions for auto-saving results NOT met (started: ${quizWasStarted}, allPresented: ${allQuestionsWerePresented}, notExplicitlyEnded: ${quizNotExplicitlyEndedByTeacher}).`
-        );
+    // --- BEGIN MODIFICATION ---
+    // 정상 종료 플래그 확인
+    if (ws.isGracefulShutdown) {
+      logger.info(
+        `[CloseTeacher] Graceful shutdown for PIN ${pin}. Cleanup already handled by _handleEndQuiz.`
+      );
+      // kahootClients[pin].teacher = null 등은 _cleanupSessionResources에서 처리될 것이므로 여기서 중복 처리 불필요.
+      // Pub/Sub 해지도 _cleanupSessionResources 이후 kahootShared에서 처리됨.
+      // 따라서 여기서는 별도 작업 없이 return.
+      // 단, kahootClients[pin].teacher = null;은 여기서도 안전하게 호출해줄 수 있음.
+      if (kahootClients[pin]) {
+        kahootClients[pin].teacher = null;
       }
-    } else {
-      logger.warn(
-        `Cannot determine if results should be saved for PIN ${pin} on close; session data from Redis or question content missing.`
+      // unsubscribe 시도는 이미 _cleanupSessionResources에서 ws.close()가 트리거되기 전에
+      // 모든 연결이 없어지는 조건으로 kahootShared.js에서 관리될 것임.
+      // 여기서는 명시적 unsubscribe 호출보다는, 이미 _handleEndQuiz에서 시작된 정리 흐름을 따름.
+      return;
+    }
+    // --- END MODIFICATION ---
+
+    if (kahootClients[pin]) {
+      kahootClients[pin].teacher = null;
+      logger.info(
+        `Teacher ${teacherId} removed from local kahootClients for PIN ${pin} (unexpected close).`
       );
     }
 
-    await _cleanupSessionResources(pin, ws, cleanupOptions);
+    // 예기치 않은 종료 시, 조건부 자동 결과 저장
+    const currentSessionOnClose = await redisJsonGet(sessionMetadataKey);
+    if (currentSessionOnClose && questionContent) {
+      // questionContent도 유효해야 함
+      await _handleAutoSaveOnTeacherDisconnect(
+        pin,
+        currentSessionOnClose,
+        questionContent,
+        sessionMetadataKey
+      );
+    } else {
+      logger.warn(
+        `[CloseTeacher] Cannot attempt auto-save for PIN ${pin} due to missing session or question data.`
+      );
+    }
+
+    // --- BEGIN MODIFICATION ---
+    // 예기치 않은 종료 시에도 전체 리소스 정리 (_cleanupSessionResources 호출)
+    // 단, 이 경우 학생들에게 알림은 보내지 않고, 이미 닫힌 교사 소켓을 또 닫으려 하지 않도록 옵션 조정
     logger.info(
-      `Cleanup after teacher WebSocket close for PIN ${pin} finished. KahootQuizSession in DB preserved.`
+      `[CloseTeacher] Unexpected close for PIN ${pin}. Proceeding with full cleanup.`
     );
+    await _cleanupSessionResources(pin, ws, {
+      // ws는 전달하지만, 내부에서 ws.readyState 체크하므로 안전
+      notifyStudents: false, // 예기치 않은 종료이므로 학생들에게 별도 알림은 생략 (또는 다른 메시지 고려)
+      closeStudentSockets: true, // 남아있는 학생 연결은 닫음
+      closeTeacherSocket: false, // 이미 close 이벤트이므로 false
+    });
+    // --- END MODIFICATION ---
+
+    // Pub/Sub 구독 해지 시도는 _cleanupSessionResources가 kahootClients[pin]을 삭제하고,
+    // 모든 로컬 연결이 사라지면 kahootShared.js의 unsubscribeFromPinChannels에서 처리됨.
+    // 명시적으로 여기서 또 호출할 필요는 없음.
+    // try {
+    //   await unsubscribeFromPinChannels(pin);
+    // } catch (unsubError) {
+    //   logger.error(
+    //     `[CloseTeacher] Error unsubscribing from PIN channels for ${pin}, teacher ${teacherId} (unexpected):`,
+    //     unsubError
+    //   );
+    // }
+
+    if (!kahootClients[pin]) {
+      logger.info(
+        `[CloseTeacher] kahootClients[${pin}] was deleted by cleanup/unsubscribe. This instance no longer manages PIN ${pin}.`
+      );
+    }
   });
 
-  ws.on("error", (error) => {
+  ws.on("error", async (error) => {
+    // async 추가
     logger.error(
-      `Error occurred on teacher connection for pin ${pin}: ${error}`
+      `Error occurred on teacher connection for pin ${pin} (teacherId: ${teacherId}): ${error}`
     );
+    // 에러 발생 시에도 구독 해지 시도 (ws.on('close')가 항상 호출된다는 보장이 없을 수 있으므로)
+    // try {
+    //   if (kahootClients[pin]) { // kahootClients[pin]이 존재하는 경우에만 시도
+    //     kahootClients[pin].teacher = null; // 안전하게 null 처리 먼저
+    //   }
+    //   await unsubscribeFromPinChannels(pin);
+    // } catch (unsubError) {
+    //   logger.error(`[ErrorEvtTeacher] Error unsubscribing from PIN channels for ${pin}, teacher ${teacherId}:`, unsubError);
+    // }
+    if (
+      ws.readyState === WebSocket.OPEN ||
+      ws.readyState === WebSocket.CONNECTING
+    ) {
+      ws.terminate();
+    }
   });
 
   ws.on("message", async (message) => {
     const parsedMessage = JSON.parse(message);
-    // 매 메시지 처리 시 Redis에서 최신 세션 메타데이터를 가져옴
     let currentSessionState = await redisJsonGet(sessionMetadataKey);
 
     if (!currentSessionState) {
@@ -635,10 +1090,12 @@ exports.handleTeacherWebSocketConnection = async (ws, teacherId, pin) => {
           message: "Session data lost. Please restart.",
         })
       );
-      // 여기서 ws.close()를 호출하여 연결을 정리할 수도 있음
       return;
     }
-    // questionContent는 핸들러 인스턴스 메모리에 이미 로드되어 있음
+
+    // questionContent는 핸들러 스코프에 이미 로드되어 있음 (수정: 메시지 핸들러 외부 스코프로 이동 필요)
+    // 또는, 각 메시지 타입 핸들러 (_handleStartQuiz 등) 내부에서 필요시 sessionQuestionsKey로 다시 로드.
+    // 현재는 핸들러 외부 스코프에 있는 questionContent를 사용한다고 가정.
 
     switch (parsedMessage.type) {
       case "startQuiz":
@@ -656,7 +1113,7 @@ exports.handleTeacherWebSocketConnection = async (ws, teacherId, pin) => {
         await _handleEndQuiz(pin, ws, currentSessionState, questionContent);
         break;
       case "viewDetailedResults":
-        await _handleViewDetailedResults(pin, ws, currentSessionState); // questionContent도 전달 가능
+        await _handleViewDetailedResults(pin, ws, currentSessionState);
         break;
       default:
         logger.warn(

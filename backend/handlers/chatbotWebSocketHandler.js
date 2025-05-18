@@ -1,6 +1,6 @@
 const { v4: uuidv4 } = require("uuid");
 const { getNLPResponse } = require("../services/nlpService");
-const redisClient = require("../utils/redisClient");
+const {redisClient} = require("../utils/redisClient");
 const logger = require("../utils/logger");
 const config = require("../config");
 const chatUsageService = require("../services/chatUsageService");

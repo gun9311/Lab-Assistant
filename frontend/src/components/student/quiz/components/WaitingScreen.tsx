@@ -24,6 +24,11 @@ const WaitingScreenComponent: React.FC<WaitingScreenComponentProps> = ({
 }) => {
   const [dots, setDots] = useState("");
 
+  // Prop 값 확인
+  console.log(
+    `WaitingScreenComponent received selectedCharacter prop: ${selectedCharacter}`
+  );
+
   useEffect(() => {
     const interval = setInterval(() => {
       setDots((prev) => (prev.length < 3 ? prev + "." : ""));

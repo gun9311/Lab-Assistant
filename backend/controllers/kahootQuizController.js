@@ -1,8 +1,13 @@
 const KahootQuizContent = require("../models/KahootQuizContent");
 const KahootQuizSession = require("../models/KahootQuizSession");
-// const redisClient = require("../utils/redisClient");
-const { getSessionKey, getSessionQuestionsKey } = require("../utils/redisKeys"); // redisKeys 모듈 import
-const { redisJsonGet, redisJsonSet } = require("../utils/redisUtils"); // 새로운 헬퍼 함수 import
+const { redisClient } = require("../utils/redisClient");
+const {
+  getSessionKey,
+  getSessionQuestionsKey,
+  getSessionStudentIdsSetKey,
+  getSessionTakenCharactersSetKey,
+} = require("../utils/redisKeys"); // redisKeys 모듈 import
+const { redisJsonGet, redisJsonSet } = require("../utils/redisUtils"); // redisClient 추가
 const multer = require("multer");
 const multerS3 = require("multer-s3");
 const s3 = require("../utils/s3Client"); // S3 클라이언트 가져옴
@@ -339,26 +344,48 @@ exports.toggleLike = async (req, res) => {
     const quizId = req.params.quizId;
     const userId = req.user._id;
 
-    const quiz = await KahootQuizContent.findById(quizId);
+    // 먼저 해당 퀴즈를 찾아 사용자가 이미 좋아요를 눌렀는지 확인
+    const quiz = await KahootQuizContent.findById(quizId).select("likes"); // likes 필드만 가져옴
 
     if (!quiz) {
       return res.status(404).send({ error: "퀴즈를 찾을 수 없습니다." });
     }
 
-    const likeIndex = quiz.likes.indexOf(userId);
+    const userHasLiked = quiz.likes.includes(userId);
+    let updateOperation;
 
-    if (likeIndex === -1) {
-      // 좋아요 추가
-      quiz.likes.push(userId);
-      quiz.likeCount += 1;
+    if (userHasLiked) {
+      // 이미 좋아요를 누른 상태: 좋아요 취소
+      updateOperation = {
+        $pull: { likes: userId }, // likes 배열에서 userId 제거
+        $inc: { likeCount: -1 }, // likeCount 1 감소
+      };
     } else {
-      // 좋아요 제거
-      quiz.likes.splice(likeIndex, 1);
-      quiz.likeCount -= 1;
+      // 좋아요를 누르지 않은 상태: 좋아요 추가
+      updateOperation = {
+        $addToSet: { likes: userId }, // likes 배열에 userId 추가 (중복 방지)
+        $inc: { likeCount: 1 }, // likeCount 1 증가
+      };
     }
 
-    await quiz.save();
-    res.status(200).json({ likeCount: quiz.likeCount });
+    // findByIdAndUpdate는 업데이트된 문서를 반환할 수 있음 (옵션 new: true)
+    const updatedQuiz = await KahootQuizContent.findByIdAndUpdate(
+      quizId,
+      updateOperation,
+      { new: true } // 업데이트된 문서를 반환받아 likeCount를 응답으로 보냄
+    ).select("likeCount"); // 업데이트 후 likeCount만 필요
+
+    if (!updatedQuiz) {
+      // 이론적으로는 quiz를 처음에 찾았으므로 이 경우가 발생하면 안되지만, 방어 코드
+      return res
+        .status(404)
+        .send({ error: "퀴즈를 업데이트하는 중 찾을 수 없습니다." });
+    }
+
+    res.status(200).json({
+      likeCount: updatedQuiz.likeCount,
+      userLiked: !userHasLiked, // 토글된 새로운 좋아요 상태
+    });
   } catch (error) {
     logger.error("좋아요 처리 중 오류가 발생했습니다.", error);
     res.status(500).send({ error: "좋아요 처리 중 오류가 발생했습니다." });
@@ -371,74 +398,124 @@ function generatePIN() {
 }
 
 async function generateUniquePIN() {
-  let pin = generatePIN(); // 랜덤으로 6자리 PIN 생성
-  let isPinUnique = false;
+  let pin;
+  let isPinReserved = false;
+  const RESERVATION_TTL_SECONDS = 5; // 예약이 지속되는 시간 (초)
+  let attempts = 0;
+  const MAX_ATTEMPTS = 20; // 무한 루프 방지를 위한 최대 시도 횟수
 
-  while (!isPinUnique) {
-    const existingSession = await redisJsonGet(getSessionKey(pin));
-    if (!existingSession) {
-      isPinUnique = true;
-    } else {
-      pin = generatePIN(); // 중복된 경우 다시 PIN 생성
+  while (!isPinReserved && attempts < MAX_ATTEMPTS) {
+    attempts++;
+    pin = generatePIN(); // 랜덤으로 6자리 PIN 생성
+    const sessionPinKey = getSessionKey(pin); // 예: "session:123456"
+
+    try {
+      // NX (Not eXists) 옵션: 키가 존재하지 않을 경우에만 설정합니다.
+      // EX 옵션: 지정된 시간(초) 후에 키가 만료되도록 설정합니다.
+      // 이 작업은 원자적으로 수행됩니다.
+      const result = await redisClient.set(
+        sessionPinKey,
+        JSON.stringify({ status: "reserved_by_generator", ts: Date.now() }), // 임시 예약 값
+        "EX",
+        RESERVATION_TTL_SECONDS,
+        "NX"
+      );
+
+      if (result === "OK") {
+        // PIN이 성공적으로 예약되었습니다.
+        isPinReserved = true;
+        logger.info(
+          `PIN ${pin} successfully reserved with key ${sessionPinKey} for ${RESERVATION_TTL_SECONDS} seconds.`
+        );
+      } else {
+        // PIN이 이미 존재하거나 (다른 동시 요청에 의해 방금 예약되었거나, TTL이 남아있는 이전 예약),
+        // NX 조건으로 인해 설정에 실패했습니다.
+        logger.info(
+          `PIN ${pin} (key ${sessionPinKey}) could not be reserved (likely already exists or NX failed). Retrying.`
+        );
+        // 루프는 새로운 PIN을 생성하여 계속됩니다.
+      }
+    } catch (error) {
+      logger.error(
+        `Error during PIN reservation attempt for ${pin} (key ${sessionPinKey}):`,
+        error
+      );
+      // 오류 발생 시, 현재 시도에서는 예약 실패로 간주하고 다음 시도를 진행합니다.
+      // 심각한 오류의 경우, 여기서 예외를 다시 던지거나 루프를 중단시킬 수 있습니다.
     }
   }
 
-  return pin;
+  if (!isPinReserved) {
+    logger.error(
+      `Failed to generate and reserve a unique PIN after ${MAX_ATTEMPTS} attempts.`
+    );
+    throw new Error("Failed to generate and reserve a unique PIN.");
+  }
+
+  return pin; // 예약된 PIN 반환
 }
 
 exports.startQuizSession = async (req, res) => {
-  try {
-    const { quizId } = req.params;
-    const teacherId = req.user._id;
+  // --- BEGIN MODIFICATION: Add Lock ---
+  const teacherIdForLock = req.user._id.toString(); // 락 키에는 문자열 ID 사용
+  const quizIdForLock = req.params.quizId;
+  const lockKey = `lock:startsession:${teacherIdForLock}:${quizIdForLock}`;
+  let lockAcquired = false;
+  // --- END MODIFICATION: Add Lock ---
 
-    // 1. 원본 KahootQuizContent 조회
+  try {
+    // --- BEGIN MODIFICATION: Acquire Lock ---
+    const result = await redisClient.set(lockKey, "locked", "EX", 5, "NX"); // 20초 타임아웃
+    lockAcquired = result === "OK";
+
+    if (!lockAcquired) {
+      logger.warn(
+        `[StartSession] Could not acquire lock for teacher ${teacherIdForLock}, quiz ${quizIdForLock}. Session start likely in progress by the same teacher.`
+      );
+      return res.status(429).send({
+        error:
+          "Session creation for this quiz by you is already in progress. Please wait.",
+      }); // 429 Too Many Requests
+    }
+    // --- END MODIFICATION: Acquire Lock ---
+
+    const { quizId } = req.params; // quizIdForLock과 동일하지만, 명시적으로 다시 가져옴
+    const teacherId = req.user._id; // teacherIdForLock과 동일
+
     const quizContent = await KahootQuizContent.findById(quizId);
     if (!quizContent) {
       return res.status(404).send({ error: "Quiz content not found." });
     }
 
-    // 2. 고유 PIN 생성
     const pin = await generateUniquePIN();
 
-    // 3. KahootQuizSession 문서 생성 (단순화된 스키마 기준)
     const newSession = new KahootQuizSession({
       teacher: teacherId,
       pin: pin,
-      // startedAt: 기본값으로 Date.now()가 설정됨
-
-      // 원본 퀴즈의 메타데이터 복사
       grade: quizContent.grade,
       subject: quizContent.subject,
       semester: quizContent.semester,
       unit: quizContent.unit,
-      // originalQuizImageUrl: quizContent.imageUrl, // 필요하다면 원본 퀴즈 이미지 URL도 복사
-
-      // 질문 스냅샷 생성 (원본 질문의 _id도 포함하여 나중에 참조 가능하도록)
       questionsSnapshot: quizContent.questions.map((q) => ({
-        originalQuestionId: q._id, // 원본 질문의 ObjectId
+        originalQuestionId: q._id,
         questionText: q.questionText,
         questionType: q.questionType,
         options: q.options.map((opt) => ({
           text: opt.text,
           imageUrl: opt.imageUrl,
-          // originalOptionId: opt._id // 필요시 원본 옵션 ID도 저장
         })),
         correctAnswer: q.correctAnswer,
         timeLimit: q.timeLimit,
         imageUrl: q.imageUrl,
       })),
-
-      // 팀 모드 관련 정보 (요청 본문에 따라 설정, 여기서는 기본값으로 처리)
-      isTeamMode: req.body.isTeamMode || false, // 요청에서 isTeamMode를 받을 수 있도록
+      isTeamMode: req.body.isTeamMode || false,
       initialTeams:
         req.body.isTeamMode && req.body.teams
           ? req.body.teams.map((team) => ({
               teamName: team.teamName,
-              memberStudentIds: team.memberStudentIds || [], // 학생 ID 배열
+              memberStudentIds: team.memberStudentIds || [],
             }))
           : [],
-
-      // 제거된 필드: status, endedAt, participants 등
     });
 
     await newSession.save();
@@ -446,59 +523,63 @@ exports.startQuizSession = async (req, res) => {
       `New KahootQuizSession created in DB. PIN: ${pin}, SessionID: ${newSession._id}`
     );
 
-    // 4. Redis에 세션 메타데이터 및 문제 스냅샷 저장
     const sessionMetadataKey = getSessionKey(pin);
     const sessionQuestionsKey = getSessionQuestionsKey(pin);
+    const studentIdsSetKey = getSessionStudentIdsSetKey(pin);
+    const takenCharactersSetKey = getSessionTakenCharactersSetKey(pin);
 
-    // Redis에 저장할 세션 메타데이터 (MongoDB ObjectId는 문자열로 변환)
     const sessionMetadataForRedis = {
-      sessionId: newSession._id.toString(), // MongoDB 세션 문서의 ID
+      sessionId: newSession._id.toString(),
       teacherId: teacherId.toString(),
       pin: pin,
-      quizContentId: quizId.toString(), // 원본 KahootQuizContent의 ID (참조용)
-      // 퀴즈 진행에 필요한 초기 상태값들
-      currentQuestionIndex: -1, // 퀴즈 시작 전이므로 -1 또는 null
+      quizContentId: quizId.toString(),
+      currentQuestionIndex: -1,
       isQuestionActive: false,
-      quizStarted: false, // 명시적으로 퀴즈 시작 여부 관리
-      quizEndedByTeacher: false, // 명시적으로 교사가 종료했는지 여부
-      // KahootQuizSession에 저장했던 grade, subject 등 메타데이터 추가
+      quizStarted: false,
+      quizEndedByTeacher: false,
       grade: newSession.grade,
       subject: newSession.subject,
       semester: newSession.semester,
       unit: newSession.unit,
-      isTeamMode: newSession.isTeamMode, // 팀모드 여부 추가
-      // initialTeams: newSession.initialTeams, // 초기 팀 정보도 필요시 추가 (객체이므로 redis 저장시 주의)
+      isTeamMode: newSession.isTeamMode,
       questionsSnapshot: newSession.questionsSnapshot.map((q) =>
         q._id.toString()
-      ), // 질문 ID 목록만 저장하거나, 필요한 최소 정보만 저장 고려
+      ),
     };
 
-    // Redis에 문제 스냅샷 저장 (newSession.questionsSnapshot은 이미 plain JS 객체 배열일 것임)
-    // Mongoose 문서의 toObject()나 lean()을 사용하지 않아도 될 수 있지만, 확실히 하기 위해 toObject() 사용 권장
-    const questionsSnapshotForRedis = newSession.questionsSnapshot.map(
-      (q) => (typeof q.toObject === "function" ? q.toObject() : q) // 각 질문 객체를 plain object로
+    const questionsSnapshotForRedis = newSession.questionsSnapshot.map((q) =>
+      typeof q.toObject === "function" ? q.toObject() : q
     );
 
     await redisJsonSet(sessionMetadataKey, sessionMetadataForRedis, {
       EX: 3600,
-    }); // 예: 1시간 TTL
+    });
     await redisJsonSet(sessionQuestionsKey, questionsSnapshotForRedis, {
       EX: 3600,
-    }); // 예: 1시간 TTL
+    });
+    // 새로운 학생 ID Set 초기화
+    await redisClient.del(studentIdsSetKey);
+    // 선점된 캐릭터 Set 초기화
+    await redisClient.del(takenCharactersSetKey);
 
     logger.info(
-      `Session metadata and questions snapshot cached in Redis for PIN: ${pin}`
+      `Session metadata, questions snapshot, student IDs Set, and taken characters Set initialized in Redis for PIN: ${pin}.`
     );
 
     res.status(201).send({
       message: "Quiz session started successfully",
       pin: pin,
-      sessionId: newSession._id, // 생성된 MongoDB 세션 ID
-      // 프론트엔드에서 필요하다면 다른 정보도 전달 가능
+      sessionId: newSession._id,
     });
   } catch (error) {
     logger.error("Error starting quiz session:", error);
     res.status(500).send({ error: "Failed to start quiz session." });
+  } finally {
+    // --- BEGIN MODIFICATION: Release Lock ---
+    if (lockAcquired) {
+      await redisClient.del(lockKey);
+    }
+    // --- END MODIFICATION: Release Lock ---
   }
 };
 

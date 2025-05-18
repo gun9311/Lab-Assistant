@@ -8,7 +8,7 @@ const mongoose = require("mongoose");
 const session = require("express-session");
 const RedisStore = require("connect-redis").default;
 const { WebSocketServer } = require("ws");
-const jwt = require("jsonwebtoken");
+// const jwt = require("jsonwebtoken"); // jwt는 websocketInitialSetup.js에서 사용
 const compression = require("compression");
 const authRoutes = require("./routes/authRoutes");
 // const quizRoutes = require('./routes/quizRoutes');
@@ -20,13 +20,14 @@ const adminRoutes = require("./routes/adminRoutes");
 const subjectRoutes = require("./routes/subjectRoutes");
 const reportRoutes = require("./routes/reportRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
-const ChatSummary = require("./models/ChatSummary");
-const cron = require("node-cron");
-const redisClient = require("./utils/redisClient");
+// const ChatSummary = require("./models/ChatSummary"); // 현재 사용되지 않음
+// const cron = require("node-cron"); // 현재 사용되지 않음
+const { redisClient } = require("./utils/redisClient"); // redisClient만 가져오도록 수정 (subscriberClient는 kahootShared에서 사용)
 const cors = require("cors");
 const timeRoutes = require("./routes/timeRoutes"); // 새로 추가
 const config = require("./config"); // 설정 파일 로드
-const { handleNewWebSocketConnection } = require("./websocketInitialSetup"); // 수정
+const { handleNewWebSocketConnection } = require("./websocketInitialSetup");
+const { initializeKahootPubSub } = require("./handlers/kahootShared"); // Pub/Sub 초기화 함수 import
 
 // MongoDB 연결
 mongoose
@@ -37,7 +38,7 @@ mongoose
 // Express 앱 설정
 const app = express();
 
-const { ALLOWED_ORIGINS } = config.serverConfig; // 설정값 사용
+const { ALLOWED_ORIGINS } = config.serverConfig;
 
 app.use(
   cors({
@@ -48,13 +49,13 @@ app.use(
         callback(new Error("Not allowed by CORS"));
       }
     },
-    credentials: true, // 자격 증명을 포함한 요청 허용
+    credentials: true,
   })
 );
 
 app.use(
   session({
-    store: new RedisStore({ client: redisClient }),
+    store: new RedisStore({ client: redisClient }), // 여기서는 기본 redisClient 사용
     secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: true,
@@ -64,26 +65,32 @@ app.use(
 app.use(compression());
 app.use(bodyParser.json());
 
-// 헬스체크 엔드포인트 추가 (라우트 설정 전에 추가)
 app.get("/health", async (req, res) => {
   try {
-    // MongoDB 연결 확인
     if (mongoose.connection.readyState !== 1) {
       throw new Error("MongoDB not connected");
     }
     await mongoose.connection.db.admin().ping();
 
-    // 모든 서비스 정상
+    // Redis 연결 확인 (ping 사용)
+    const redisPingResponse = await redisClient.ping();
+    if (redisPingResponse !== "PONG") {
+      throw new Error("Redis not connected or not responding PONG");
+    }
+
     res.status(200).json({
       status: "healthy",
       mongodb: "connected",
-      redis: "connected",
+      redis: "connected", // Redis 상태 추가
     });
   } catch (error) {
     logger.error("Health check failed:", error);
     res.status(500).json({
       status: "unhealthy",
       error: error.message,
+      mongodb:
+        mongoose.connection.readyState === 1 ? "connected" : "disconnected",
+      redis: "check_failed", // Redis 상세 상태는 에러 메시지에 포함될 것임
     });
   }
 });
@@ -96,38 +103,34 @@ app.use("/api/subjects", subjectRoutes);
 app.use("/api/quiz-results", quizResultsRoutes);
 app.use("/api/report", reportRoutes);
 app.use("/api/notifications", notificationRoutes);
-app.use("/api/kahoot-quiz", kahootQuizRoutes); // 카훗 스타일 퀴즈 서비스 라우트 추가
-app.use("/api/time", timeRoutes); // 새로 추가
+app.use("/api/kahoot-quiz", kahootQuizRoutes);
+app.use("/api/time", timeRoutes);
 
-// HTTP 서버 시작
-const serverPort = process.env.PORT || config.serverConfig.DEFAULT_PORT; // 수정됨
-const server = app.listen(serverPort, () => {
-  // 수정됨
-  logger.info(`Server running on port ${serverPort}`); // 수정됨
-});
+const serverPort = process.env.PORT || config.serverConfig.DEFAULT_PORT;
 
-// 웹소켓 서버 생성
-const wss = new WebSocketServer({ server });
+// 애플리케이션 시작을 위한 async 함수
+async function startServer() {
+  try {
+    // HTTP 서버 시작
+    const server = app.listen(serverPort, () => {
+      logger.info(`Server running on port ${serverPort}`);
+    });
 
-// 웹소켓 서버 연결 처리 (수정)
-wss.on("connection", handleNewWebSocketConnection);
+    // 웹소켓 서버 생성
+    const wss = new WebSocketServer({ server });
+    wss.on("connection", handleNewWebSocketConnection);
 
-// 크론 작업 설정 (채팅 요약 데이터 삭제)
-// cron.schedule("0 0 * * *", async () => {
-//   logger.info("Running removeOldSummaries at midnight");
-//   try {
-//     const days = 7;
-//     // 기존: const chatSummaries = await ChatSummary.find();
-//     // 변경: ChatSummary.find().cursor() 사용하여 메모리 효율성 증대
-//     const cursor = ChatSummary.find().cursor();
+    // Kahoot Pub/Sub 리스너 초기화
+    await initializeKahootPubSub(); // Pub/Sub 초기화 호출
+    logger.info("Kahoot Pub/Sub listener initialized successfully.");
+  } catch (error) {
+    logger.error("Failed to start the server or initialize Pub/Sub:", error);
+    process.exit(1); // 시작 실패 시 프로세스 종료
+  }
+}
 
-//     // 기존: for (const chatSummary of chatSummaries) {
-//     // 변경: for await...of 구문으로 커서 처리
-//     for await (const chatSummary of cursor) {
-//       await chatSummary.removeOldSummaries(days);
-//     }
-//     logger.info("Old summaries removed successfully");
-//   } catch (error) {
-//     logger.error("Error removing old summaries:", error);
-//   }
-// });
+// 서버 시작 함수 호출
+startServer();
+
+// 크론 작업 설정은 현재 주석 처리되어 있으므로 그대로 둡니다.
+// ...

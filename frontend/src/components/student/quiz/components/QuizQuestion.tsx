@@ -51,7 +51,8 @@ const QuizQuestionComponent: React.FC<QuizQuestionComponentProps> = ({
               display: "flex",
               flexDirection: "column",
               alignItems: "center",
-              transition: "transform 0.2s, background-color 0.2s, color 0.2s, border-color 0.2s",
+              transition:
+                "transform 0.2s, background-color 0.2s, color 0.2s, border-color 0.2s",
               color: selectedAnswer === index ? "#ffffff" : "#000000",
               borderColor: selectedAnswer === index ? "#66bb6a" : "#d3d3d3",
               "&:hover": {

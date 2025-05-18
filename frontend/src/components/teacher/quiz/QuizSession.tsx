@@ -102,6 +102,12 @@ const QuizSessionPage = ({
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState<number>(0); // 현재 문제 번호 상태 추가
   const [totalQuestions, setTotalQuestions] = useState<number>(0); // 총 문제 수 상태 추가
 
+  // Add new loading states
+  const [isProcessingNextQuestion, setIsProcessingNextQuestion] =
+    useState(false);
+  const [isProcessingEndQuiz, setIsProcessingEndQuiz] = useState(false);
+  const [isProcessingViewResults, setIsProcessingViewResults] = useState(false);
+
   const socketRef = React.useRef<WebSocket | null>(null);
 
   const [openConfirmDialog, setOpenConfirmDialog] = useState(false);
@@ -127,21 +133,39 @@ const QuizSessionPage = ({
       const message = JSON.parse(event.data);
 
       if (message.type === "studentJoined") {
-        setStudents((prevStudents) => [
-          ...prevStudents,
-          {
-            id: message.studentId,
-            name: message.name,
-            isReady: message.isReady,
-            character: message.character,
-          },
-        ]);
-        setTotalStudents((prevCount) => prevCount + 1);
+        setStudents((prevStudents) => {
+          const existingStudent = prevStudents.find(
+            (student) => student.id === message.studentId
+          );
+          if (existingStudent) {
+            return prevStudents;
+          }
+          return [
+            ...prevStudents,
+            {
+              id: message.studentId,
+              name: message.name,
+              isReady: message.isReady,
+              character: message.character,
+            },
+          ];
+        });
+        setTotalStudents((prevCount) => {
+          const studentExists = students.some(
+            (s) => s.id === message.studentId
+          );
+          return studentExists ? prevCount : prevCount + 1;
+        });
       } else if (message.type === "studentDisconnected") {
         setStudents((prevStudents) =>
           prevStudents.filter((student) => student.id !== message.studentId)
         );
-        setTotalStudents((prevCount) => prevCount - 1);
+        setTotalStudents((prevCount) => {
+          const studentExists = students.some(
+            (s) => s.id === message.studentId
+          );
+          return studentExists ? Math.max(0, prevCount - 1) : prevCount;
+        });
         console.log(`Student ${message.name} disconnected`);
       } else if (message.type === "quizStartingSoon") {
         setTotalQuestions(message.totalQuestions); // 총 문제 수 설정
@@ -159,6 +183,7 @@ const QuizSessionPage = ({
         setIsLastQuestion(message.isLastQuestion);
         setCurrentQuestion(null);
         setIsShowingFeedback(false);
+        setIsProcessingNextQuestion(false); // Reset loading state
       } else if (message.type === "newQuestion") {
         setIsPreparingNextQuestion(false);
         setIsShowingFeedback(false);
@@ -166,6 +191,7 @@ const QuizSessionPage = ({
         setSubmittedCount(0);
         setAllSubmitted(false);
         setEndTime(message.endTime);
+        setIsProcessingNextQuestion(false); // Reset loading state also here if flow allows
       } else if (message.type === "studentSubmitted") {
         setStudents((prevStudents) =>
           prevStudents.map((student) =>
@@ -204,10 +230,13 @@ const QuizSessionPage = ({
         setFeedbacks(feedback); // 피드백 저장
       } else if (message.type === "quizCompleted") {
         setIsSessionActive(false);
+        // setIsProcessingEndQuiz(false); // It might be better to reset on navigate or unmount
       } else if (message.type === "detailedResults") {
         setQuizResults(message.results);
         setIsViewingResults(true);
+        setIsProcessingViewResults(false); // Reset loading state
       } else if (message.type === "sessionEnded") {
+        // setIsProcessingEndQuiz(false); // Reset before navigating
         navigate("/manage-quizzes");
       } else if (message.type === "noStudentsRemaining") {
         setConfirmMessage(message.message);
@@ -217,6 +246,10 @@ const QuizSessionPage = ({
 
     socket.onclose = () => {
       console.log("WebSocket connection closed");
+      // Reset processing states on close as well to be safe
+      setIsProcessingNextQuestion(false);
+      setIsProcessingEndQuiz(false);
+      setIsProcessingViewResults(false);
     };
 
     return () => {
@@ -230,7 +263,7 @@ const QuizSessionPage = ({
         });
       }
     };
-  }, [pin, setIsQuizMode]);
+  }, [pin, setIsQuizMode, navigate]); // Added navigate to dependency array
 
   // useEffect(() => {
   //   const allReady =
@@ -246,6 +279,8 @@ const QuizSessionPage = ({
   };
 
   const handleNextQuestion = () => {
+    if (isProcessingNextQuestion) return; // Prevent if already processing
+    setIsProcessingNextQuestion(true);
     setStudents((prevStudents) =>
       prevStudents.map((student) => ({
         ...student,
@@ -257,20 +292,28 @@ const QuizSessionPage = ({
     if (socketRef.current) {
       socketRef.current.send(JSON.stringify({ type: "nextQuestion" }));
     }
+    // setIsProcessingNextQuestion will be set to false when 'preparingNextQuestion' or 'newQuestion' is received
   };
 
   const handleEndQuiz = () => {
+    if (isProcessingEndQuiz) return; // Prevent if already processing
+    setIsProcessingEndQuiz(true);
     if (socketRef.current) {
       socketRef.current.send(JSON.stringify({ type: "endQuiz" }));
       setIsSessionActive(false);
-      // navigate("/manage-quizzes");
+      // navigate("/manage-quizzes"); // Navigation will happen on 'sessionEnded'
     }
+    // setIsProcessingEndQuiz will be reset implicitly by navigation or component unmount,
+    // or explicitly if 'sessionEnded' message isn't guaranteed to always lead to unmount
   };
 
   const handleViewResults = () => {
+    if (isProcessingViewResults) return; // Prevent if already processing
+    setIsProcessingViewResults(true);
     if (socketRef.current) {
       socketRef.current.send(JSON.stringify({ type: "viewDetailedResults" }));
     }
+    // setIsProcessingViewResults will be set to false when 'detailedResults' is received
   };
 
   const handleConfirmClose = (confirm: boolean) => {
@@ -507,6 +550,10 @@ const QuizSessionPage = ({
                 handleNextQuestion={handleNextQuestion}
                 handleEndQuiz={handleEndQuiz}
                 handleViewResults={handleViewResults}
+                // Pass new loading states as props
+                isProcessingNextQuestion={isProcessingNextQuestion}
+                isProcessingEndQuiz={isProcessingEndQuiz}
+                isProcessingViewResults={isProcessingViewResults}
               />
             </Box>
           )}
