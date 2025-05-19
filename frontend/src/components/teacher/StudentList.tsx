@@ -465,21 +465,21 @@ const StudentList: React.FC<StudentListProps> = ({
                   )}
                 </TabPanel>
                 <TabPanel value={activeTab} index={1}>
-                  {/* <QuizResults
+                  <QuizResults
                     studentId={selectedStudent._id}
                     selectedSemester={selectedSemester}
                     selectedSubject={selectedSubject}
                     isStudentView={false}
-                  /> */}
-                  <ComingSoon />
+                  />
+                  {/* <ComingSoon /> */}
                 </TabPanel>
                 <TabPanel value={activeTab} index={2}>
-                  {/* <StudentReport
+                  <StudentReport
                     studentId={selectedStudent._id}
                     selectedSemester={selectedSemester}
                     selectedSubject={selectedSubject}
-                  /> */}
-                  <ComingSoon />
+                  />
+                  {/* <ComingSoon /> */}
                 </TabPanel>
               </>
             ) : (

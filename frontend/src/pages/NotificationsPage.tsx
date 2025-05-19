@@ -16,8 +16,14 @@ import { useNotificationContext } from "../context/NotificationContext";
 import { NotificationsActive, Done, CheckCircle } from "@mui/icons-material";
 
 const NotificationsPage: React.FC = () => {
-  const { notifications, markAsRead, markAllAsRead } = useNotificationContext();
-  const [isLoading, setIsLoading] = useState(false);
+  const {
+    notifications,
+    markAsRead,
+    markAllAsRead,
+    loadMoreNotifications,
+    hasMore,
+    isLoading,
+  } = useNotificationContext();
 
   const handleNotificationClick = (id: string) => {
     markAsRead(id);
@@ -26,13 +32,10 @@ const NotificationsPage: React.FC = () => {
   const handleMarkAllAsRead = async () => {
     if (isLoading) return;
 
-    setIsLoading(true);
     try {
       await markAllAsRead();
     } catch (error) {
       console.error("Failed to mark all notifications as read:", error);
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -145,6 +148,19 @@ const NotificationsPage: React.FC = () => {
             ))
           )}
         </List>
+
+        {hasMore && (
+          <Box display="flex" justifyContent="center" mt={2} mb={2}>
+            <Button
+              onClick={loadMoreNotifications}
+              disabled={isLoading}
+              variant="outlined"
+              startIcon={isLoading ? <CircularProgress size={20} /> : null}
+            >
+              {isLoading ? "로딩 중..." : "더 보기"}
+            </Button>
+          </Box>
+        )}
       </Paper>
     </Container>
   );
