@@ -978,25 +978,15 @@ exports.handleTeacherWebSocketConnection = async (ws, teacherId, pin) => {
       `Teacher WebSocket for pin ${pin} (teacherId: ${teacherId}) closed.`
     );
 
-    // --- BEGIN MODIFICATION ---
-    // 정상 종료 플래그 확인
     if (ws.isGracefulShutdown) {
       logger.info(
         `[CloseTeacher] Graceful shutdown for PIN ${pin}. Cleanup already handled by _handleEndQuiz.`
       );
-      // kahootClients[pin].teacher = null 등은 _cleanupSessionResources에서 처리될 것이므로 여기서 중복 처리 불필요.
-      // Pub/Sub 해지도 _cleanupSessionResources 이후 kahootShared에서 처리됨.
-      // 따라서 여기서는 별도 작업 없이 return.
-      // 단, kahootClients[pin].teacher = null;은 여기서도 안전하게 호출해줄 수 있음.
       if (kahootClients[pin]) {
         kahootClients[pin].teacher = null;
       }
-      // unsubscribe 시도는 이미 _cleanupSessionResources에서 ws.close()가 트리거되기 전에
-      // 모든 연결이 없어지는 조건으로 kahootShared.js에서 관리될 것임.
-      // 여기서는 명시적 unsubscribe 호출보다는, 이미 _handleEndQuiz에서 시작된 정리 흐름을 따름.
       return;
     }
-    // --- END MODIFICATION ---
 
     if (kahootClients[pin]) {
       kahootClients[pin].teacher = null;
@@ -1005,10 +995,8 @@ exports.handleTeacherWebSocketConnection = async (ws, teacherId, pin) => {
       );
     }
 
-    // 예기치 않은 종료 시, 조건부 자동 결과 저장
     const currentSessionOnClose = await redisJsonGet(sessionMetadataKey);
     if (currentSessionOnClose && questionContent) {
-      // questionContent도 유효해야 함
       await _handleAutoSaveOnTeacherDisconnect(
         pin,
         currentSessionOnClose,
@@ -1021,31 +1009,26 @@ exports.handleTeacherWebSocketConnection = async (ws, teacherId, pin) => {
       );
     }
 
-    // --- BEGIN MODIFICATION ---
-    // 예기치 않은 종료 시에도 전체 리소스 정리 (_cleanupSessionResources 호출)
-    // 단, 이 경우 학생들에게 알림은 보내지 않고, 이미 닫힌 교사 소켓을 또 닫으려 하지 않도록 옵션 조정
     logger.info(
-      `[CloseTeacher] Unexpected close for PIN ${pin}. Proceeding with full cleanup.`
+      `[CloseTeacher] Unexpected close for PIN ${pin}. Proceeding with full cleanup and explicit unsubscribe check.`
     );
     await _cleanupSessionResources(pin, ws, {
-      // ws는 전달하지만, 내부에서 ws.readyState 체크하므로 안전
-      notifyStudents: false, // 예기치 않은 종료이므로 학생들에게 별도 알림은 생략 (또는 다른 메시지 고려)
-      closeStudentSockets: true, // 남아있는 학생 연결은 닫음
-      closeTeacherSocket: false, // 이미 close 이벤트이므로 false
+      notifyStudents: false,
+      closeStudentSockets: true,
+      closeTeacherSocket: false,
     });
-    // --- END MODIFICATION ---
 
-    // Pub/Sub 구독 해지 시도는 _cleanupSessionResources가 kahootClients[pin]을 삭제하고,
-    // 모든 로컬 연결이 사라지면 kahootShared.js의 unsubscribeFromPinChannels에서 처리됨.
-    // 명시적으로 여기서 또 호출할 필요는 없음.
-    // try {
-    //   await unsubscribeFromPinChannels(pin);
-    // } catch (unsubError) {
-    //   logger.error(
-    //     `[CloseTeacher] Error unsubscribing from PIN channels for ${pin}, teacher ${teacherId} (unexpected):`,
-    //     unsubError
-    //   );
-    // }
+    try {
+      logger.info(
+        `[CloseTeacher-ExplicitUnsub] Attempting to unsubscribe channels for PIN ${pin} after teacher disconnect.`
+      );
+      await unsubscribeFromPinChannels(pin);
+    } catch (unsubError) {
+      logger.error(
+        `[CloseTeacher-ExplicitUnsub] Error during explicit unsubscribeFromPinChannels for PIN ${pin} after teacher disconnect:`,
+        unsubError
+      );
+    }
 
     if (!kahootClients[pin]) {
       logger.info(
@@ -1055,19 +1038,9 @@ exports.handleTeacherWebSocketConnection = async (ws, teacherId, pin) => {
   });
 
   ws.on("error", async (error) => {
-    // async 추가
     logger.error(
       `Error occurred on teacher connection for pin ${pin} (teacherId: ${teacherId}): ${error}`
     );
-    // 에러 발생 시에도 구독 해지 시도 (ws.on('close')가 항상 호출된다는 보장이 없을 수 있으므로)
-    // try {
-    //   if (kahootClients[pin]) { // kahootClients[pin]이 존재하는 경우에만 시도
-    //     kahootClients[pin].teacher = null; // 안전하게 null 처리 먼저
-    //   }
-    //   await unsubscribeFromPinChannels(pin);
-    // } catch (unsubError) {
-    //   logger.error(`[ErrorEvtTeacher] Error unsubscribing from PIN channels for ${pin}, teacher ${teacherId}:`, unsubError);
-    // }
     if (
       ws.readyState === WebSocket.OPEN ||
       ws.readyState === WebSocket.CONNECTING
@@ -1092,10 +1065,6 @@ exports.handleTeacherWebSocketConnection = async (ws, teacherId, pin) => {
       );
       return;
     }
-
-    // questionContent는 핸들러 스코프에 이미 로드되어 있음 (수정: 메시지 핸들러 외부 스코프로 이동 필요)
-    // 또는, 각 메시지 타입 핸들러 (_handleStartQuiz 등) 내부에서 필요시 sessionQuestionsKey로 다시 로드.
-    // 현재는 핸들러 외부 스코프에 있는 questionContent를 사용한다고 가정.
 
     switch (parsedMessage.type) {
       case "startQuiz":

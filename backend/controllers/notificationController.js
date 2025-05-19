@@ -6,104 +6,106 @@ const logger = require("../utils/logger");
 
 // 알림 생성 및 푸시 알림 전송
 const sendPushNotification = async (
-  message,
-  tokens,
+  fcmMessage,
+  tokensToProcess,
   attempt = 1,
   maxAttempts = 3
 ) => {
-  try {
-    const response = await admin.messaging().sendMulticast(message);
-    logger.debug("FCM response:", response);
+  const { notification, data, recipientType } = fcmMessage;
 
-    if (response.failureCount > 0) {
-      const failedTokens = response.responses
-        .map((resp, idx) =>
-          resp.error ? { token: tokens[idx], error: resp.error } : null
-        )
-        .filter((item) => item !== null);
+  const results = [];
+  const successfulTokens = [];
+  const failedTokenDetails = [];
+  const retryableTokens = [];
 
-      logger.warn("Failed tokens with errors:", failedTokens);
+  const fcm = admin.messaging();
 
-      const invalidTokens = failedTokens
-        .filter(
-          (item) =>
-            item.error.code === "messaging/invalid-registration-token" ||
-            item.error.code === "messaging/unregistered"
-        )
-        .map((item) => item.token);
+  for (const token of tokensToProcess) {
+    try {
+      const individualMessage = {
+        token: token,
+        notification: notification,
+        data: { ...data, notificationId: fcmMessage.data.notificationId },
+      };
+      const response = await fcm.send(individualMessage);
+      results.push({ success: true, response, token });
+      successfulTokens.push(token);
+      logger.debug(`Successfully sent message to token: ${token}`, {
+        response,
+      });
+    } catch (error) {
+      logger.warn(`Failed to send message to token: ${token}`, {
+        error: error.message,
+        code: error.code,
+      });
+      results.push({ success: false, error, token });
+      failedTokenDetails.push({ token, error });
 
-      if (invalidTokens.length > 0) {
-        logger.info(
-          "Invalid tokens detected and will be removed:",
-          invalidTokens
-        );
-        await handleInvalidTokens(
-          invalidTokens,
-          message.data.recipientType === "Student" ? Student : Teacher
-        );
+      if (
+        error.code === "messaging/registration-token-not-registered" ||
+        error.code === "messaging/invalid-registration-token" ||
+        error.code === "messaging/unregistered"
+      ) {
+        logger.info(`Token ${token} marked for removal.`);
+      } else if (attempt < maxAttempts) {
+        retryableTokens.push(token);
       }
+    }
+  }
 
-      const retryableTokens = failedTokens
-        .filter(
-          (item) =>
-            item.error.code !== "messaging/invalid-registration-token" &&
-            item.error.code !== "messaging/unregistered"
-        )
-        .map((item) => item.token);
+  const failureCount = failedTokenDetails.length;
+  logger.info(
+    `FCM send attempt ${attempt} summary: ${successfulTokens.length} success, ${failureCount} failure.`
+  );
 
-      if (retryableTokens.length > 0 && attempt < maxAttempts) {
-        const backoffTime = Math.pow(2, attempt) * 1000;
-        logger.info(
-          `Retrying in ${backoffTime / 1000} seconds... Attempt ${attempt + 1}`
-        );
-        const modelForRetry =
-          message.data.recipientType === "Student" ? Student : Teacher;
-        setTimeout(
-          () =>
-            sendPushNotification(
-              message,
-              retryableTokens,
-              attempt + 1,
-              maxAttempts,
-              modelForRetry
-            ),
-          backoffTime
-        );
-      } else if (retryableTokens.length > 0) {
-        logger.warn(
-          "Max retry attempts reached for some tokens. No further action will be taken."
+  if (failureCount > 0) {
+    const invalidTokensForRemoval = failedTokenDetails
+      .filter(
+        (item) =>
+          item.error.code === "messaging/invalid-registration-token" ||
+          item.error.code === "messaging/registration-token-not-registered" ||
+          item.error.code === "messaging/unregistered"
+      )
+      .map((item) => item.token);
+
+    if (invalidTokensForRemoval.length > 0) {
+      logger.info(
+        "Invalid tokens detected and will be removed:",
+        invalidTokensForRemoval
+      );
+      const Model = recipientType === "Student" ? Student : Teacher;
+      if (Model) {
+        await handleInvalidTokens(invalidTokensForRemoval, Model);
+      } else {
+        logger.error(
+          "Cannot determine model for handleInvalidTokens: recipientType is undefined or invalid",
+          { recipientType }
         );
       }
     }
-  } catch (error) {
-    logger.error("Failed to send push notification:", {
-      error: error.message,
-      stack: error.stack,
-      tokens,
-      attempt,
-    });
-    if (attempt < maxAttempts) {
+
+    if (retryableTokens.length > 0 && attempt < maxAttempts) {
       const backoffTime = Math.pow(2, attempt) * 1000;
       logger.info(
-        `Retrying in ${backoffTime / 1000} seconds due to error... Attempt ${
-          attempt + 1
-        }`
+        `Retrying for ${retryableTokens.length} tokens in ${
+          backoffTime / 1000
+        } seconds... Attempt ${attempt + 1}`
       );
-      const modelForRetry =
-        message.data.recipientType === "Student" ? Student : Teacher;
       setTimeout(
         () =>
           sendPushNotification(
-            message,
-            tokens,
+            fcmMessage,
+            retryableTokens,
             attempt + 1,
-            maxAttempts,
-            modelForRetry
+            maxAttempts
           ),
         backoffTime
       );
-    } else {
-      logger.warn("Max retry attempts reached after error.");
+    } else if (retryableTokens.length > 0) {
+      logger.warn(
+        "Max retry attempts reached for some tokens. No further action will be taken for these tokens in this batch:",
+        retryableTokens
+      );
     }
   }
 };
@@ -150,7 +152,7 @@ const sendQuizResultNotification = async (req, res, next) => {
     if (student && student.tokens.length > 0) {
       const tokens = student.tokens.map((t) => t.token);
 
-      const message = {
+      const fcmMessage = {
         notification: {
           title: "퀴즈 결과 알림",
           body: `퀴즈 결과가 준비되었습니다: ${subject} - ${unit}. 확인해보세요!`,
@@ -159,10 +161,10 @@ const sendQuizResultNotification = async (req, res, next) => {
           notificationId: notification._id.toString(),
           recipientType: "Student",
         },
-        tokens: tokens,
+        recipientType: "Student",
       };
 
-      await sendPushNotification(message, tokens);
+      await sendPushNotification(fcmMessage, tokens);
     }
 
     res.status(200).send({ message: "알림이 성공적으로 전송되었습니다." });
@@ -236,7 +238,7 @@ const sendReportGeneratedNotification = async (req, res, next) => {
           notificationId: notification._id.toString(),
           recipientType: "Teacher",
         },
-        tokens: tokens,
+        recipientType: "Teacher",
       };
 
       await sendPushNotification(fcmMessage, tokens);
@@ -259,10 +261,29 @@ const sendReportGeneratedNotification = async (req, res, next) => {
 
 const getNotifications = async (req, res, next) => {
   try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 5;
+    const skip = (page - 1) * limit;
+
     const notifications = await Notification.find({
       recipientId: req.user._id,
-    }).sort({ createdAt: -1 });
-    res.status(200).json(notifications);
+    })
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
+
+    // 전체 알림 개수도 함께 반환
+    const total = await Notification.countDocuments({
+      recipientId: req.user._id,
+    });
+
+    res.status(200).json({
+      notifications,
+      total,
+      currentPage: page,
+      totalPages: Math.ceil(total / limit),
+      hasMore: skip + notifications.length < total,
+    });
   } catch (error) {
     logger.error("Failed to fetch notifications:", {
       error: error.message,

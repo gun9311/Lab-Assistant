@@ -22,6 +22,7 @@ import {
   ListItemText,
   Box,
   Avatar,
+  CircularProgress,
 } from "@mui/material";
 import {
   Home,
@@ -47,7 +48,14 @@ const Navbar: React.FC<{ role: string; isQuizMode: boolean }> = ({
   const navigate = useNavigate();
   const location = useLocation();
   const { isChatbotActive, setAlertOpen } = useChatbotContext();
-  const { notifications, markAllAsRead, markAsRead } = useNotificationContext();
+  const {
+    notifications,
+    markAllAsRead,
+    markAsRead,
+    hasMore,
+    loadMoreNotifications,
+    isLoading,
+  } = useNotificationContext();
   const theme = useTheme();
   const isDesktop = useMediaQuery(theme.breakpoints.up("lg"));
 
@@ -447,7 +455,7 @@ const Navbar: React.FC<{ role: string; isQuizMode: boolean }> = ({
         PaperProps={{
           sx: {
             maxHeight: 400,
-            width: "30ch",
+            width: "400px",
             p: 1,
             boxShadow: "0px 4px 12px rgba(0, 0, 0, 0.1)",
             borderRadius: "16px",
@@ -487,59 +495,85 @@ const Navbar: React.FC<{ role: string; isQuizMode: boolean }> = ({
             새로운 알림이 없습니다.
           </Typography>
         ) : (
-          notifications.map((notification, index) => (
-            <MenuItem
-              key={index}
-              onClick={() => {
-                markAsRead(notification._id);
-                handleNotificationClose();
-              }}
-              sx={{
-                mb: 1,
-                borderRadius: "12px",
-                backgroundColor: notification.read ? "#f5f5f5" : "#e0f7fa",
-                "&:hover": {
-                  backgroundColor: notification.read ? "#e0e0e0" : "#b2ebf2",
-                },
-                transition: "background-color 0.2s ease",
-              }}
-            >
-              <ListItemIcon>
-                <Badge
-                  color="secondary"
-                  variant="dot"
-                  invisible={notification.read}
+          <>
+            {notifications.map((notification) => (
+              <MenuItem
+                key={notification._id}
+                onClick={() => {
+                  markAsRead(notification._id);
+                  handleNotificationClose();
+                }}
+                sx={{
+                  mb: 1,
+                  borderRadius: "12px",
+                  backgroundColor: notification.read ? "#f5f5f5" : "#e0f7fa",
+                  "&:hover": {
+                    backgroundColor: notification.read ? "#e0e0e0" : "#b2ebf2",
+                  },
+                  transition: "background-color 0.2s ease",
+                  whiteSpace: "normal",
+                  wordBreak: "break-word",
+                }}
+              >
+                <ListItemIcon>
+                  <Badge
+                    color="secondary"
+                    variant="dot"
+                    invisible={notification.read}
+                  >
+                    {notification.read ? (
+                      <Done sx={{ color: "#81c784" }} />
+                    ) : (
+                      <NotificationsActive sx={{ color: "#039be5" }} />
+                    )}
+                  </Badge>
+                </ListItemIcon>
+                <ListItemText
+                  primary={
+                    <Typography
+                      variant="subtitle1"
+                      sx={{
+                        fontWeight: notification.read ? "normal" : "bold",
+                        color: notification.read ? "#757575" : "#000",
+                        wordBreak: "break-word",
+                      }}
+                    >
+                      {notification.title}
+                    </Typography>
+                  }
+                  secondary={
+                    <Typography
+                      variant="body2"
+                      sx={{
+                        color: notification.read ? "#9e9e9e" : "#424242",
+                        wordBreak: "break-word",
+                      }}
+                    >
+                      {notification.body}
+                    </Typography>
+                  }
+                />
+              </MenuItem>
+            ))}
+            {hasMore && (
+              <Box display="flex" justifyContent="center" mt={1} mb={1}>
+                <Button
+                  onClick={loadMoreNotifications}
+                  disabled={isLoading}
+                  variant="outlined"
+                  size="small"
+                  startIcon={isLoading ? <CircularProgress size={16} /> : null}
+                  sx={{
+                    borderRadius: "16px",
+                    textTransform: "none",
+                    fontSize: "0.75rem",
+                  }}
                 >
-                  {notification.read ? (
-                    <Done sx={{ color: "#81c784" }} />
-                  ) : (
-                    <NotificationsActive sx={{ color: "#039be5" }} />
-                  )}
-                </Badge>
-              </ListItemIcon>
-              <ListItemText
-                primary={
-                  <Typography
-                    variant="subtitle1"
-                    sx={{
-                      fontWeight: notification.read ? "normal" : "bold",
-                      color: notification.read ? "#757575" : "#000",
-                    }}
-                  >
-                    {notification.title}
-                  </Typography>
-                }
-                secondary={
-                  <Typography
-                    variant="body2"
-                    sx={{ color: notification.read ? "#9e9e9e" : "#424242" }}
-                  >
-                    {notification.body}
-                  </Typography>
-                }
-              />
-            </MenuItem>
-          ))
+                  {isLoading ? "로딩 중..." : "더 보기"}
+                </Button>
+              </Box>
+            )}
+          </>
         )}
       </Menu>
 
