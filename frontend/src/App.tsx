@@ -291,25 +291,25 @@ const AppContent: React.FC = () => {
           />
           <Route
             path="/my-quizzes"
-            element={<MyQuizzesPage setIsQuizMode={setIsQuizMode} />} // 기존 컴포넌트 주석 처리
-            // element={
-            //   <PrivateRoute
-            //     roles={["student"]}
-            //     element={
-            //       <StudentRouteGuard>
-            //         <ComingSoon />
-            //       </StudentRouteGuard>
-            //     }
-            //   />
-            // }
+            // element={<MyQuizzesPage setIsQuizMode={setIsQuizMode} />} // 기존 컴포넌트 주석 처리
+            element={
+              <PrivateRoute
+                roles={["student"]}
+                element={
+                  <StudentRouteGuard>
+                    <ComingSoon />
+                  </StudentRouteGuard>
+                }
+              />
+            }
           />
           <Route
             path="/manage-quizzes"
             element={
               <PrivateRoute
                 roles={["teacher"]}
-                element={<ManageQuizzesPage />} // 기존 컴포넌트 주석 처리
-                // element={<ComingSoon />} // ComingSoon 컴포넌트로 대체
+                // element={<ManageQuizzesPage />} // 기존 컴포넌트 주석 처리
+                element={<ComingSoon />} // ComingSoon 컴포넌트로 대체
               />
             }
           />
