@@ -109,7 +109,7 @@ const ChatSummaryList: React.FC<ChatSummaryListProps> = ({
         setSummaries([]);
         setTotalPages(0);
         setCurrentPage(1);
-        setCurrentQueryTarget("과목 선택 또는 검색어 입력 필요");
+        // setCurrentQueryTarget("과목 선택 또는 검색어 입력 필요");
         setQueryType("none");
         return;
       }

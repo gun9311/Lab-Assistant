@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { addUnits, getSubjects } from "../../utils/api";
+import { addUnits } from "../../utils/api";
 import { SubjectData, UnitData } from "../../utils/types";
 
 const AddUnits = ({ subjects, onUnitAdded }: { subjects: SubjectData[], onUnitAdded: () => void }) => {
