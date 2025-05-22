@@ -15,12 +15,58 @@ const addSubject = async (req, res) => {
 };
 
 // 과목 조회
-const getSubjects = async (req, res) => {
+const getAllSubjects = async (req, res) => {
   try {
     const subjects = await Subject.find();
     res.status(200).send(subjects);
   } catch (error) {
     logger.error("과목 정보를 불러오는데 실패했습니다.", error); // G_TOKEN_REPLACEMENT_
+    res.status(500).send({ error: "과목 정보를 불러오는데 실패했습니다." });
+  }
+};
+
+// 과목 조회
+const getSubjects = async (req, res) => {
+  const { grade, semester } = req.query;
+
+  try {
+    let query = {};
+    if (grade) {
+      query.grade = parseInt(grade);
+    }
+    if (semester) {
+      query.semester = { $in: semester.split(",") };
+    }
+
+    const subjects = await Subject.find(query); // .sort({ name: 1 }) 제거 또는 유지
+
+    // 과목 이름만 추출하여 중복 없이 배열로 반환
+    const subjectNames = [...new Set(subjects.map((s) => s.name))];
+
+    const predefinedOrder = [
+      "국어",
+      "도덕",
+      "수학",
+      "과학",
+      "사회",
+      "영어",
+      "음악",
+      "미술",
+      "체육",
+      "실과",
+    ];
+    const sortedSubjectNames = subjectNames.sort((a, b) => {
+      const indexA = predefinedOrder.indexOf(a);
+      const indexB = predefinedOrder.indexOf(b);
+      if (indexA === -1 && indexB === -1) return a.localeCompare(b);
+      if (indexA === -1) return 1;
+      if (indexB === -1) return -1;
+      return indexA - indexB;
+    });
+
+    res.status(200).send(sortedSubjectNames); // 최종적으로 이 배열이 보내져야 합니다.
+  } catch (error) {
+    logger.error("과목 정보를 불러오는데 실패했습니다.", error);
     res.status(500).send({ error: "과목 정보를 불러오는데 실패했습니다." });
   }
 };
@@ -125,4 +171,11 @@ const addUnitRating = async (req, res) => {
   }
 };
 
-module.exports = { addSubject, getSubjects, getUnits, addUnits, addUnitRating };
+module.exports = {
+  addSubject,
+  getAllSubjects,
+  getSubjects,
+  getUnits,
+  addUnits,
+  addUnitRating,
+};
