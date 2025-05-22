@@ -400,13 +400,13 @@ const TeacherHomePage: React.FC = () => {
           {showReportGeneration ? (
             <>
               {grade && classNumber && uniqueIdentifier ? (
-                // <ReportGeneration
-                //   school={school}
-                //   grade={grade}
-                //   classNumber={classNumber}
-                //   students={students}
-                // />
-                <ComingSoon />
+                <ReportGeneration
+                  school={school}
+                  grade={grade}
+                  classNumber={classNumber}
+                  students={students}
+                />
+                // <ComingSoon />
               ) : (
                 <Box
                   sx={{

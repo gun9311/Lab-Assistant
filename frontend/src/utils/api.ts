@@ -62,7 +62,7 @@ export const addSubject = (subjectData: SubjectData) =>
   api.post("/subjects/add-subject", subjectData);
 export const addUnits = (unitData: UnitData) =>
   api.post("/subjects/add-units", unitData);
-export const getSubjects = () => api.get("/subjects");
+export const getAllSubjects = () => api.get("/subjects/all");
 export const addUnitRating = (ratingData: RatingData) =>
   api.post("/subjects/add-unit-rating", ratingData);
 export const addQuiz = (quizData: QuizData) => api.post("/quiz", quizData);
@@ -70,6 +70,23 @@ export const addQuiz = (quizData: QuizData) => api.post("/quiz", quizData);
 // --- 추가된 함수 ---
 export const getChatUsage = (): Promise<{ data: ChatUsageData }> =>
   api.get("/users/chat-usage");
+
+// getSubjects 함수 수정: grade와 semester 파라미터 추가
+export const getSubjects = (
+  grade?: number | null,
+  semesters?: string[] | null // 여러 학기를 문자열 배열로 받음
+): Promise<{ data: string[] }> => {
+  // 반환 타입을 string[]로 명시
+  let params: any = {};
+  if (grade) {
+    params.grade = grade;
+  }
+  if (semesters && semesters.length > 0) {
+    // 여러 학기를 쉼표로 구분된 문자열로 변환
+    params.semester = semesters.join(",");
+  }
+  return api.get("/subjects", { params });
+};
 // --- 추가된 함수 끝 ---
 
 export default api;

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { getSubjects } from "../../utils/api";
+import { getAllSubjects } from "../../utils/api";
 import { SubjectData } from "../../utils/types";
 import AddSubject from "./AddSubject";
 import AddUnits from "./AddUnits";
@@ -13,7 +13,7 @@ const AddThings = () => {
   useEffect(() => {
     const fetchSubjects = async () => {
       try {
-        const res = await getSubjects();
+        const res = await getAllSubjects();
         setSubjects(res.data);
       } catch (error) {
         console.error("Failed to fetch subjects:", error);
@@ -26,7 +26,7 @@ const AddThings = () => {
 
   const refreshSubjects = async () => {
     try {
-      const res = await getSubjects();
+      const res = await getAllSubjects();
       setSubjects(res.data);
     } catch (error) {
       console.error("Failed to fetch subjects:", error);
