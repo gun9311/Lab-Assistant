@@ -6,14 +6,18 @@ require("dotenv").config();
 // 기존 스키마 유지
 const studentSchema = new mongoose.Schema({
   loginId: { type: String, required: true, unique: true },
-  studentId: { type: String, required: true },
+  studentId: { type: String, required: true }, // 출석번호
   name: { type: String, required: true },
   password: { type: String, required: true },
   grade: { type: Number, required: true },
-  class: { type: String, required: true },
+  class: { type: String, required: true }, // 반
   school: { type: String, required: true },
   role: { type: String, default: "student" },
-  tokens: [{ token: { type: String, required: true } }],
+  tokens: [{ token: { type: String, required: false } }], // FCM 토큰 저장
+  dailyChatCount: { type: Number, default: 0 },
+  lastChatDay: { type: String, default: null }, // 예: "YYYY-MM-DD"
+  monthlyChatCount: { type: Number, default: 0 },
+  lastChatMonth: { type: String, default: null }, // 예: "YYYY-MM"
 });
 
 const Student = mongoose.model("Student", studentSchema);
@@ -32,28 +36,32 @@ const StudentReport = mongoose.model("StudentReport", studentReportSchema);
 const resultSchema = new mongoose.Schema({
   questionId: {
     type: Schema.Types.ObjectId,
-    ref: "KahootQuizContent.questions",
     required: true,
-  }, // 퀴즈 문제 ID
-  studentAnswer: { type: Number, required: false }, // 학생의 답변
+  }, // 퀴즈 문제 ID (세션 스냅샷 내 질문 객체의 _id)
+  studentAnswer: { type: Number, required: false }, // 학생의 답변 (선택지 인덱스 등)
   isCorrect: { type: Boolean, required: true }, // 정답 여부 (True/False)
 });
 
+// 퀴즈 결과 스키마
 const quizResultSchema = new mongoose.Schema({
-  studentId: { type: Schema.Types.ObjectId, ref: "Student", required: true },
-  quizId: {
+  studentId: { type: Schema.Types.ObjectId, ref: "Student", required: true }, // 학생 ID
+
+  sessionId: {
     type: Schema.Types.ObjectId,
-    ref: "KahootQuizContent",
+    ref: "KahootQuizSession", // KahootQuizSession 모델 참조
     required: true,
   },
+
+  // quizId 필드 제거: 원본 KahootQuizContent에 대한 직접 참조 불필요
+
   subject: { type: String, required: true },
   semester: { type: String, required: true },
   unit: { type: String, required: true },
-  results: [resultSchema],
-  score: { type: Number, required: true },
-  createdAt: { type: Date, default: Date.now },
-});
 
+  results: [resultSchema], // 개별 질문의 결과 배열
+  score: { type: Number, required: true }, // 전체 점수 (정답 개수 기반)
+  createdAt: { type: Date, default: Date.now }, // 생성 날짜
+});
 const QuizResult = mongoose.model("QuizResult", quizResultSchema);
 
 const RatingSchema = new Schema({
@@ -113,13 +121,17 @@ const getRandomComment = async (
   grade,
   semester,
   unit,
-  usedUnits = []
+  usedUnits = [],
+  allowDuplicates = false
 ) => {
   const subjectData = await Subject.findOne({ name: subject, grade, semester });
   if (!subjectData) return null;
 
+  // 중복 허용 시에는 usedUnits을 필터링하지 않음
   const availableUnits = unit
     ? [subjectData.units.find((u) => u.name === unit)]
+    : allowDuplicates
+    ? subjectData.units
     : subjectData.units.filter((u) => !usedUnits.includes(u.name));
 
   if (availableUnits.length === 0) return null;
@@ -238,17 +250,69 @@ const processMessage = async (message) => {
 
             // 부족한 줄 수만큼 랜덤 평어 추가 (중복 제외)
             const remainingLines = reportLines - comments.length;
+
+            // 과목의 모든 단원 정보 가져오기
+            const subjectData = await Subject.findOne({
+              name: subject,
+              grade,
+              semester,
+            });
+
+            // 해당 과목/학기의 전체 단원 수 확인
+            const totalUnitsCount = subjectData?.units?.length || 0;
+            const remainingUnitsCount = totalUnitsCount - usedUnits.length;
+
+            // 중복 허용 여부 결정 - 남은 단원 수가 필요한 줄 수보다 적을 때만 허용
+            const allowDuplicates = remainingUnitsCount < remainingLines;
+
+            // 균등 분배를 위한 준비 (중복 허용 시)
+            let unitUsageCount = {};
+            if (allowDuplicates && totalUnitsCount > 0) {
+              // 모든 단원의 사용 횟수 초기화
+              subjectData.units.forEach((unit) => {
+                unitUsageCount[unit.name] = usedUnits.includes(unit.name)
+                  ? 1
+                  : 0;
+              });
+            }
+
             for (let i = 0; i < remainingLines; i++) {
-              const randomResult = await getRandomComment(
-                subject,
-                grade,
-                semester,
-                null,
-                usedUnits
-              );
-              if (randomResult) {
-                comments.push(randomResult.comment);
-                usedUnits.push(randomResult.unit);
+              if (allowDuplicates && totalUnitsCount > 0) {
+                // 가장 적게 사용된 단원 선택 (균등 분배)
+                const leastUsedUnit = Object.keys(unitUsageCount).reduce(
+                  (a, b) => (unitUsageCount[a] <= unitUsageCount[b] ? a : b)
+                );
+
+                // 선택된 단원에 대한 평어 생성
+                const randomResult = await getRandomComment(
+                  subject,
+                  grade,
+                  semester,
+                  leastUsedUnit
+                );
+
+                if (randomResult) {
+                  comments.push(randomResult.comment);
+                  unitUsageCount[leastUsedUnit]++;
+                }
+              } else {
+                // 기존 로직: 중복 없이 랜덤 단원 선택
+                const randomResult = await getRandomComment(
+                  subject,
+                  grade,
+                  semester,
+                  null,
+                  usedUnits,
+                  false
+                );
+
+                if (randomResult) {
+                  comments.push(randomResult.comment);
+                  usedUnits.push(randomResult.unit);
+                } else if (allowDuplicates) {
+                  // 중복을 허용해도 평어를 생성할 수 없는 경우 (단원이 없는 경우)
+                  break;
+                }
               }
             }
 
