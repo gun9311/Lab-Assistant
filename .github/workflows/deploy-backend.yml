@@ -37,6 +37,7 @@ jobs:
             REDIS_URL=redis://redis:6379
             SESSION_SECRET=${{ secrets.SESSION_SECRET }}
             OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+            ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}
             SQS_REGION=${{ secrets.SQS_REGION }}
             QUIZ_QUEUE_URL=${{ secrets.QUIZ_QUEUE_URL }}
             REPORT_QUEUE_URL=${{ secrets.REPORT_QUEUE_URL }}
