@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useLayoutEffect } from "react";
 import {
   Box,
   Button,
@@ -79,6 +79,78 @@ const SUBJECT_ORDER = [
   "체육",
   "실과",
 ];
+
+interface CommentRendererProps {
+  text: string;
+  isExpanded: boolean;
+  onToggle: () => void;
+  clampLines?: number;
+}
+
+const CommentRenderer: React.FC<CommentRendererProps> = ({
+  text,
+  isExpanded,
+  onToggle,
+  clampLines = 3,
+}) => {
+  const [canOverflow, setCanOverflow] = useState(false);
+  const textRef = useRef<HTMLParagraphElement>(null);
+
+  useLayoutEffect(() => {
+    if (textRef.current) {
+      const element = textRef.current;
+      // 넘침 여부를 정확히 측정하기 위해 일시적으로 clamping 스타일 적용
+      element.style.display = "-webkit-box";
+      element.style.webkitBoxOrient = "vertical";
+      element.style.webkitLineClamp = `${clampLines}`;
+      element.style.overflow = "hidden";
+
+      setCanOverflow(element.scrollHeight > element.clientHeight);
+
+      // 측정 후 임시로 적용한 인라인 스타일 제거 (sx prop이 최종 스타일을 결정하도록)
+      element.style.display = "";
+      element.style.webkitBoxOrient = "";
+      element.style.webkitLineClamp = "";
+      element.style.overflow = "";
+    }
+  }, [text, clampLines]);
+
+  return (
+    <>
+      <Typography
+        variant="body2"
+        ref={textRef}
+        sx={{
+          whiteSpace: "pre-line",
+          wordBreak: "break-word",
+          fontSize: "0.875rem",
+          lineHeight: 1.6,
+          display: "-webkit-box",
+          WebkitBoxOrient: "vertical",
+          WebkitLineClamp: isExpanded ? "none" : clampLines,
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+        }}
+      >
+        {text}
+      </Typography>
+      {canOverflow && (
+        <Button
+          size="small"
+          onClick={onToggle}
+          startIcon={isExpanded ? <VisibilityOffIcon /> : <VisibilityIcon />}
+          sx={{
+            mt: 0.5,
+            p: 0.5,
+            fontSize: "0.75rem",
+          }}
+        >
+          {isExpanded ? "간략히" : "더보기"}
+        </Button>
+      )}
+    </>
+  );
+};
 
 const ReportComponent: React.FC<ReportComponentProps> = ({
   reports,
@@ -278,8 +350,6 @@ const ReportComponent: React.FC<ReportComponentProps> = ({
                             .map((report: Report, index: number) => {
                               const commentKey = `${report.studentId._id}-${subject}-${index}`;
                               const isExpanded = !!expandedComments[commentKey];
-                              const needsExpansion =
-                                report.comment.length > COMMENT_TRUNCATE_LENGTH;
 
                               return (
                                 <TableRow
@@ -324,46 +394,13 @@ const ReportComponent: React.FC<ReportComponentProps> = ({
                                       py: 1.5,
                                     }}
                                   >
-                                    <Typography
-                                      variant="body2"
-                                      sx={{
-                                        whiteSpace: "pre-line",
-                                        wordBreak: "break-word",
-                                        fontSize: "0.875rem",
-                                        lineHeight: 1.6,
-                                        display: "-webkit-box",
-                                        WebkitBoxOrient: "vertical",
-                                        WebkitLineClamp: isExpanded
-                                          ? "none"
-                                          : 3,
-                                        overflow: "hidden",
-                                        textOverflow: "ellipsis",
-                                      }}
-                                    >
-                                      {report.comment}
-                                    </Typography>
-                                    {needsExpansion && (
-                                      <Button
-                                        size="small"
-                                        onClick={() =>
-                                          toggleCommentExpansion(commentKey)
-                                        }
-                                        startIcon={
-                                          isExpanded ? (
-                                            <VisibilityOffIcon />
-                                          ) : (
-                                            <VisibilityIcon />
-                                          )
-                                        }
-                                        sx={{
-                                          mt: 0.5,
-                                          p: 0.5,
-                                          fontSize: "0.75rem",
-                                        }}
-                                      >
-                                        {isExpanded ? "간략히" : "더보기"}
-                                      </Button>
-                                    )}
+                                    <CommentRenderer
+                                      text={report.comment}
+                                      isExpanded={isExpanded}
+                                      onToggle={() =>
+                                        toggleCommentExpansion(commentKey)
+                                      }
+                                    />
                                   </TableCell>
                                 </TableRow>
                               );

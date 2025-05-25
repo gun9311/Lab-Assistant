@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useLayoutEffect, useRef } from "react";
 import {
   Paper,
   Typography,
@@ -34,7 +34,82 @@ type Report = {
 
 // 각 평어의 확장 상태를 관리하기 위한 타입
 type ExpandedCommentsState = {
-  [key: string]: boolean; // key는 report._id 또는 report.subject + report.semester 조합
+  [key: string]: boolean;
+};
+
+// 새로운 내부 컴포넌트 정의
+interface CommentDisplayProps {
+  comment: string;
+  commentKey: string; // 고유 키 전달
+  isExpanded: boolean;
+  onToggleExpansion: () => void;
+}
+
+const CommentDisplay: React.FC<CommentDisplayProps> = ({
+  comment,
+  commentKey, // 사용하지 않더라도 props로 받을 수 있음 (혹은 제거)
+  isExpanded,
+  onToggleExpansion,
+}) => {
+  const [canOverflow, setCanOverflow] = useState(false);
+  const textRef = useRef<HTMLParagraphElement>(null);
+  const clampLines = 3;
+
+  useLayoutEffect(() => {
+    if (textRef.current) {
+      const element = textRef.current;
+      // Temporarily apply clamping styles to measure
+      const originalStyles = {
+        display: element.style.display,
+        webkitBoxOrient: element.style.webkitBoxOrient,
+        webkitLineClamp: element.style.webkitLineClamp,
+        overflow: element.style.overflow,
+      };
+
+      element.style.display = "-webkit-box";
+      element.style.webkitBoxOrient = "vertical";
+      element.style.webkitLineClamp = `${clampLines}`;
+      element.style.overflow = "hidden";
+
+      setCanOverflow(element.scrollHeight > element.clientHeight);
+
+      // Restore original styles (or remove inline styles if sx prop handles it)
+      element.style.display = originalStyles.display;
+      element.style.webkitBoxOrient = originalStyles.webkitBoxOrient;
+      element.style.webkitLineClamp = originalStyles.webkitLineClamp;
+      element.style.overflow = originalStyles.overflow;
+    }
+  }, [comment, clampLines]);
+
+  return (
+    <Box>
+      <Typography
+        variant="body2"
+        sx={{
+          whiteSpace: "pre-line",
+          wordBreak: "break-word",
+          display: "-webkit-box",
+          WebkitBoxOrient: "vertical",
+          WebkitLineClamp: isExpanded ? "none" : clampLines,
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          lineHeight: 1.6,
+        }}
+        ref={textRef}
+      >
+        {comment}
+      </Typography>
+      {canOverflow && (
+        <Button
+          size="small"
+          onClick={onToggleExpansion}
+          sx={{ mt: 0.5, p: 0, textTransform: "none" }}
+        >
+          {isExpanded ? "간략히" : "더보기"}
+        </Button>
+      )}
+    </Box>
+  );
 };
 
 const StudentReport: React.FC<StudentReportProps> = ({
@@ -47,7 +122,6 @@ const StudentReport: React.FC<StudentReportProps> = ({
   const [loading, setLoading] = useState<boolean>(true);
   const [expandedComments, setExpandedComments] =
     useState<ExpandedCommentsState>({});
-  // 아코디언 확장 상태를 관리하기 위한 상태 (학기 이름을 키로 사용)
   const [expandedAccordions, setExpandedAccordions] = useState<
     Record<string, boolean>
   >({});
@@ -98,7 +172,6 @@ const StudentReport: React.FC<StudentReportProps> = ({
     setExpandedComments((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
-  // 아코디언 확장/축소 핸들러
   const handleAccordionChange =
     (semester: string) =>
     (event: React.SyntheticEvent, isExpanded: boolean) => {
@@ -108,80 +181,50 @@ const StudentReport: React.FC<StudentReportProps> = ({
       }));
     };
 
-  const renderComment = (comment: string, key: string) => {
-    const maxLength = 100; // 기본적으로 보여줄 최대 글자 수
-    const isExpanded = expandedComments[key];
-    const isLongComment = comment.length > maxLength;
-
-    return (
-      <Box>
-        <Typography
-          variant="body2"
-          sx={{
-            whiteSpace: "pre-line",
-            wordBreak: "break-word",
-            display: "-webkit-box",
-            WebkitBoxOrient: "vertical",
-            WebkitLineClamp: isExpanded || !isLongComment ? "none" : 3,
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            lineHeight: 1.6,
-          }}
-        >
-          {comment}
-        </Typography>
-        {isLongComment && (
-          <Button
-            size="small"
-            onClick={() => toggleCommentExpansion(key)}
-            sx={{ mt: 0.5, p: 0, textTransform: "none" }}
-          >
-            {isExpanded ? "간략히" : "더보기"}
-          </Button>
-        )}
-      </Box>
-    );
-  };
-
   const renderReportItem = (
     report: Report,
     reportIndex: number,
     totalInSemester: number
-  ) => (
-    <ListItem
-      key={report._id || `${report.subject}-${reportIndex}`}
-      divider={reportIndex < totalInSemester - 1}
-      sx={{
-        py: 1.5,
-        px: 2,
-        flexDirection: "column",
-        alignItems: "flex-start",
-      }}
-    >
-      <Box
+  ) => {
+    const commentKey = report._id || `${report.subject}-${reportIndex}`;
+    return (
+      <ListItem
+        key={commentKey}
+        divider={reportIndex < totalInSemester - 1}
         sx={{
-          display: "flex",
-          alignItems: "center",
-          mb: 0.5,
-          width: "100%",
+          py: 1.5,
+          px: 2,
+          flexDirection: "column",
+          alignItems: "flex-start",
         }}
       >
-        {/* <SubjectIcon sx={{ mr: 1, color: 'primary.main' }} /> */}
-        {/* 아이콘 예시: getSubjectIcon(report.subject) */}
-        <Typography
-          variant="subtitle2"
-          sx={{ fontWeight: "bold", flexGrow: 1 }}
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            mb: 0.5,
+            width: "100%",
+          }}
         >
-          {report.subject}
-        </Typography>
-        {/* <Chip label="세부평가" size="small" variant="outlined" sx={{ml: 1}}/> */}
-      </Box>
-      {renderComment(
-        report.comment,
-        report._id || `${report.subject}-${reportIndex}`
-      )}
-    </ListItem>
-  );
+          {/* <SubjectIcon sx={{ mr: 1, color: 'primary.main' }} /> */}
+          {/* 아이콘 예시: getSubjectIcon(report.subject) */}
+          <Typography
+            variant="subtitle2"
+            sx={{ fontWeight: "bold", flexGrow: 1 }}
+          >
+            {report.subject}
+          </Typography>
+          {/* <Chip label="세부평가" size="small" variant="outlined" sx={{ml: 1}}/> */}
+        </Box>
+        <CommentDisplay
+          comment={report.comment}
+          commentKey={commentKey}
+          isExpanded={!!expandedComments[commentKey]}
+          onToggleExpansion={() => toggleCommentExpansion(commentKey)}
+        />
+      </ListItem>
+    );
+  };
 
   if (loading) {
     return (
