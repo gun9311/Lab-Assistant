@@ -179,7 +179,7 @@ const StudentList: React.FC<StudentListProps> = ({
 
   const handleStudentSelect = (student: Student) => {
     setSelectedStudent(student);
-    setActiveTab(0);
+    // setActiveTab(0); // 이 부분을 주석 처리하거나 삭제하여 탭 상태를 유지합니다.
   };
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
