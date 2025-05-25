@@ -17,6 +17,8 @@ import {
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import api from "../../utils/api";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+import VisibilityIcon from "@mui/icons-material/Visibility";
+import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
 // import { getSubjectIcon } from "./iconMapper"; // 실제 아이콘 매퍼 경로
 
 type StudentReportProps = {
@@ -103,7 +105,19 @@ const CommentDisplay: React.FC<CommentDisplayProps> = ({
         <Button
           size="small"
           onClick={onToggleExpansion}
-          sx={{ mt: 0.5, p: 0, textTransform: "none" }}
+          startIcon={
+            isExpanded ? (
+              <VisibilityOffIcon fontSize="small" />
+            ) : (
+              <VisibilityIcon fontSize="small" />
+            )
+          }
+          sx={{
+            mt: 0.5,
+            p: 0.5, // 아이콘 추가로 약간의 패딩 조정
+            textTransform: "none",
+            fontSize: "0.75rem", // ReportComponent와 유사하게 폰트 크기 조정
+          }}
         >
           {isExpanded ? "간략히" : "더보기"}
         </Button>
