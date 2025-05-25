@@ -204,20 +204,28 @@ const Chatbot: React.FC<ChatbotProps> = ({
         setLimitExceededError(null);
         const { bot, isFinal } = data;
 
-        if (isFinal) {
-          console.log(
-            "[Chatbot] Received isFinal=true. Typing animation will continue."
-          );
-        } else if (
-          bot !== undefined &&
-          bot !== null &&
-          typeof bot === "string"
-        ) {
+        if (bot !== undefined && bot !== null && typeof bot === "string") {
           setIsResponding(true);
 
-          if (currentBotMessageIdRef.current !== null) {
+          if (isFinal && currentBotMessageIdRef.current === null) {
+            const newMsgId = messageIdCounter.current++;
+            const newBotMessage: ChatMessage = {
+              id: newMsgId,
+              sender: "챗봇",
+              content: bot,
+            };
+            setChatHistory((prevChatHistory) => [
+              ...prevChatHistory,
+              newBotMessage,
+            ]);
+            setIsResponding(false);
+            targetBotContentRef.current = "";
+            if (typingTimeoutRef.current) {
+              clearTimeout(typingTimeoutRef.current);
+              typingTimeoutRef.current = null;
+            }
+          } else if (currentBotMessageIdRef.current !== null) {
             targetBotContentRef.current += bot;
-
             if (!typingTimeoutRef.current) {
               const randomDelay = Math.floor(Math.random() * 21) + 40;
               typingTimeoutRef.current = setTimeout(typeCharacter, randomDelay);
@@ -227,25 +235,26 @@ const Chatbot: React.FC<ChatbotProps> = ({
               clearTimeout(typingTimeoutRef.current);
               typingTimeoutRef.current = null;
             }
-
             const newMsgId = messageIdCounter.current++;
             const newBotMessage: ChatMessage = {
               id: newMsgId,
               sender: "챗봇",
               content: "",
             };
-
             setChatHistory((prevChatHistory) => [
               ...prevChatHistory,
               newBotMessage,
             ]);
-
             currentBotMessageIdRef.current = newMsgId;
             targetBotContentRef.current = bot;
 
             const randomDelay = Math.floor(Math.random() * 21) + 40;
             typingTimeoutRef.current = setTimeout(typeCharacter, randomDelay);
           }
+        } else if (isFinal) {
+          console.log(
+            "[Chatbot] Received isFinal=true. Typing animation will continue or finalize."
+          );
         }
       } catch (error) {
         console.error("Error processing WebSocket message:", error);
