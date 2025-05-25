@@ -1,13 +1,10 @@
 const { v4: uuidv4 } = require("uuid");
 const { getNLPResponse } = require("../services/nlpService");
-const {redisClient} = require("../utils/redisClient");
+const { redisClient } = require("../utils/redisClient");
 const logger = require("../utils/logger");
 const config = require("../config");
 const chatUsageService = require("../services/chatUsageService");
-const {
-  preprocessUserMessage,
-  postprocessBotResponse,
-} = require("../services/chatbotMessageService"); // 수정: chatbotMessageService에서 함수 가져오기
+const { preprocessUserMessage } = require("../services/chatbotMessageService"); // 수정: chatbotMessageService에서 함수 가져오기
 const chatbotInteractionService = require("../services/chatbotInteractionService"); // 수정: chatbotInteractionService 가져오기
 const chatSummaryService = require("../services/chatSummaryService"); // 추가: chatSummaryService 가져오기
 
@@ -208,7 +205,10 @@ const initializeChatConnection = async (ws, userId, subjectParam) => {
             topic
           );
 
-        const streamResponse = getNLPResponse(messagesForNLP);
+        const streamResponse = getNLPResponse(
+          messagesForNLP.systemPrompt,
+          messagesForNLP.userMessages
+        );
         let botResponseContent = ""; // rawBotResponseContent 대신 botResponseContent로 통일
         for await (const botResp of streamResponse) {
           // 변수명 변경 botResponse -> botResp
@@ -242,7 +242,16 @@ const initializeChatConnection = async (ws, userId, subjectParam) => {
       } = await preprocessUserMessage(rawUserMessage, userId, clientId); // chatbotMessageService의 함수
 
       if (userMessageIsFiltered) {
-        // ... (사용자 메시지 필터링 처리) ...
+        // 사용자 메시지가 필터링된 경우, 거절 응답을 클라이언트에게 전송
+        ws.send(
+          JSON.stringify({
+            bot: userMessageRefusalResponse, // 거절 메시지를 bot 필드에 담아 전송
+            isFinal: true, // 단일 메시지이므로 isFinal: true
+            // 여기에 추가적으로 filterDetails 같은 정보를 포함시켜 클라이언트에서 활용할 수도 있습니다.
+            // 예: filterType: userMessageFilterDetails?.type
+          })
+        );
+
         // 히스토리 저장 시 chatbotInteractionService.saveToChatHistory 사용
         await chatbotInteractionService.saveToChatHistory(
           chatHistoryKey,
@@ -252,9 +261,9 @@ const initializeChatConnection = async (ws, userId, subjectParam) => {
           userId
         );
         logger.info(
-          `Saved filtered (User Message Filter) interaction to Redis for user ${userId}`
+          `Sent refusal response and saved filtered interaction to Redis for user ${userId}`
         );
-        return;
+        return; // 여기서 함수가 종료됨
       }
 
       const recentHistory = chatHistory.slice(-RECENT_HISTORY_COUNT);
@@ -269,9 +278,11 @@ const initializeChatConnection = async (ws, userId, subjectParam) => {
           messageForProcessing
         );
 
-      // if (!messagesForNLP || !messagesForNLP.every(...)) // 이 유효성 검사는 서비스 내부로 이동함
-
-      const streamResponse = getNLPResponse(messagesForNLP);
+      // getNLPResponse 호출을 새로운 시그니처에 맞게 수정
+      const streamResponse = getNLPResponse(
+        messagesForNLP.systemPrompt,
+        messagesForNLP.userMessages
+      );
       let rawBotResponseContent = "";
       for await (const botResp of streamResponse) {
         // 변수명 변경 botresponse -> botResp
@@ -280,12 +291,6 @@ const initializeChatConnection = async (ws, userId, subjectParam) => {
       }
       ws.send(JSON.stringify({ bot: null, isFinal: true }));
 
-      const finalBotResponseForHistory = await postprocessBotResponse(
-        rawBotResponseContent,
-        userId,
-        clientId
-      ); // chatbotMessageService의 함수
-
       if (saveToHistory) {
         // saveToHistory는 true일 것 (빈 메시지가 아니므로)
         // 수정: 히스토리 저장 서비스 함수 호출
@@ -293,7 +298,7 @@ const initializeChatConnection = async (ws, userId, subjectParam) => {
           chatHistoryKey,
           chatHistory,
           finalUserMessageForHistory,
-          finalBotResponseForHistory,
+          rawBotResponseContent, // Claude 원본 응답을 히스토리에 저장
           userId
         );
       }

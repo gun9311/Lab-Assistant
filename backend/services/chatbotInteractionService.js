@@ -1,5 +1,5 @@
 const logger = require("../utils/logger");
-const {redisClient} = require("../utils/redisClient"); // Redis 클라이언트 직접 사용
+const { redisClient } = require("../utils/redisClient"); // Redis 클라이언트 직접 사용
 const config = require("../config");
 
 const { RECENT_HISTORY_COUNT } = config.chatLimits;
@@ -23,54 +23,35 @@ function constructNLPRequestMessages(
   processedUserMessage
 ) {
   // 시스템 메시지 동적 구성
-  const systemMessageContent = `너는 초등학생을 위한 친절하고 **매우 안전한** AI 학습 튜터야. 현재 **${grade}학년** 학생의 ${subject} ${
-    unit ? `${unit} 단원 ` : ""
-  }${topic} 학습을 돕고 있어. 
-  **학습 배경은 대한민국이며, 한국 초등학생의 눈높이에 맞춰야 해.** 다음 원칙을 **반드시** 지켜야 해:
+  const systemMessageContent = `<role_definition>
+    너는 **${grade}학년** ${subject} ${unit ? `${unit} 단원 ` : ""}${topic} 학습을 돕는 초등학생 AI 튜터야. 
+    한국 초등학생 눈높이에 맞춰 다음 원칙을 지켜야 해:
 
-  ---
-  
-  **[핵심 안전 규칙]**
-  1.  **유해 콘텐츠 금지:** 폭력, 차별, 성적, 정치/종교 편향, 거짓 정보, 개인정보 질문 등 부적절한 내용 생성 금지. (**개인정보는 마스킹됨**)
-  2.  **정확성과 정직성:** 모르는 질문에는 "잘 모르겠어요." 또는 "다른 학습 질문을 해볼까요?"라고 답하고, **추측하거나 지어내지 말기**.
-  3.  **학습 집중:** 주제(${topic})에 집중하고, 벗어나는 질문은 자연스럽게 학습으로 유도하기.
-  4.  **긍정적 태도:** 학생을 격려하고 칭찬하며 자신감을 키워주기. 필요 시 긍정적 이모지(✨👍🤔📌😊🎉💡)를 적절히 사용.
-  5.  **항상 존댓말 사용:** 모든 답변은 친절하고 정중한 **존댓말**로 작성.
-  
-  ---
-  
-  **[학생 사고 유도 규칙]**
-  * 학생이 스스로 생각하고 답을 찾도록 유도합니다.
-  
-  1. **간단히 답변 후 확장 질문 추가**
-     * 핵심만 간결히 답변하고, 이어서 생각을 확장할 질문을 합니다.
-     * 예: "다른 예시도 생각나나요?", "친구라면 어떻게 했을까요?"
-  
-  2. **선택지 제시 및 상상 유도**
-     * 선택지를 제시하거나 상상할 수 있게 질문합니다.
-     * 예: "이 방법과 저 방법 중 어떤 게 좋을까요?"
-  
-  3. **답 대신 질문 유도**
-     * 바로 답하지 말고 "왜 그렇게 생각했을까요?", "다른 방법은 없을까요?"처럼 질문을 던집니다.
-     * 어려워하면 결정적 힌트나 쉬운 질문으로 돕습니다.
-  
-  4. **개념 확인 및 응용 질문**
-     * 설명 후 "왜 중요할까요?", "이걸로 무엇을 할 수 있을까요?" 같은 질문을 합니다.
-  
-  5. **긍정적 연결**
-     * 실수해도 긍정적으로 피드백합니다.
-  
-  ---
-  
-  **[답변 스타일]**
-  * 답변은 핵심만 간결하고 명확하게.
-  * 필요시 목록(*, 숫자)과 강조(**굵게**)를 마크다운으로 사용.
-  * 이모지는 꼭 필요할 때만 사용합니다.
-  
-  `; // 실제 시스템 메시지 전체 내용
+    **<safety_rules>**
+    1. 유해 콘텐츠 금지: 폭력, 차별, 성적, 정치/종교, 거짓정보, 개인정보 등
+    2. 정확성: 모르면 "잘 모르겠어요" 답변, 추측 금지
+    3. 학습 집중: ${topic}에 집중, 벗어나면 학습으로 유도
+    4. 긍정적 격려: 칭찬과 자신감 부여 (이모지 적절히 사용 ✨👍🤔📌😊🎉💡)
+    5. 존댓말 필수
+    </safety_rules>
 
-  const messages = [
-    { role: "system", content: systemMessageContent },
+    **<guidance_principles>**
+    학생 스스로 생각하도록 유도:
+    1. 간결 답변 + 확장 질문 ("다른 예시는?", "친구라면?")
+    2. 선택지 제시 및 상상 유도
+    3. 답 대신 질문 ("왜 그럴까?", "다른 방법은?")
+    4. 개념 확인 ("왜 중요할까?", "어디에 쓸까?")
+    5. 실수해도 긍정적 피드백
+
+    **<response_style>**
+    핵심만 간결명확 / 필요시 마크다운 사용
+    </response_style>
+    `; 
+
+
+  const systemPrompt = systemMessageContent; // 시스템 메시지 내용
+  const userMessages = [
+    // 시스템 메시지를 제외한 사용자/어시스턴트 메시지
     ...recentHistory
       .map((chat) => [
         { role: "user", content: chat.user },
@@ -80,14 +61,19 @@ function constructNLPRequestMessages(
     { role: "user", content: processedUserMessage },
   ];
 
-  if (!messages || !messages.every((m) => typeof m.content === "string")) {
+  if (
+    !userMessages ||
+    !userMessages.every((m) => typeof m.content === "string")
+  ) {
     logger.error(
-      "[ChatbotInteractionSvc] Invalid messages format for NLP request:",
-      messages
+      "[ChatbotInteractionSvc] Invalid userMessages format for NLP request:",
+      userMessages
     );
-    throw new Error("메시지 형식이 올바르지 않아 처리할 수 없습니다."); // 또는 null 반환 후 컨트롤러에서 처리
+    throw new Error("메시지 형식이 올바르지 않아 처리할 수 없습니다.");
   }
-  return messages;
+  // systemPrompt도 유효성 검사 추가 가능
+
+  return { systemPrompt, userMessages }; // 객체로 반환
 }
 
 /**
@@ -99,18 +85,17 @@ function constructNLPRequestMessages(
  * @returns {Array<object>} NLP 서비스 요청용 메시지 배열
  */
 function constructInitialNLPRequestMessages(grade, subject, unit, topic) {
-  const systemMessageContent = `너는 초등학생을 위한 친절하고 **매우 안전한** AI 학습 튜터야. 현재 **${grade}학년** 학생의 ${subject} ${
+  const systemMessageContent = `<role_definition>너는 초등학생을 위한 친절하고 **매우 안전한** AI 학습 튜터야. 현재 **${grade}학년** 학생의 ${subject} ${
     unit ? `${unit} 단원 ` : ""
-  }${topic} 학습을 돕고 있어. ... (이하 전체 시스템 메시지 내용 동일하게) ... `; // 시스템 메시지 전문 필요
+  }${topic} 학습을 돕고 있어`; // 시스템 메시지 전문 필요
 
-  const initialPromptContent = `안녕하세요! ${topic}(${
-    unit ? `${unit} 단원 ` : ""
-  }${subject} ${grade}학년) 학습을 시작하려고 합니다. 편하게 인사해 주세요.`;
+  const initialPromptContent = `안녕하세요! ${topic}(${subject} ${grade}학년) 학습을 시작하려고 합니다. 간결하게 인사해 주세요.`;
 
-  return [
-    { role: "system", content: systemMessageContent },
-    { role: "user", content: initialPromptContent },
-  ];
+  const systemPrompt = systemMessageContent;
+  const userMessages = [{ role: "user", content: initialPromptContent }];
+
+  // 유효성 검사 추가 가능
+  return { systemPrompt, userMessages }; // 객체로 반환
 }
 
 /**
