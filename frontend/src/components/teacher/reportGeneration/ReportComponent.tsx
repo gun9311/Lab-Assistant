@@ -536,7 +536,7 @@ const ReportComponent: React.FC<ReportComponentProps> = ({
                                         </Box>
                                       </Box>
                                     ) : (
-                                      <>
+                                      <Box sx={{ position: "relative", pr: 6 }}>
                                         <CommentRenderer
                                           text={report.comment}
                                           isExpanded={isExpanded}
@@ -547,11 +547,14 @@ const ReportComponent: React.FC<ReportComponentProps> = ({
                                         <Box
                                           sx={{
                                             position: "absolute",
-                                            top: 8,
-                                            right: 4,
+                                            top: 0,
+                                            right: 0,
                                             display: "flex",
                                             flexDirection: "column",
                                             gap: 0.5,
+                                            backgroundColor: "background.paper",
+                                            padding: "4px",
+                                            borderRadius: "4px",
                                           }}
                                         >
                                           <Tooltip title="수정하기">
@@ -581,7 +584,7 @@ const ReportComponent: React.FC<ReportComponentProps> = ({
                                             </IconButton>
                                           </Tooltip>
                                         </Box>
-                                      </>
+                                      </Box>
                                     )}
                                   </TableCell>
                                 </TableRow>
