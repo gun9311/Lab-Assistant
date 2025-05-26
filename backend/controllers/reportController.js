@@ -108,4 +108,44 @@ const getStudentReports = async (req, res) => {
   }
 };
 
-module.exports = { generateReport, queryReport, getStudentReports };
+// 특정 평어 수정 요청 핸들러
+const updateReportComment = async (req, res) => {
+  const { reportId } = req.params;
+  const { comment } = req.body; // 수정될 새로운 평어 내용
+
+  if (!comment || typeof comment !== "string" || comment.trim() === "") {
+    return res
+      .status(400)
+      .send({ message: "Comment content cannot be empty." });
+  }
+
+  try {
+    const updatedReport = await StudentReport.findByIdAndUpdate(
+      reportId,
+      { $set: { comment: comment.trim() } },
+      { new: true, runValidators: true } // new: true는 업데이트된 문서를 반환, runValidators는 스키마 유효성 검사 실행
+    ).populate("studentId", "studentId name");
+
+    if (!updatedReport) {
+      return res.status(404).send({ message: "Report not found." });
+    }
+
+    // logger.info(`Report comment updated successfully for report ID: ${reportId}`);
+    res.status(200).send(updatedReport);
+  } catch (error) {
+    logger.error(`Error updating report comment for ID ${reportId}:`, error);
+    if (error.name === "ValidationError") {
+      return res
+        .status(400)
+        .send({ message: "Validation error.", details: error.errors });
+    }
+    res.status(500).send({ message: "Error updating report comment." });
+  }
+};
+
+module.exports = {
+  generateReport,
+  queryReport,
+  getStudentReports,
+  updateReportComment,
+};
