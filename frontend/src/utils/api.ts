@@ -87,6 +87,14 @@ export const getSubjects = (
   }
   return api.get("/subjects", { params });
 };
+
+// 평어 수정 함수 추가
+export const updateReportComment = (
+  reportId: string,
+  comment: string
+): Promise<{ data: any }> => // data 타입을 실제 반환 타입에 맞게 수정할 수 있음
+  api.put(`/report/comment/${reportId}`, { comment });
+
 // --- 추가된 함수 끝 ---
 
 export default api;

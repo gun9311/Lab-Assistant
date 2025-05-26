@@ -22,8 +22,8 @@ type SelectedUnitsType = {
 };
 
 type GenerationStepSummaryProps = {
-//   icon: React.ReactElement;
-//   label: string;
+  //   icon: React.ReactElement;
+  //   label: string;
   generationMethod: string;
   selectedSemesters: string[];
   selectedSubjects: string[];
@@ -33,8 +33,8 @@ type GenerationStepSummaryProps = {
 };
 
 const GenerationStepSummary: React.FC<GenerationStepSummaryProps> = ({
-//   icon,
-//   label,
+  //   icon,
+  //   label,
   generationMethod,
   selectedSemesters,
   selectedSubjects,
