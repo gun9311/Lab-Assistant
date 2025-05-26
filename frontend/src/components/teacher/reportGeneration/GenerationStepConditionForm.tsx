@@ -38,8 +38,8 @@ type SelectedUnitsType = {
 };
 
 type GenerationStepConditionFormProps = {
-//   icon: React.ReactElement;
-//   label: string;
+  //   icon: React.ReactElement;
+  //   label: string;
   generationMethod: string;
   handleGenerationMethodChange: (
     event: React.ChangeEvent<HTMLInputElement>
@@ -63,7 +63,7 @@ const GenerationStepConditionForm: React.FC<
   GenerationStepConditionFormProps
 > = ({
   //   icon,
-//   label,
+  //   label,
   generationMethod,
   handleGenerationMethodChange,
   reportLines,
@@ -82,6 +82,12 @@ const GenerationStepConditionForm: React.FC<
     if (a > b) return 1;
     return 0;
   });
+
+  const areaBasedSubjects = ["영어", "음악", "미술", "체육", "실과"];
+
+  const getTermForSubject = (subject: string) => {
+    return areaBasedSubjects.includes(subject) ? "영역" : "단원";
+  };
 
   return (
     <Box sx={{ p: { xs: 1, sm: 2 } }}>
@@ -132,7 +138,9 @@ const GenerationStepConditionForm: React.FC<
                   value="unit_based"
                   control={<Radio size="small" />}
                   label={
-                    <Typography variant="body2">단원을 직접 선택</Typography>
+                    <Typography variant="body2">
+                      단원(영역)을 직접 선택
+                    </Typography>
                   }
                 />
                 <Typography
@@ -140,7 +148,7 @@ const GenerationStepConditionForm: React.FC<
                   color="text.secondary"
                   sx={{ pl: 3.8, maxWidth: 300 }}
                 >
-                  직접 선택한 단원 기반으로 평어를 생성합니다.
+                  선택한 단원(영역) 기반으로 평어를 생성합니다.
                   <br></br>퀴즈 결과가 있으면 반영합니다.
                 </Typography>
               </Box>
@@ -182,7 +190,17 @@ const GenerationStepConditionForm: React.FC<
               gutterBottom
               sx={{ mb: 1, fontWeight: 500 }}
             >
-              과목별 단원 선택 (학기 구분)
+              과목별{" "}
+              {selectedSubjects.length > 0 &&
+              selectedSubjects.every((sub) => areaBasedSubjects.includes(sub))
+                ? "영역"
+                : selectedSubjects.length > 0 &&
+                  selectedSubjects.some((sub) =>
+                    areaBasedSubjects.includes(sub)
+                  )
+                ? "단원(영역)"
+                : "단원"}{" "}
+              선택
             </Typography>
             {selectedSubjects.length > 0 && selectedSemesters.length > 0 ? (
               <Grid container spacing={2}>
@@ -247,7 +265,7 @@ const GenerationStepConditionForm: React.FC<
                                     display="block"
                                     sx={{ mt: 0.5, textAlign: "right" }}
                                   >
-                                    선택된 단원:{" "}
+                                    선택된 {getTermForSubject(subject)}:{" "}
                                     {selectedUnits[subject]?.[semester]
                                       ?.length || 0}
                                     개
@@ -261,7 +279,9 @@ const GenerationStepConditionForm: React.FC<
                             Object.keys(fetchedUnits).length > 0 &&
                             !isGeneratingUnits && ( // Check if specific subject's units for all semesters are empty
                               <Alert severity="info">
-                                {`${subject} 과목의 선택된 학기에 대한 단원 정보가 없습니다.`}
+                                {`${subject} 과목의 선택된 학기에 대한 ${getTermForSubject(
+                                  subject
+                                )} 정보가 없습니다.`}
                               </Alert>
                             )}
                         </Stack>
@@ -276,7 +296,18 @@ const GenerationStepConditionForm: React.FC<
                     sx={{ display: "flex", justifyContent: "center", my: 2 }}
                   >
                     <CircularProgress />
-                    <Typography sx={{ ml: 1 }}>단원 정보 로딩 중...</Typography>
+                    <Typography sx={{ ml: 1 }}>
+                      {selectedSubjects.every((sub) =>
+                        areaBasedSubjects.includes(sub)
+                      )
+                        ? "영역"
+                        : selectedSubjects.some((sub) =>
+                            areaBasedSubjects.includes(sub)
+                          )
+                        ? "단원/영역"
+                        : "단원"}{" "}
+                      정보 로딩 중...
+                    </Typography>
                   </Grid>
                 )}
                 {!isGeneratingUnits &&
@@ -286,8 +317,38 @@ const GenerationStepConditionForm: React.FC<
                     <Grid item xs={12}>
                       <Alert severity="warning" sx={{ mt: 1 }}>
                         {grade
-                          ? "단원 정보를 가져오는 중이거나, 선택된 조건에 해당하는 단원이 없습니다."
-                          : "학년 정보가 없어 단원을 가져올 수 없습니다."}
+                          ? `${
+                              selectedSubjects.every((sub) =>
+                                areaBasedSubjects.includes(sub)
+                              )
+                                ? "영역"
+                                : selectedSubjects.some((sub) =>
+                                    areaBasedSubjects.includes(sub)
+                                  )
+                                ? "단원/영역"
+                                : "단원"
+                            } 정보를 가져오는 중이거나, 선택된 조건에 해당하는 ${
+                              selectedSubjects.every((sub) =>
+                                areaBasedSubjects.includes(sub)
+                              )
+                                ? "영역"
+                                : selectedSubjects.some((sub) =>
+                                    areaBasedSubjects.includes(sub)
+                                  )
+                                ? "단원/영역"
+                                : "단원"
+                            }이 없습니다.`
+                          : `학년 정보가 없어 ${
+                              selectedSubjects.every((sub) =>
+                                areaBasedSubjects.includes(sub)
+                              )
+                                ? "영역"
+                                : selectedSubjects.some((sub) =>
+                                    areaBasedSubjects.includes(sub)
+                                  )
+                                ? "단원/영역"
+                                : "단원"
+                            }을 가져올 수 없습니다.`}
                       </Alert>
                     </Grid>
                   )}

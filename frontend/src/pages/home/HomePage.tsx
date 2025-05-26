@@ -30,7 +30,7 @@ const HomePage = () => {
       lottieSrc:
         "https://lottie.host/a3d6c1b3-9f05-4344-9979-d94c9c0962a0/XaXJnOIszd.lottie",
       description:
-        "학생 맞춤형 AI 챗봇과 함께하세요.\n안전한 환경과 간편한 모니터링을 제공합니다.",
+        "학습 맞춤형 AI 챗봇과 함께하세요.\n안전한 환경과 간편한 모니터링을 제공합니다.",
     },
     {
       lottieSrc:

@@ -16,6 +16,9 @@ import {
   AccordionSummary,
   AccordionDetails,
   IconButton,
+  Snackbar,
+  TextField,
+  Tooltip,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import AssignmentIcon from "@mui/icons-material/Assignment";
@@ -33,6 +36,10 @@ import BuildIcon from "@mui/icons-material/Build";
 import MusicNoteIcon from "@mui/icons-material/MusicNote";
 import PaletteIcon from "@mui/icons-material/Palette";
 import SportsSoccerIcon from "@mui/icons-material/SportsSoccer";
+import ContentCopyIcon from "@mui/icons-material/ContentCopy";
+import EditIcon from "@mui/icons-material/Edit";
+import SaveIcon from "@mui/icons-material/Save";
+import CancelIcon from "@mui/icons-material/Cancel";
 
 interface Student {
   _id: string;
@@ -41,6 +48,7 @@ interface Student {
 }
 
 interface Report {
+  _id: string;
   studentId: Student;
   subject: string;
   semester: string;
@@ -50,6 +58,7 @@ interface Report {
 interface ReportComponentProps {
   reports: Report[];
   onBack: () => void;
+  onCommentUpdate: (reportId: string, newComment: string) => void;
 }
 
 const subjectIcons: { [key: string]: React.ReactElement } = {
@@ -125,6 +134,7 @@ const CommentRenderer: React.FC<CommentRendererProps> = ({
           wordBreak: "break-word",
           fontSize: "0.875rem",
           lineHeight: 1.6,
+          minHeight: `calc(${clampLines} * 1.6em)`, // 최소 높이 추가 (1.6em은 lineHeight * fontSize에 해당)
           display: "-webkit-box",
           WebkitBoxOrient: "vertical",
           WebkitLineClamp: isExpanded ? "none" : clampLines,
@@ -155,13 +165,69 @@ const CommentRenderer: React.FC<CommentRendererProps> = ({
 const ReportComponent: React.FC<ReportComponentProps> = ({
   reports,
   onBack,
+  onCommentUpdate,
 }) => {
   const [expandedComments, setExpandedComments] = useState<{
     [key: string]: boolean;
   }>({});
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState("");
+  const [snackbarSeverity, setSnackbarSeverity] = useState<"success" | "error">(
+    "success"
+  );
+  const [editingCommentKey, setEditingCommentKey] = useState<string | null>(
+    null
+  );
+  const [editedCommentText, setEditedCommentText] = useState<string>("");
 
   const toggleCommentExpansion = (key: string) => {
     setExpandedComments((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const handleCopyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setSnackbarMessage("평어가 클립보드에 복사되었습니다.");
+      setSnackbarSeverity("success");
+      setSnackbarOpen(true);
+    } catch (err) {
+      console.error("클립보드 복사 실패:", err);
+      setSnackbarMessage("클립보드 복사에 실패했습니다.");
+      setSnackbarSeverity("error");
+      setSnackbarOpen(true);
+    }
+  };
+
+  const handleEditClick = (report: Report) => {
+    setEditingCommentKey(report._id);
+    setEditedCommentText(report.comment);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingCommentKey(null);
+    setEditedCommentText("");
+  };
+
+  const handleSaveEdit = async (reportId: string) => {
+    if (editedCommentText.trim() === "") {
+      setSnackbarMessage("평어 내용은 비워둘 수 없습니다.");
+      setSnackbarSeverity("error");
+      setSnackbarOpen(true);
+      return;
+    }
+    try {
+      onCommentUpdate(reportId, editedCommentText);
+
+      setSnackbarMessage("평어가 성공적으로 수정되었습니다.");
+      setSnackbarSeverity("success");
+      setSnackbarOpen(true);
+      setEditingCommentKey(null);
+    } catch (error) {
+      console.error("평어 수정 실패:", error);
+      setSnackbarMessage("평어 수정에 실패했습니다.");
+      setSnackbarSeverity("error");
+      setSnackbarOpen(true);
+    }
   };
 
   const groupedReports = reports.reduce((acc: any, report: Report) => {
@@ -308,12 +374,49 @@ const ReportComponent: React.FC<ReportComponentProps> = ({
                         {subject}
                       </Typography>
                     </Box>
-                    <Chip
-                      label={`${groupedReports[semester][subject].length}명`}
-                      size="small"
-                      color="primary"
-                      variant="outlined"
-                    />
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        onClick={(event) => {
+                          event.stopPropagation(); // 아코디언 토글 방지
+
+                          const subjectReports =
+                            groupedReports[semester][subject];
+
+                          const payload = {
+                            subject,
+                            comments: subjectReports.map((report: Report) => ({
+                              studentId: report.studentId.studentId,
+                              comment: report.comment,
+                            })),
+                          };
+
+                          if (chrome?.runtime?.sendMessage) {
+                            chrome.runtime.sendMessage(
+                              {
+                                type: "INJECT_COMMENTS",
+                                payload,
+                              },
+                              () => {
+                                console.log("평어 전송 완료");
+                              }
+                            );
+                          } else {
+                            console.warn("크롬 익스텐션과 통신할 수 없습니다.");
+                          }
+                        }}
+                        sx={{ textTransform: "none" }}
+                      >
+                        NEIS로 일괄 전송
+                      </Button>
+                      <Chip
+                        label={`${groupedReports[semester][subject].length}명`}
+                        size="small"
+                        color="primary"
+                        variant="outlined"
+                      />
+                    </Box>
                   </AccordionSummary>
                   <AccordionDetails sx={{ p: 0 }}>
                     <TableContainer
@@ -392,15 +495,94 @@ const ReportComponent: React.FC<ReportComponentProps> = ({
                                       pr: 2,
                                       verticalAlign: "top",
                                       py: 1.5,
+                                      position: "relative",
                                     }}
                                   >
-                                    <CommentRenderer
-                                      text={report.comment}
-                                      isExpanded={isExpanded}
-                                      onToggle={() =>
-                                        toggleCommentExpansion(commentKey)
-                                      }
-                                    />
+                                    {editingCommentKey === report._id ? (
+                                      <Box>
+                                        <TextField
+                                          fullWidth
+                                          multiline
+                                          rows={3}
+                                          value={editedCommentText}
+                                          onChange={(e) =>
+                                            setEditedCommentText(e.target.value)
+                                          }
+                                          variant="outlined"
+                                          size="small"
+                                          sx={{ mb: 1 }}
+                                        />
+                                        <Box sx={{ display: "flex", gap: 1 }}>
+                                          <Button
+                                            variant="contained"
+                                            color="primary"
+                                            size="small"
+                                            startIcon={<SaveIcon />}
+                                            onClick={() =>
+                                              handleSaveEdit(report._id)
+                                            }
+                                          >
+                                            저장
+                                          </Button>
+                                          <Button
+                                            variant="outlined"
+                                            color="inherit"
+                                            size="small"
+                                            startIcon={<CancelIcon />}
+                                            onClick={handleCancelEdit}
+                                          >
+                                            취소
+                                          </Button>
+                                        </Box>
+                                      </Box>
+                                    ) : (
+                                      <>
+                                        <CommentRenderer
+                                          text={report.comment}
+                                          isExpanded={isExpanded}
+                                          onToggle={() =>
+                                            toggleCommentExpansion(commentKey)
+                                          }
+                                        />
+                                        <Box
+                                          sx={{
+                                            position: "absolute",
+                                            top: 8,
+                                            right: 4,
+                                            display: "flex",
+                                            flexDirection: "column",
+                                            gap: 0.5,
+                                          }}
+                                        >
+                                          <Tooltip title="수정하기">
+                                            <IconButton
+                                              aria-label="edit comment"
+                                              size="small"
+                                              onClick={() =>
+                                                handleEditClick(report)
+                                              }
+                                              sx={{ color: "text.secondary" }}
+                                            >
+                                              <EditIcon fontSize="small" />
+                                            </IconButton>
+                                          </Tooltip>
+                                          <Tooltip title="복사하기">
+                                            <IconButton
+                                              aria-label="copy comment"
+                                              size="small"
+                                              onClick={() =>
+                                                handleCopyToClipboard(
+                                                  report.comment
+                                                )
+                                              }
+                                              sx={{ color: "text.secondary" }}
+                                            >
+                                              <ContentCopyIcon fontSize="small" />
+                                            </IconButton>
+                                          </Tooltip>
+                                        </Box>
+                                      </>
+                                    )}
                                   </TableCell>
                                 </TableRow>
                               );
@@ -413,6 +595,21 @@ const ReportComponent: React.FC<ReportComponentProps> = ({
               ))}
           </Box>
         ))}
+      <Snackbar
+        open={snackbarOpen}
+        autoHideDuration={3000}
+        onClose={() => setSnackbarOpen(false)}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert
+          onClose={() => setSnackbarOpen(false)}
+          severity={snackbarSeverity}
+          variant="filled"
+          sx={{ width: "100%" }}
+        >
+          {snackbarMessage}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

@@ -663,6 +663,7 @@ const UnifiedModal: React.FC<UnifiedModalProps> = ({
                       label="학년"
                       error={fieldErrors.grade}
                     >
+                      <MenuItem value={2}>2</MenuItem>
                       <MenuItem value={3}>3</MenuItem>
                       <MenuItem value={4}>4</MenuItem>
                       <MenuItem value={5}>5</MenuItem>
@@ -1049,7 +1050,7 @@ const UnifiedModal: React.FC<UnifiedModalProps> = ({
               >
                 <InfoOutlinedIcon fontSize="small" sx={{ mr: 1 }} />
                 <Typography variant="body2">
-                  학생이 비밀번호를 잊었을 경우, 여기서 아이디로 검색 후
+                  학생 비밀번호를 분실 시, 여기서 아이디 검색 후
                   '비밀번호 초기화' 버튼을 눌러 초기 비밀번호("123")로 재설정할
                   수 있습니다.
                 </Typography>

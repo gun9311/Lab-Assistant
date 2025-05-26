@@ -50,7 +50,7 @@ import SemesterSelect from "./SemesterSelect";
 import SubjectSelect from "./SubjectSelect";
 import StudentSelect from "./StudentSelect";
 import UnitSelect from "./UnitSelect";
-import api, { getSubjects } from "../../../utils/api";
+import api, { getSubjects, updateReportComment } from "../../../utils/api";
 import ReportComponent from "./ReportComponent";
 
 // 새로운 하위 컴포넌트 임포트
@@ -164,6 +164,8 @@ const ReportGeneration: React.FC<ReportGenerationProps> = ({
   const [availableSubjects, setAvailableSubjects] = useState<string[]>([]);
 
   const steps = tabValue === 0 ? generationSteps_new : querySteps_new;
+
+  const areaBasedSubjects = ["영어", "음악", "미술", "체육", "실과"];
 
   useEffect(() => {
     if (
@@ -341,8 +343,13 @@ const ReportGeneration: React.FC<ReportGenerationProps> = ({
         selectedSubjects.length > 0 &&
         selectedSemesters.length > 0
       ) {
+        const term = selectedSubjects.some((subject) =>
+          areaBasedSubjects.includes(subject)
+        )
+          ? "영역"
+          : "단원";
         setSnackbarMessage(
-          "각 과목 및 학기별로 하나 이상의 단원을 선택해주세요."
+          `각 과목 및 학기별로 하나 이상의 ${term}을 선택해주세요.`
         );
         setSnackbarSeverity("error");
         setSnackbarOpen(true);
@@ -470,6 +477,32 @@ const ReportGeneration: React.FC<ReportGenerationProps> = ({
     } finally {
       setIsGenerating(false);
     }
+  };
+
+  const handleCommentUpdateInParent = (
+    reportId: string,
+    newComment: string
+  ) => {
+    setReportResults((prevResults) =>
+      prevResults.map((report) =>
+        report._id === reportId ? { ...report, comment: newComment } : report
+      )
+    );
+
+    const performUpdate = async () => {
+      try {
+        await updateReportComment(reportId, newComment);
+      } catch (error) {
+        console.error("Parent: Failed to update comment on backend:", error);
+        setReportResults((prevResults) => prevResults.map((report) => report));
+        setSnackbarMessage(
+          "백엔드 업데이트에 실패했습니다. 다시 시도해주세요."
+        );
+        setSnackbarSeverity("error");
+        setSnackbarOpen(true);
+      }
+    };
+    performUpdate();
   };
 
   const handleBackToGenerationOrQuery = () => {
@@ -640,6 +673,7 @@ const ReportGeneration: React.FC<ReportGenerationProps> = ({
       <ReportComponent
         reports={reportResults}
         onBack={handleBackToGenerationOrQuery}
+        onCommentUpdate={handleCommentUpdateInParent}
       />
     );
   }
