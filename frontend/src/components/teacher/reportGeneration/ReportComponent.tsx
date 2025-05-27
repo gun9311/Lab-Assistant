@@ -394,7 +394,7 @@ const ReportComponent: React.FC<ReportComponentProps> = ({
 
                           if (chrome?.runtime?.sendMessage) {
                             chrome.runtime.sendMessage(
-                              "jiiinmlkefdhpklfhimllbffpigechal",
+                              "jefkdeojjfmmcdbanibhdfmaggceehbb",
                               {
                                 type: "INJECT_COMMENTS",
                                 payload,
