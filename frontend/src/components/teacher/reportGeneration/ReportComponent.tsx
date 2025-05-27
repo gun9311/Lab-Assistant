@@ -394,6 +394,7 @@ const ReportComponent: React.FC<ReportComponentProps> = ({
 
                           if (chrome?.runtime?.sendMessage) {
                             chrome.runtime.sendMessage(
+                              "jiiinmlkefdhpklfhimllbffpigechal",
                               {
                                 type: "INJECT_COMMENTS",
                                 payload,
@@ -445,10 +446,10 @@ const ReportComponent: React.FC<ReportComponentProps> = ({
                         </TableHead>
                         <TableBody>
                           {groupedReports[semester][subject]
-                            .sort((a: Report, b: Report) =>
-                              a.studentId.studentId.localeCompare(
-                                b.studentId.studentId
-                              )
+                            .sort(
+                              (a: Report, b: Report) =>
+                                parseInt(a.studentId.studentId) -
+                                parseInt(b.studentId.studentId)
                             )
                             .map((report: Report, index: number) => {
                               const commentKey = `${report.studentId._id}-${subject}-${index}`;
