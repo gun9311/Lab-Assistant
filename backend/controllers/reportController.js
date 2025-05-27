@@ -70,7 +70,12 @@ const queryReport = async (req, res) => {
 
     const reports = await StudentReport.find(query)
       .populate("studentId", "studentId name")
-      .sort({ "studentId.studentId": 1 });
+      .then((reports) =>
+        reports.sort(
+          (a, b) =>
+            parseInt(a.studentId.studentId) - parseInt(b.studentId.studentId)
+        )
+      );
 
     res.status(200).send(reports);
   } catch (error) {
