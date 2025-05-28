@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import api from "../../utils/api";
+import api, { getSubjects } from "../../utils/api";
 import {
   Box,
   TextField,
@@ -60,10 +60,33 @@ const SubjectSelector: React.FC<SubjectSelectorProps> = ({
   const [unit, setUnit] = useState("");
   const [topic, setTopic] = useState("");
   const [units, setUnits] = useState<string[]>([]);
+  const [subjects, setSubjects] = useState<string[]>([]);
+  const [mainSubjects] = useState([
+    "국어",
+    "도덕",
+    "수학",
+    "과학",
+    "사회",
+    "통합교과과",
+  ]);
 
-  const mainSubjects = ["국어", "도덕", "수학", "과학", "사회"];
-  const otherSubjects = ["영어", "음악", "미술", "체육", "실과"];
-  const allSubjects = [...mainSubjects, ...otherSubjects];
+  useEffect(() => {
+    const fetchSubjects = async () => {
+      if (grade && semester) {
+        try {
+          const response = await getSubjects(parseInt(grade), [semester]);
+          setSubjects(response.data);
+        } catch (error) {
+          console.error("Failed to fetch subjects:", error);
+          setSubjects([]);
+        }
+      } else {
+        setSubjects([]);
+      }
+    };
+
+    fetchSubjects();
+  }, [grade, semester]);
 
   useEffect(() => {
     const fetchUnits = async () => {
@@ -203,7 +226,7 @@ const SubjectSelector: React.FC<SubjectSelectorProps> = ({
               <MenuItem value="" disabled>
                 <em>과목 선택</em>
               </MenuItem>
-              {allSubjects.map((sub, index) => (
+              {subjects.map((sub, index) => (
                 <MenuItem key={`subject-${index}`} value={sub}>
                   {sub}
                 </MenuItem>
