@@ -447,8 +447,11 @@ const ReportGeneration: React.FC<ReportGenerationProps> = ({
         "평어 생성 요청이 성공적으로 접수되었습니다. 완료 시 알림을 받습니다."
       );
       setSnackbarSeverity("success");
-      setActiveStep(0);
-      resetSelectionsForNewTab();
+
+      // 생성 탭 초기화 대신 조회 탭으로 이동
+      setTabValue(1); // 조회 탭으로 이동
+      setActiveStep(0); // 조회 탭의 첫 단계로
+      resetSelectionsForNewTab(); // 선택사항 초기화
     } catch (error) {
       setSnackbarMessage("평어 생성 요청에 실패했습니다.");
       setSnackbarSeverity("error");
