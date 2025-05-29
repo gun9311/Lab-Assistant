@@ -54,6 +54,7 @@ const getSubjects = async (req, res) => {
       "미술",
       "체육",
       "실과",
+      "통합교과",
     ];
     const sortedSubjectNames = subjectNames.sort((a, b) => {
       const indexA = predefinedOrder.indexOf(a);
