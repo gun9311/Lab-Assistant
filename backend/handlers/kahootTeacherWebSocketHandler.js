@@ -796,12 +796,46 @@ async function _handleAutoSaveOnTeacherDisconnect(
 }
 
 // Helper function for 'viewDetailedResults' message
-async function _handleViewDetailedResults(pin, ws, currentSessionState) {
+async function _handleViewDetailedResults(
+  pin,
+  ws,
+  currentSessionState,
+  questionContent
+) {
   logger.info(`Handling viewDetailedResults for session PIN: ${pin}`);
 
+  // 1. 학생 연결 종료
+  if (kahootClients[pin] && kahootClients[pin].students) {
+    logger.info(
+      `[ViewResults] Closing student WebSockets for PIN: ${pin} as teacher is viewing detailed results.`
+    );
+    Object.values(kahootClients[pin].students).forEach((studentWs) => {
+      if (studentWs.readyState === WebSocket.OPEN) {
+        try {
+          studentWs.send(
+            JSON.stringify({
+              type: "sessionClosedByTeacher",
+              message:
+                "The teacher is viewing detailed results. The session is concluding.",
+            })
+          );
+          studentWs.close(1000, "Teacher viewing detailed results"); // 정상 종료 코드
+        } catch (e) {
+          logger.warn(
+            `[ViewResults] Error sending close message or closing student WebSocket for PIN ${pin}: ${e.message}. Terminating.`
+          );
+          studentWs.terminate(); // 강제 종료
+        }
+      }
+    });
+    // 학생 목록을 로컬에서 즉시 비우는 것보다, 각 소켓의 'close' 이벤트 핸들러가
+    // kahootClients[pin].students에서 개별 학생을 제거하고,
+    // 필요한 경우 unsubscribeFromPinChannels를 트리거하도록 두는 것이 더 견고할 수 있습니다.
+  }
+
+  // 2. 필요한 데이터 가져오기 (참여자 정보)
   const studentIdsSetKey = getSessionStudentIdsSetKey(pin);
   let studentIdsForResults = [];
-
   try {
     studentIdsForResults = await redisClient.sMembers(studentIdsSetKey);
   } catch (error) {
@@ -820,13 +854,27 @@ async function _handleViewDetailedResults(pin, ws, currentSessionState) {
   }
 
   if (studentIdsForResults.length === 0) {
-    logger.info(
-      `No participants found (no student IDs in Set) for detailed results, PIN: ${pin}.`
-    );
+    logger.info(`No participants found for detailed results, PIN: ${pin}.`);
+    // 학생이 없더라도, 퀴즈 기본 정보와 빈 결과 구조를 보낼 수 있습니다.
+    // 여기서는 일단 빈 결과로 처리하고, 프론트엔드에서 "참여자가 없습니다" 등으로 표시하도록 합니다.
     ws.send(
       JSON.stringify({
         type: "detailedResults",
-        results: [],
+        payload: {
+          overallRanking: [],
+          questionDetails: [],
+          quizSummary: {
+            totalParticipants: 0,
+            averageScore: 0,
+            mostDifficultQuestions: [],
+            easiestQuestions: [],
+          },
+          quizMetadata: {
+            // 퀴즈 기본 정보 추가
+            title: currentSessionState.quizTitle || "퀴즈 제목 없음", // 세션 생성 시 KahootQuizContent의 title을 저장했다면 사용
+            totalQuestions: questionContent ? questionContent.length : 0,
+          },
+        },
       })
     );
     return;
@@ -835,51 +883,155 @@ async function _handleViewDetailedResults(pin, ws, currentSessionState) {
   const participantKeys = studentIdsForResults.map((sid) =>
     getParticipantKey(pin, sid)
   );
-  const participantsDataArray = await redisJsonMGet(participantKeys); // MGET 사용
-  const validResults = [];
+  const participantsDataArray = await redisJsonMGet(participantKeys);
+  const validParticipants = participantsDataArray
+    .filter((p) => p)
+    .map((p) => ({
+      studentId: p.student,
+      name: p.name,
+      score: p.score || 0,
+      responses: p.responses || [],
+      character: p.character, // 캐릭터 정보가 있다면 포함
+    }));
 
-  if (participantsDataArray) {
-    participantsDataArray.forEach((participant, index) => {
-      if (participant) {
-        validResults.push({
-          studentId: participant.student,
-          name: participant.name,
-          score: participant.score,
-          responses: participant.responses.map((response) => ({
-            questionId: response.question,
-            answer: response.answer,
-            isCorrect: response.isCorrect,
-          })),
-        });
-      } else {
-        logger.error(
-          // 개별 참여자 데이터 조회 실패는 오류로 로깅
-          `Failed to process participant data (null or invalid from MGET) for student ID ${studentIdsForResults[index]}, PIN: ${pin}, during detailed results.`
-        );
-        // 실패한 참여자는 결과에서 제외하거나, 오류 상태로 포함할 수 있음. 여기서는 제외.
-      }
-    });
-  } else {
-    logger.error(
-      `Failed to get participant data array via MGET for detailed results, PIN: ${pin}.`
+  if (validParticipants.length === 0) {
+    logger.info(
+      `No valid participant data found after MGET for detailed results, PIN: ${pin}.`
     );
     ws.send(
       JSON.stringify({
-        type: "error",
-        message: "상세 결과 데이터 조회 중 오류가 발생했습니다 (MGET 실패).",
+        type: "detailedResults",
+        payload: {
+          /* ... 빈 구조 ... */
+        },
       })
     );
     return;
   }
 
+  // 3. 데이터 분석 및 가공
+  const overallRanking = [...validParticipants]
+    .sort((a, b) => b.score - a.score)
+    .map((p, index) => ({ ...p, rank: index + 1 }));
+
+  const questionDetails = [];
+  if (questionContent && questionContent.length > 0) {
+    for (const question of questionContent) {
+      const questionIdStr = question._id.toString();
+      let correctAttempts = 0;
+      let totalAttempts = 0;
+      const optionCounts = Array(question.options.length).fill(0);
+
+      for (const participant of validParticipants) {
+        const response = participant.responses.find(
+          (r) => r.question && r.question.toString() === questionIdStr
+        );
+        if (response) {
+          totalAttempts++;
+          if (response.isCorrect) {
+            correctAttempts++;
+          }
+          if (
+            response.answer !== null &&
+            response.answer >= 0 &&
+            response.answer < optionCounts.length
+          ) {
+            optionCounts[response.answer]++;
+          }
+        }
+      }
+
+      const correctAnswerRate =
+        totalAttempts > 0 ? correctAttempts / totalAttempts : 0;
+      const optionDistribution = optionCounts.map((count, index) => ({
+        optionIndex: index,
+        text: question.options[index]
+          ? question.options[index].text
+          : `옵션 ${index + 1}`, // 옵션 텍스트 추가
+        imageUrl: question.options[index]
+          ? question.options[index].imageUrl
+          : null, // 옵션 이미지 URL 추가
+        count,
+        percentage: totalAttempts > 0 ? count / totalAttempts : 0,
+      }));
+
+      questionDetails.push({
+        questionId: questionIdStr,
+        questionText: question.questionText,
+        questionType: question.questionType,
+        imageUrl: question.imageUrl,
+        options: question.options.map((opt) => ({
+          text: opt.text,
+          imageUrl: opt.imageUrl,
+        })), // 간략한 옵션 정보
+        correctAnswer: question.correctAnswer, // 정답 인덱스 또는 내용
+        correctAnswerRate,
+        totalAttempts,
+        optionDistribution,
+      });
+    }
+  }
+
+  const sortedByDifficulty = [...questionDetails].sort(
+    (a, b) => a.correctAnswerRate - b.correctAnswerRate
+  );
+  const mostDifficultQuestions = sortedByDifficulty
+    .slice(0, Math.min(3, sortedByDifficulty.length))
+    .map((q) => ({
+      questionId: q.questionId,
+      questionText: q.questionText,
+      correctAnswerRate: q.correctAnswerRate,
+    }));
+  const easiestQuestions = sortedByDifficulty
+    .slice(Math.max(0, sortedByDifficulty.length - 3))
+    .reverse()
+    .map((q) => ({
+      questionId: q.questionId,
+      questionText: q.questionText,
+      correctAnswerRate: q.correctAnswerRate,
+    }));
+
+  const totalScoreSum = validParticipants.reduce((sum, p) => sum + p.score, 0);
+  const averageScore =
+    validParticipants.length > 0 ? totalScoreSum / validParticipants.length : 0;
+
+  const quizSummary = {
+    totalParticipants: validParticipants.length,
+    averageScore: parseFloat(averageScore.toFixed(2)),
+    mostDifficultQuestions,
+    easiestQuestions,
+  };
+
+  const quizMetadata = {
+    title:
+      currentSessionState.quizTitle ||
+      (questionContent && questionContent.length > 0
+        ? "퀴즈"
+        : "퀴즈 제목 없음"), // KahootQuizContent에서 가져온 title
+    totalQuestions: questionContent ? questionContent.length : 0,
+    grade: currentSessionState.grade,
+    subject: currentSessionState.subject,
+    semester: currentSessionState.semester,
+    unit: currentSessionState.unit,
+  };
+
+  // 4. 교사에게 결과 전송
+  const detailedResultsPayload = {
+    overallRanking,
+    questionDetails,
+    quizSummary,
+    quizMetadata, // 퀴즈 메타데이터 추가
+  };
+
   ws.send(
     JSON.stringify({
       type: "detailedResults",
-      results: validResults,
+      payload: detailedResultsPayload,
     })
   );
+
   logger.info(
-    `Sent detailedResults to teacher for session PIN: ${pin}. Found ${studentIdsForResults.length} student IDs, processed ${validResults.length} successfully.`
+    `Sent detailedResults to teacher for session PIN: ${pin}. Processed ${validParticipants.length} participants.`
   );
 }
 
@@ -1082,7 +1234,12 @@ exports.handleTeacherWebSocketConnection = async (ws, teacherId, pin) => {
         await _handleEndQuiz(pin, ws, currentSessionState, questionContent);
         break;
       case "viewDetailedResults":
-        await _handleViewDetailedResults(pin, ws, currentSessionState);
+        await _handleViewDetailedResults(
+          pin,
+          ws,
+          currentSessionState,
+          questionContent
+        );
         break;
       default:
         logger.warn(

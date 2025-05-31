@@ -397,7 +397,7 @@ const ReportComponent: React.FC<ReportComponentProps> = ({
 
                           if (chrome?.runtime?.sendMessage) {
                             chrome.runtime.sendMessage(
-                              "jefkdeojjfmmcdbanibhdfmaggceehbb",
+                              "mlaphiokjhimgcjgcjkpcmmdgdajmjka",
                               {
                                 type: "INJECT_COMMENTS",
                                 payload,
@@ -406,16 +406,6 @@ const ReportComponent: React.FC<ReportComponentProps> = ({
                                 console.log("평어 전송 완료");
                               }
                             );
-                            // const EXT_ID = (window as any).__NEIS_HELPER_EXTENSION_ID__;
-                            // if (EXT_ID) {
-                            //   chrome.runtime.sendMessage(
-                            //     EXT_ID,
-                            //     { type: "INJECT_COMMENTS", payload },
-                            //     () => console.log("평어 전송 완료")
-                            //     );
-                            // } else {
-                            //   console.warn("확장 ID를 찾을 수 없습니다.");
-                            // }
                           } else {
                             console.warn("크롬 익스텐션과 통신할 수 없습니다.");
                           }

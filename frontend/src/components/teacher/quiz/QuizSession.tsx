@@ -18,7 +18,7 @@ import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import { getToken } from "../../../utils/auth";
 import StudentListComponent from "./components/StudentList";
 import QuestionComponent from "./components/Question";
-import ResultComponent from "./components/Result";
+import ResultComponent from "./components/ResultComponent";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import FullscreenIcon from "@mui/icons-material/Fullscreen";
 // import backgroundImage from '../../../assets/quiz_show_background.png';
@@ -72,6 +72,65 @@ type Feedback = {
   rank: number;
 };
 
+// 백엔드 payload 구조에 맞춘 타입 정의 (export 추가)
+export interface QuizMetadata {
+  title: string;
+  totalQuestions: number;
+  grade?: number;
+  subject?: string;
+  semester?: string;
+  unit?: string;
+}
+
+export interface QuestionDetail {
+  questionId: string;
+  questionText: string;
+  questionType: string;
+  imageUrl?: string;
+  options: { text: string; imageUrl?: string }[];
+  correctAnswer: string | number;
+  correctAnswerRate: number;
+  totalAttempts: number;
+  optionDistribution: {
+    optionIndex: number;
+    text: string;
+    imageUrl?: string;
+    count: number;
+    percentage: number;
+  }[];
+}
+
+export interface OverallRankingStudent {
+  studentId: string;
+  name: string;
+  score: number;
+  responses: any[];
+  character?: string;
+  rank: number;
+}
+
+export interface QuizSummary {
+  totalParticipants: number;
+  averageScore: number;
+  mostDifficultQuestions: {
+    questionId: string;
+    questionText: string;
+    correctAnswerRate: number;
+  }[];
+  easiestQuestions: {
+    questionId: string;
+    questionText: string;
+    correctAnswerRate: number;
+  }[];
+}
+
+export interface DetailedResultsPayload {
+  overallRanking: OverallRankingStudent[];
+  questionDetails: QuestionDetail[];
+  quizSummary: QuizSummary;
+  quizMetadata: QuizMetadata;
+}
+
 const QuizSessionPage = ({
   setIsQuizMode,
 }: {
@@ -92,7 +151,8 @@ const QuizSessionPage = ({
   const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
   const [isShowingFeedback, setIsShowingFeedback] = useState(false);
   const [isLastQuestion, setIsLastQuestion] = useState(false);
-  const [quizResults, setQuizResults] = useState<Feedback[] | null>(null);
+  const [detailedQuizResults, setDetailedQuizResults] =
+    useState<DetailedResultsPayload | null>(null);
   const [isViewingResults, setIsViewingResults] = useState(false);
   const [quizStarted, setQuizStarted] = useState(false);
   const [backgroundImage, setBackgroundImage] = useState<string>(
@@ -203,44 +263,53 @@ const QuizSessionPage = ({
         setSubmittedCount((prevCount) => prevCount + 1);
       } else if (message.type === "allStudentsSubmitted") {
         console.log("모두 제출");
-        const feedback = message.feedback;
+        const feedbackMessageData = message.feedback; // 변수명 변경 (기존 feedbacks와 혼동 방지)
         setAllSubmitted(true);
 
         setTimeout(() => {
           setStudents((prevStudents) =>
             prevStudents.map((student) => {
-              const studentFeedback = feedback.find(
+              const studentFeedback = feedbackMessageData.find(
+                // 변경된 변수명 사용
                 (f: any) => f.studentId === student.id
               );
               if (studentFeedback) {
                 return {
                   ...student,
-                  // hasSubmitted: false,
                   isCorrect: studentFeedback.isCorrect,
                   prevRank: student.rank,
-                  rank: studentFeedback.rank, // 순위 반영
+                  rank: studentFeedback.rank,
                 };
               }
               return student;
             })
           );
-          console.log("Updated students with ranks:", students);
-          setIsShowingFeedback(true); // 피드백 표시 상태로 전환
-        }, 3000); // 3초 지연
-        setFeedbacks(feedback); // 피드백 저장
+          setIsShowingFeedback(true);
+        }, 3000);
+        setFeedbacks(feedbackMessageData); // 변경된 변수명 사용
       } else if (message.type === "quizCompleted") {
         setIsSessionActive(false);
         // setIsProcessingEndQuiz(false); // It might be better to reset on navigate or unmount
       } else if (message.type === "detailedResults") {
-        setQuizResults(message.results);
+        // payload를 사용하도록 수정
+        setDetailedQuizResults(message.payload);
         setIsViewingResults(true);
-        setIsProcessingViewResults(false); // Reset loading state
+        setIsProcessingViewResults(false);
       } else if (message.type === "sessionEnded") {
         // setIsProcessingEndQuiz(false); // Reset before navigating
         navigate("/manage-quizzes");
       } else if (message.type === "noStudentsRemaining") {
         setConfirmMessage(message.message);
         setOpenConfirmDialog(true);
+      } else if (message.type === "sessionClosedByTeacher") {
+        // 학생 측에서 받을 메시지
+        alert(
+          message.message ||
+            "The teacher has ended this session or is viewing results. You will be disconnected."
+        );
+        // 학생의 경우 여기서 추가 정리 로직 (예: 메인 화면으로 이동)
+        // socketRef.current?.close(); // 이미 서버에서 닫힐 것이므로 클라이언트에서 또 닫을 필요는 없을 수 있음
+        navigate("/"); // 예시: 학생을 홈으로 보냄
       }
     };
 
@@ -308,12 +377,11 @@ const QuizSessionPage = ({
   };
 
   const handleViewResults = () => {
-    if (isProcessingViewResults) return; // Prevent if already processing
+    if (isProcessingViewResults) return;
     setIsProcessingViewResults(true);
     if (socketRef.current) {
       socketRef.current.send(JSON.stringify({ type: "viewDetailedResults" }));
     }
-    // setIsProcessingViewResults will be set to false when 'detailedResults' is received
   };
 
   const handleConfirmClose = (confirm: boolean) => {
@@ -391,10 +459,11 @@ const QuizSessionPage = ({
         <FullscreenIcon />
       </IconButton>
 
-      {isViewingResults ? (
+      {isViewingResults && detailedQuizResults ? ( // detailedQuizResults null 체크 추가
         <ResultComponent
-          quizResults={quizResults}
+          quizResults={detailedQuizResults} // 변경된 상태 전달
           handleEndQuiz={handleEndQuiz}
+          isProcessingEndQuiz={isProcessingEndQuiz} // 종료 버튼 로딩 상태 전달
         />
       ) : (
         <>

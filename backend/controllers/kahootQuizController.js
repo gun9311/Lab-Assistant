@@ -533,6 +533,7 @@ exports.startQuizSession = async (req, res) => {
       teacherId: teacherId.toString(),
       pin: pin,
       quizContentId: quizId.toString(),
+      quizTitle: quizContent.title,
       currentQuestionIndex: -1,
       isQuestionActive: false,
       quizStarted: false,
