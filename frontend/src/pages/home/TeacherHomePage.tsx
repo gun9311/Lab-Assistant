@@ -38,6 +38,7 @@ import StudentRegistrationResultModal from "./StudentRegistrationResultModal";
 import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import ComingSoon from "../../components/common/ComingSoon";
+import GetAppIcon from "@mui/icons-material/GetApp";
 
 type Student = {
   _id: number;
@@ -119,6 +120,44 @@ const TeacherHomePage: React.FC = () => {
   const school = getSchoolName();
   const theme = useTheme();
   const currentTabIndex = showReportGeneration ? 1 : 0;
+
+  const [isChromeBrowser, setIsChromeBrowser] = useState(false);
+  const [canCommunicateWithExtension, setCanCommunicateWithExtension] =
+    useState(false);
+  const [showExtensionAlert, setShowExtensionAlert] = useState(true);
+
+  useEffect(() => {
+    const userAgent = navigator.userAgent.toLowerCase();
+    const isChrome = userAgent.includes("chrome") && !userAgent.includes("edg");
+    setIsChromeBrowser(isChrome);
+
+    if (isChrome && chrome?.runtime?.sendMessage) {
+      try {
+        chrome.runtime.sendMessage(
+          "mlaphiokjhimgcjgcjkpcmmdgdajmjka", // Extension ID
+          { type: "PING" },
+          (response) => {
+            if (chrome.runtime.lastError) {
+              console.warn(
+                "Extension PING failed:",
+                chrome.runtime.lastError.message
+              );
+              setCanCommunicateWithExtension(false);
+            } else if (response && response.success) {
+              setCanCommunicateWithExtension(true);
+            } else {
+              setCanCommunicateWithExtension(false);
+            }
+          }
+        );
+      } catch (e) {
+        console.warn("Error sending PING to extension:", e);
+        setCanCommunicateWithExtension(false);
+      }
+    } else {
+      setCanCommunicateWithExtension(false);
+    }
+  }, []);
 
   useEffect(() => {
     const fetchStudents = async () => {
@@ -232,6 +271,56 @@ const TeacherHomePage: React.FC = () => {
 
   return (
     <Container component="main" maxWidth="lg" sx={{ mt: 6, mb: 4 }}>
+      {showExtensionAlert &&
+        (!isChromeBrowser || !canCommunicateWithExtension) && (
+          <Alert
+            severity={!isChromeBrowser ? "warning" : "info"}
+            sx={{ mb: 2 }}
+            action={
+              <Box>
+                {!isChromeBrowser && (
+                  <Button
+                    color="inherit"
+                    size="small"
+                    onClick={() =>
+                      window.open("https://www.google.com/chrome/", "_blank")
+                    }
+                    startIcon={<GetAppIcon />}
+                  >
+                    Chrome 설치
+                  </Button>
+                )}
+                {isChromeBrowser && !canCommunicateWithExtension && (
+                  <Button
+                    color="inherit"
+                    size="small"
+                    onClick={() =>
+                      window.open(
+                        "https://chromewebstore.google.com/detail/mlaphiokjhimgcjgcjkpcmmdgdajmjka?utm_source=item-share-cb",
+                        "_blank"
+                      )
+                    }
+                    startIcon={<GetAppIcon />}
+                  >
+                    확장 프로그램 설치
+                  </Button>
+                )}
+                <Button
+                  color="inherit"
+                  size="small"
+                  onClick={() => setShowExtensionAlert(false)}
+                  sx={{ ml: 1 }}
+                >
+                  닫기
+                </Button>
+              </Box>
+            }
+          >
+            {!isChromeBrowser
+              ? "NUDGE의 모든 기능을 원활하게 사용하려면 Chrome 브라우저 사용을 권장합니다. NEIS 자동입력 기능은 Chrome에서만 지원됩니다."
+              : "NEIS 자동입력 기능을 사용하려면 Chrome 확장 프로그램 설치가 필요합니다. 설치 후 반드시 페이지를 새로고침 해주세요."}
+          </Alert>
+        )}
       <Paper elevation={3} sx={{ padding: theme.spacing(4), borderRadius: 2 }}>
         <Grid container spacing={2} alignItems="center" sx={{ mb: 4 }}>
           <Grid item xs>
@@ -407,8 +496,8 @@ const TeacherHomePage: React.FC = () => {
                   classNumber={classNumber}
                   students={students}
                 />
-                // <ComingSoon />
               ) : (
+                // <ComingSoon />
                 <Box
                   sx={{
                     display: "flex",
