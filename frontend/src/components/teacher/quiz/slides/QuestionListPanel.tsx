@@ -1,8 +1,16 @@
 import React from "react";
-import { Box, List, ListItem, ListItemText, Typography, Button, IconButton } from "@mui/material";
+import {
+  Box,
+  List,
+  ListItem,
+  ListItemText,
+  Typography,
+  Button,
+  IconButton,
+} from "@mui/material";
 import { DragDropContext, Draggable, Droppable } from "react-beautiful-dnd";
 import { Question } from "../types";
-import { CheckCircle, DragIndicator } from "@mui/icons-material";
+import { CheckCircle, DragIndicator, ErrorOutline } from "@mui/icons-material";
 
 type QuestionListPanelProps = {
   questions: Question[];
@@ -30,6 +38,19 @@ const QuestionListPanel: React.FC<QuestionListPanelProps> = ({
     moveToSlide(currentSlideIndex);
   };
 
+  const isQuestionInvalid = (q: Question): boolean => {
+    if (isReadOnly) return false;
+    return (
+      !q.questionText.trim() ||
+      q.correctAnswer === -1 ||
+      q.timeLimit <= 0 ||
+      (q.questionType === "multiple-choice" &&
+        q.options.filter(
+          (opt) => opt.text.trim() !== "" || opt.imageUrl || opt.image
+        ).length < 2)
+    );
+  };
+
   return (
     <Box
       sx={{
@@ -39,7 +60,10 @@ const QuestionListPanel: React.FC<QuestionListPanelProps> = ({
         boxShadow: "0px 4px 12px rgba(0, 0, 0, 0.05)",
       }}
     >
-      <Typography variant="h6" sx={{ fontWeight: "bold", color: "#333", marginBottom: "1rem" }}>
+      <Typography
+        variant="h6"
+        sx={{ fontWeight: "bold", color: "#333", marginBottom: "1rem" }}
+      >
         문제 목록
       </Typography>
 
@@ -93,14 +117,34 @@ const QuestionListPanel: React.FC<QuestionListPanelProps> = ({
                       {/* 문제 텍스트 일부 표시, 텍스트가 없을 경우 '비어있음' 표시 */}
                       <ListItemText
                         primary={`${index + 1}. ${
-                          question.questionText ? question.questionText.slice(0, 10) + "..." : "문제 없음"
+                          question.questionText
+                            ? question.questionText.slice(0, 10) + "..."
+                            : "문제 없음"
                         }`}
                         primaryTypographyProps={{
                           fontSize: "1rem",
-                          fontWeight: currentSlideIndex === index + 1 ? "bold" : "normal",
-                          color: currentSlideIndex === index + 1 ? "#f57c00" : "#333",
+                          fontWeight:
+                            currentSlideIndex === index + 1 ? "bold" : "normal",
+                          color:
+                            currentSlideIndex === index + 1
+                              ? "#f57c00"
+                              : isQuestionInvalid(question)
+                              ? "#d32f2f"
+                              : "#333",
                         }}
                       />
+
+                      {isQuestionInvalid(question) && !isReadOnly && (
+                        <ErrorOutline
+                          sx={{
+                            color: "#d32f2f",
+                            fontSize: "1.1rem",
+                            marginLeft: "auto",
+                            marginRight:
+                              currentSlideIndex === index + 1 ? "0.5rem" : 0,
+                          }}
+                        />
+                      )}
 
                       {/* 선택된 문제 아이콘 */}
                       {currentSlideIndex === index + 1 && (
@@ -108,7 +152,9 @@ const QuestionListPanel: React.FC<QuestionListPanelProps> = ({
                           sx={{
                             color: "#f57c00",
                             fontSize: "1rem",
-                            marginLeft: "auto",
+                            marginLeft: isQuestionInvalid(question)
+                              ? "0.2rem"
+                              : "auto",
                           }}
                         />
                       )}
@@ -140,7 +186,11 @@ const QuestionListPanel: React.FC<QuestionListPanelProps> = ({
           "&:hover": { backgroundColor: isReviewSlide ? "#bdbdbd" : "#fb8c00" },
         }}
       >
-        {isReadOnly ? "전체 보기" : isReviewSlide ? "퀴즈 검토 중" : "퀴즈 검토 및 저장"}
+        {isReadOnly
+          ? "전체 보기"
+          : isReviewSlide
+          ? "퀴즈 검토 중"
+          : "퀴즈 검토 및 저장"}
       </Button>
     </Box>
   );

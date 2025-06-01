@@ -9,6 +9,7 @@ import QuestionListPanel from "./slides/QuestionListPanel";
 import { Question } from "./types";
 import { initialQuestion } from "./utils";
 import { getUnits, createQuiz, updateQuiz } from "../../../utils/quizApi";
+import { getSubjects } from "../../../utils/api";
 import { useNavigate } from "react-router-dom";
 
 interface QuizContainerProps {
@@ -19,14 +20,13 @@ interface QuizContainerProps {
   onEditQuiz?: () => void; // 퀴즈 편집 핸들러 추가
 }
 
-const QuizContainer: React.FC<QuizContainerProps> = ({ 
-  isEdit = false, 
-  initialData, 
+const QuizContainer: React.FC<QuizContainerProps> = ({
+  isEdit = false,
+  initialData,
   isReadOnly = false,
   onStartQuiz,
   onEditQuiz,
 }) => {
-  
   const navigate = useNavigate();
   const [title, setTitle] = useState(initialData?.title || "");
   const [grade, setGrade] = useState(initialData?.grade || "");
@@ -36,30 +36,84 @@ const QuizContainer: React.FC<QuizContainerProps> = ({
   const [units, setUnits] = useState<string[]>([]);
   const [quizImage, setQuizImage] = useState<File | null>(null);
   const [quizImageUrl, setQuizImageUrl] = useState(initialData?.imageUrl || "");
-  const [questions, setQuestions] = useState<Question[]>(initialData?.questions || [initialQuestion]);
+
+  // 초기 데이터가 있을 경우 correctAnswer를 숫자로 변환
+  const processedInitialQuestions = initialData?.questions
+    ? initialData.questions.map((q: any) => ({
+        ...q,
+        // correctAnswer를 숫자로 변환합니다.
+        // MongoDB에서 문자열로 오므로, 프론트엔드 타입(number)에 맞춥니다.
+        correctAnswer:
+          q.correctAnswer !== undefined &&
+          q.correctAnswer !== null &&
+          !isNaN(Number(q.correctAnswer))
+            ? Number(q.correctAnswer)
+            : -1, // 변환 실패 시 또는 값이 없을 경우 기본값 -1
+        options: q.options.map((opt: any) => ({
+          // 옵션도 imageUrl, image 필드 확인
+          text: opt.text || "",
+          imageUrl: opt.imageUrl || "",
+          image: opt.image || null,
+        })),
+        // 문제 자체의 image와 imageUrl도 확인
+        image: q.image || null,
+        imageUrl: q.imageUrl || "",
+      }))
+    : [initialQuestion];
+
+  const [questions, setQuestions] = useState<Question[]>(
+    processedInitialQuestions
+  );
   const [currentSlideIndex, setCurrentSlideIndex] = useState(1);
   const [error, setError] = useState<string | null>(null);
   const [imageDialogOpen, setImageDialogOpen] = useState(false);
   const [isReviewSlide, setIsReviewSlide] = useState(false);
-  
+  const [subjects, setSubjects] = useState<string[]>([]);
+
   useEffect(() => {
     setIsReviewSlide(currentSlideIndex > questions.length);
   }, [currentSlideIndex, questions.length]);
-  
+
   useEffect(() => {
     fetchUnits();
-  }, [grade, semester, subject]);
+    if (!isReadOnly) {
+      fetchSubjects();
+    }
+  }, [grade, semester, subject, isReadOnly]);
 
   const fetchUnits = async () => {
     if (grade && semester && subject) {
       try {
-        const { units: fetchedUnits } = await getUnits(grade, semester, subject);
+        const { units: fetchedUnits } = await getUnits(
+          grade,
+          semester,
+          subject
+        );
         setUnits(fetchedUnits);
       } catch (error) {
         setError("단원 목록을 가져오는 중 오류가 발생했습니다.");
       }
     } else {
       setUnits([]);
+    }
+  };
+
+  const fetchSubjects = async () => {
+    if (grade && semester) {
+      try {
+        const response = await getSubjects(parseInt(grade), [semester]);
+        const fetchedSubjectsData = response.data;
+        setSubjects(fetchedSubjectsData);
+        if (subject && !fetchedSubjectsData.includes(subject)) {
+          setSubject("");
+          setUnit("");
+        }
+      } catch (error) {
+        setError("과목 목록을 가져오는 중 오류가 발생했습니다.");
+        setSubjects([]);
+      }
+    } else {
+      setSubjects([]);
     }
   };
 
@@ -90,6 +144,62 @@ const QuizContainer: React.FC<QuizContainerProps> = ({
   };
 
   const saveQuiz = async () => {
+    if (!title.trim()) {
+      setError("퀴즈 제목을 입력해주세요.");
+      return;
+    }
+    if (!grade) {
+      setError("학년을 선택해주세요.");
+      return;
+    }
+    if (!semester) {
+      setError("학기를 선택해주세요.");
+      return;
+    }
+    if (!subject) {
+      setError("과목을 선택해주세요.");
+      return;
+    }
+
+    if (questions.length < 3) {
+      setError("최소 3개 이상의 문제가 필요합니다.");
+      return;
+    }
+
+    for (let i = 0; i < questions.length; i++) {
+      const q = questions[i];
+      if (!q.questionText.trim()) {
+        setError(`문제 ${i + 1}: 문제 내용을 입력해주세요.`);
+        setCurrentSlideIndex(i + 1);
+        return;
+      }
+      if (q.correctAnswer === -1) {
+        setError(`문제 ${i + 1}: 정답을 설정해주세요.`);
+        setCurrentSlideIndex(i + 1);
+        return;
+      }
+      if (q.questionType === "multiple-choice") {
+        const filledOptions = q.options.filter(
+          (opt) => opt.text.trim() !== "" || opt.imageUrl || opt.image
+        );
+        if (filledOptions.length < 2) {
+          setError(
+            `문제 ${
+              i + 1
+            }: 객관식 선택지는 최소 2개 이상 입력해야 합니다 (내용 또는 이미지).`
+          );
+          setCurrentSlideIndex(i + 1);
+          return;
+        }
+      }
+      if (q.timeLimit <= 0) {
+        setError(`문제 ${i + 1}: 시간 제한은 0보다 커야 합니다.`);
+        setCurrentSlideIndex(i + 1);
+        return;
+      }
+    }
+    setError(null);
+
     try {
       const formData = new FormData();
       formData.append("title", title);
@@ -97,7 +207,7 @@ const QuizContainer: React.FC<QuizContainerProps> = ({
       formData.append("subject", subject);
       formData.append("semester", semester);
       formData.append("unit", unit);
-      
+
       if (quizImage) formData.append("image", quizImage);
       else if (quizImageUrl) formData.append("imageUrl", quizImageUrl);
 
@@ -113,19 +223,29 @@ const QuizContainer: React.FC<QuizContainerProps> = ({
       formData.append("questions", JSON.stringify(formattedQuestions));
 
       questions.forEach((question, index) => {
-        if (question.image) formData.append(`questionImages_${index}`, question.image);
-        else if (question.imageUrl) formData.append(`questionImageUrls_${index}`, question.imageUrl);
-      
+        if (question.image)
+          formData.append(`questionImages_${index}`, question.image);
+        else if (question.imageUrl)
+          formData.append(`questionImageUrls_${index}`, question.imageUrl);
+
         question.options.forEach((option, optionIndex) => {
-          if (option.image) formData.append(`optionImages_${index}_${optionIndex}`, option.image);
-          else if (option.imageUrl) formData.append(`optionImageUrls_${index}_${optionIndex}`, option.imageUrl);
+          if (option.image)
+            formData.append(
+              `optionImages_${index}_${optionIndex}`,
+              option.image
+            );
+          else if (option.imageUrl)
+            formData.append(
+              `optionImageUrls_${index}_${optionIndex}`,
+              option.imageUrl
+            );
         });
       });
 
       if (isEdit && initialData?._id) {
-        await updateQuiz(initialData._id, formData); // 수정 모드에서 호출
+        await updateQuiz(initialData._id, formData);
       } else {
-        await createQuiz(formData); // 생성 모드에서 호출
+        await createQuiz(formData);
       }
       navigate("/manage-quizzes");
     } catch (error) {
@@ -146,6 +266,7 @@ const QuizContainer: React.FC<QuizContainerProps> = ({
           setSemester={setSemester}
           subject={subject}
           setSubject={setSubject}
+          subjects={subjects}
           unit={unit}
           setUnit={setUnit}
           units={units}
@@ -154,9 +275,9 @@ const QuizContainer: React.FC<QuizContainerProps> = ({
           setQuizImage={setQuizImage}
           setQuizImageUrl={setQuizImageUrl}
           setImageDialogOpen={setImageDialogOpen}
-          isReadOnly={isReadOnly} // 읽기 전용 전달
-          onStartQuiz={onStartQuiz}    // 퀴즈 시작 핸들러 전달
-          onEditQuiz={onEditQuiz}      // 편집 핸들러 전달
+          isReadOnly={isReadOnly}
+          onStartQuiz={onStartQuiz}
+          onEditQuiz={onEditQuiz}
         />
       </Box>
 
@@ -184,7 +305,7 @@ const QuizContainer: React.FC<QuizContainerProps> = ({
             reorderQuestions={reorderQuestions}
             goToReview={() => setCurrentSlideIndex(questions.length + 1)}
             isReviewSlide={isReviewSlide}
-            isReadOnly={isReadOnly} // 읽기 전용 전달
+            isReadOnly={isReadOnly}
           />
         </Box>
 
@@ -205,17 +326,17 @@ const QuizContainer: React.FC<QuizContainerProps> = ({
               questionIndex={currentSlideIndex - 1}
               updateQuestion={updateQuestion}
               removeQuestion={removeQuestion}
-              isReadOnly={isReadOnly} // 읽기 전용 전달
+              isReadOnly={isReadOnly}
             />
           ) : (
             <ReviewSlide
               questions={questions}
               addQuestion={addQuestion}
               moveToSlide={moveToSlide}
-              isReadOnly={isReadOnly} // 읽기 전용 전달
+              isReadOnly={isReadOnly}
             />
           )}
-          
+
           <SlideNavigation
             currentSlideIndex={currentSlideIndex}
             totalSlides={questions.length + 1}
@@ -223,7 +344,7 @@ const QuizContainer: React.FC<QuizContainerProps> = ({
             addQuestion={addQuestion}
             saveQuiz={saveQuiz}
             isReviewSlide={currentSlideIndex > questions.length}
-            isReadOnly={isReadOnly} // 읽기 전용 전달
+            isReadOnly={isReadOnly}
           />
         </Box>
       </Box>
@@ -232,8 +353,14 @@ const QuizContainer: React.FC<QuizContainerProps> = ({
       <ImageUploadDialog
         open={imageDialogOpen}
         onClose={() => setImageDialogOpen(false)}
-        onImageChange={(file) => { setQuizImage(file); setQuizImageUrl(""); }}
-        onImageUrlChange={(url) => { setQuizImageUrl(url); setQuizImage(null); }}
+        onImageChange={(file) => {
+          setQuizImage(file);
+          setQuizImageUrl("");
+        }}
+        onImageUrlChange={(url) => {
+          setQuizImageUrl(url);
+          setQuizImage(null);
+        }}
         imageFile={quizImage}
         imageUrl={quizImageUrl}
       />

@@ -10,6 +10,7 @@ const {
   getRedisChannelBroadcastToTeacher,
   getRedisChannelIndividualFeedbackList,
   getSessionStudentIdsSetKey,
+  getRedisChannelForceCloseStudents,
 } = require("../utils/redisKeys");
 const { redisJsonGet, redisJsonMGet } = require("../utils/redisUtils");
 
@@ -82,6 +83,37 @@ const handlePubSubMessage = async (message, channel) => {
           }
         });
       }
+    } else if (channel.endsWith(":force_close_students")) {
+      if (kahootClients[pin] && kahootClients[pin].students) {
+        logger.info(
+          `[PubSub-ForceClose] Received force_close_students for PIN ${pin}. Closing student sockets.`
+        );
+        const closeReason =
+          rawMessageData.reason ||
+          "Session ended by teacher for viewing results.";
+        const notificationMessage =
+          rawMessageData.notification ||
+          "퀴즈가 곧 종료됩니다. 교사가 상세 결과를 확인 중입니다.";
+
+        Object.values(kahootClients[pin].students).forEach((studentWs) => {
+          if (studentWs.readyState === WebSocket.OPEN) {
+            try {
+              studentWs.send(
+                JSON.stringify({
+                  type: "sessionForceClosed",
+                  message: notificationMessage,
+                })
+              );
+              studentWs.close(1000, closeReason);
+            } catch (e) {
+              logger.warn(
+                `[PubSub-ForceClose] Error sending close message or closing student WebSocket for PIN ${pin}: ${e.message}. Terminating.`
+              );
+              studentWs.terminate();
+            }
+          }
+        });
+      }
     }
     // ... 기존 로직 끝 ...
   } catch (error) {
@@ -131,6 +163,7 @@ const getChannelsForPin = (pin) => {
     getRedisChannelBroadcastToActiveStudents(pin),
     getRedisChannelBroadcastToTeacher(pin),
     getRedisChannelIndividualFeedbackList(pin),
+    getRedisChannelForceCloseStudents(pin),
     // 필요한 다른 PIN 특정 채널 추가 가능
   ];
 };

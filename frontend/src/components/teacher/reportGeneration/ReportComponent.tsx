@@ -1,4 +1,4 @@
-import React, { useState, useRef, useLayoutEffect } from "react";
+import React, { useState, useRef, useLayoutEffect, useEffect } from "react";
 import {
   Box,
   Button,
@@ -41,6 +41,7 @@ import EditIcon from "@mui/icons-material/Edit";
 import SaveIcon from "@mui/icons-material/Save";
 import CancelIcon from "@mui/icons-material/Cancel";
 import HubIcon from "@mui/icons-material/Hub";
+import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 
 interface Student {
   _id: string;
@@ -89,7 +90,7 @@ const SUBJECT_ORDER = [
   "미술",
   "체육",
   "실과",
-  "통합교과"
+  "통합교과",
 ];
 
 interface CommentRendererProps {
@@ -182,6 +183,36 @@ const ReportComponent: React.FC<ReportComponentProps> = ({
     null
   );
   const [editedCommentText, setEditedCommentText] = useState<string>("");
+  const [isChrome, setIsChrome] = useState(false);
+  const [canCommunicateWithExtension, setCanCommunicateWithExtension] =
+    useState(false);
+
+  useEffect(() => {
+    const userAgent = navigator.userAgent.toLowerCase();
+    setIsChrome(userAgent.includes("chrome") && !userAgent.includes("edg")); // Edg는 제외
+
+    if (chrome?.runtime?.sendMessage) {
+      // 간단한 메시지를 보내 익스텐션 활성 상태 확인 시도 (선택적)
+      // 실제로는 ID를 정확히 지정해야 함
+      try {
+        chrome.runtime.sendMessage(
+          "mlaphiokjhimgcjgcjkpcmmdgdajmjka",
+          { type: "PING" },
+          (response) => {
+            if (chrome.runtime.lastError) {
+              setCanCommunicateWithExtension(false);
+            } else {
+              setCanCommunicateWithExtension(true);
+            }
+          }
+        );
+      } catch (e) {
+        setCanCommunicateWithExtension(false);
+      }
+    } else {
+      setCanCommunicateWithExtension(false);
+    }
+  }, []);
 
   const toggleCommentExpansion = (key: string) => {
     setExpandedComments((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -378,52 +409,122 @@ const ReportComponent: React.FC<ReportComponentProps> = ({
                       </Typography>
                     </Box>
                     <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                      <Button
-                        variant="outlined"
-                        size="small"
-                        onClick={(event) => {
-                          event.stopPropagation(); // 아코디언 토글 방지
+                      <Tooltip
+                        title={
+                          <Box>
+                            <Typography variant="caption">
+                              NEIS 전송 기능은 Chrome 브라우저에서
+                              확장 프로그램이 설치되어 있어야 원활하게
+                              작동합니다.
+                            </Typography>
+                            <Typography
+                              variant="caption"
+                              sx={{ mt: 0.5, display: "block" }}
+                            >
+                              NEIS와 NUDGE는 동일한 브라우저(Chrome)에서
+                              실행되어야 합니다.
+                            </Typography>
+                            {!canCommunicateWithExtension && (
+                              <Typography
+                                variant="caption"
+                                color="warning.main"
+                                sx={{ mt: 0.5, display: "block" }}
+                              >
+                                현재 확장 프로그램과 연결되지 않았거나 Chrome
+                                브라우저가 아닙니다.
+                              </Typography>
+                            )}
+                          </Box>
+                        }
+                        arrow
+                        placement="top"
+                      >
+                        <Button
+                          variant="outlined"
+                          size="small"
+                          onClick={(event) => {
+                            event.stopPropagation(); // 아코디언 토글 방지
 
-                          const subjectReports =
-                            groupedReports[semester][subject];
+                            if (!isChrome) {
+                              setSnackbarMessage(
+                                "NEIS 전송 기능은 Chrome 브라우저에서 사용해주세요."
+                              );
+                              setSnackbarSeverity("error");
+                              setSnackbarOpen(true);
+                              return;
+                            }
 
-                          const payload = {
-                            subject,
-                            comments: subjectReports.map((report: Report) => ({
-                              studentId: report.studentId.studentId,
-                              comment: report.comment,
-                            })),
-                          };
+                            if (!canCommunicateWithExtension) {
+                              setSnackbarMessage(
+                                "NEIS 자동 전송 Chrome 확장 프로그램 설치 또는 활성화가 필요합니다."
+                              );
+                              setSnackbarSeverity("error");
+                              setSnackbarOpen(true);
+                              // 설치 링크로 안내 혹은 다른 UI 표시
+                              window.open(
+                                "https://chromewebstore.google.com/detail/mlaphiokjhimgcjgcjkpcmmdgdajmjka?utm_source=item-share-cb",
+                                "_blank"
+                              );
+                              return;
+                            }
 
-                          if (chrome?.runtime?.sendMessage) {
+                            const subjectReports =
+                              groupedReports[semester][subject];
+
+                            const payload = {
+                              subject,
+                              comments: subjectReports.map(
+                                (report: Report) => ({
+                                  studentId: report.studentId.studentId,
+                                  comment: report.comment,
+                                })
+                              ),
+                            };
+
                             chrome.runtime.sendMessage(
-                              "jefkdeojjfmmcdbanibhdfmaggceehbb",
+                              "mlaphiokjhimgcjgcjkpcmmdgdajmjka",
                               {
                                 type: "INJECT_COMMENTS",
                                 payload,
                               },
-                              () => {
-                                console.log("평어 전송 완료");
+                              (response) => {
+                                if (chrome.runtime.lastError) {
+                                  console.error(
+                                    "NEIS 전송 실패:",
+                                    chrome.runtime.lastError.message
+                                  );
+                                  setSnackbarMessage(
+                                    `NEIS 전송 중 오류가 발생했습니다: ${chrome.runtime.lastError.message}`
+                                  );
+                                  setSnackbarSeverity("error");
+                                  setSnackbarOpen(true);
+                                } else if (response && response.success) {
+                                  console.log("평어 전송 완료");
+                                  setSnackbarMessage(
+                                    "평어가 NEIS로 전송되었습니다."
+                                  );
+                                  setSnackbarSeverity("success");
+                                  setSnackbarOpen(true);
+                                } else {
+                                  console.log(
+                                    "NEIS 전송 응답 없음 또는 실패:",
+                                    response
+                                  );
+                                  setSnackbarMessage(
+                                    "NEIS 전송에 실패했거나 응답이 없습니다. 확장 프로그램 상태를 확인해주세요."
+                                  );
+                                  setSnackbarSeverity("error");
+                                  setSnackbarOpen(true);
+                                }
                               }
                             );
-                            // const EXT_ID = (window as any).__NEIS_HELPER_EXTENSION_ID__;
-                            // if (EXT_ID) {
-                            //   chrome.runtime.sendMessage(
-                            //     EXT_ID,
-                            //     { type: "INJECT_COMMENTS", payload },
-                            //     () => console.log("평어 전송 완료")
-                            //     );
-                            // } else {
-                            //   console.warn("확장 ID를 찾을 수 없습니다.");
-                            // }
-                          } else {
-                            console.warn("크롬 익스텐션과 통신할 수 없습니다.");
-                          }
-                        }}
-                        sx={{ textTransform: "none" }}
-                      >
-                        NEIS로 일괄 전송
-                      </Button>
+                          }}
+                          sx={{ textTransform: "none" }}
+                          startIcon={<InfoOutlinedIcon fontSize="small" />}
+                        >
+                          NEIS로 일괄 전송
+                        </Button>
+                      </Tooltip>
                       <Chip
                         label={`${groupedReports[semester][subject].length}명`}
                         size="small"

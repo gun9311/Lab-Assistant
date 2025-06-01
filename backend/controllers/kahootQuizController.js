@@ -70,10 +70,128 @@ const determineImageUrl = (
   return finalImageUrl;
 };
 
+// Helper function for validation (can be reused for create and update)
+const validateQuizData = (body, files) => {
+  const { title, grade, subject, semester, questions } = body;
+  let parsedQuestions;
+
+  if (!title || typeof title !== "string" || title.trim() === "") {
+    return { isValid: false, message: "퀴즈 제목을 입력해주세요." };
+  }
+  if (!grade || typeof grade !== "string" || grade.trim() === "") {
+    // Assuming grade is passed as string initially
+    return { isValid: false, message: "학년을 선택해주세요." };
+  }
+  if (!subject || typeof subject !== "string" || subject.trim() === "") {
+    return { isValid: false, message: "과목을 선택해주세요." };
+  }
+  if (!semester || typeof semester !== "string" || semester.trim() === "") {
+    return { isValid: false, message: "학기를 선택해주세요." };
+  }
+  // unit은 선택적이므로 검사에서 제외하거나 필요시 추가
+
+  if (!questions || typeof questions !== "string") {
+    return { isValid: false, message: "문제 목록이 올바르지 않습니다." };
+  }
+
+  try {
+    parsedQuestions = JSON.parse(questions);
+  } catch (e) {
+    return { isValid: false, message: "문제 목록 형식이 올바르지 않습니다." };
+  }
+
+  if (!Array.isArray(parsedQuestions) || parsedQuestions.length < 3) {
+    return { isValid: false, message: "최소 3개 이상의 문제가 필요합니다." };
+  }
+
+  for (let i = 0; i < parsedQuestions.length; i++) {
+    const q = parsedQuestions[i];
+    if (
+      !q.questionText ||
+      typeof q.questionText !== "string" ||
+      q.questionText.trim() === ""
+    ) {
+      return {
+        isValid: false,
+        message: `문제 ${i + 1}: 문제 내용을 입력해주세요.`,
+      };
+    }
+    if (
+      q.correctAnswer === undefined ||
+      q.correctAnswer === null ||
+      q.correctAnswer < 0 ||
+      (q.options && q.correctAnswer >= q.options.length)
+    ) {
+      // -1도 프론트에서 미설정으로 간주하므로, 백엔드에서는 0 이상이고 options 범위 내인지 확인
+      return {
+        isValid: false,
+        message: `문제 ${i + 1}: 유효한 정답을 설정해주세요.`,
+      };
+    }
+    if (!q.options || !Array.isArray(q.options)) {
+      return {
+        isValid: false,
+        message: `문제 ${i + 1}: 선택지 정보가 올바르지 않습니다.`,
+      };
+    }
+
+    if (q.questionType === "multiple-choice") {
+      // 프론트에서 파일/URL을 구분해서 보내므로, 백엔드에서는 텍스트 유무만으로 판단하거나,
+      // 또는 파일 존재 여부까지 고려하여 검증할 수 있습니다.
+      // 여기서는 텍스트 또는 이미지 URL(프론트에서 전달된) 중 하나라도 있는 선택지만 카운트
+      const filledOptions = q.options.filter(
+        (opt) => (opt.text && opt.text.trim() !== "") || opt.imageUrl
+      );
+      if (filledOptions.length < 2) {
+        return {
+          isValid: false,
+          message: `문제 ${
+            i + 1
+          }: 객관식 선택지는 내용 또는 이미지가 있는 것이 최소 2개 이상이어야 합니다.`,
+        };
+      }
+    } else if (q.questionType === "true-false") {
+      if (q.options.length !== 2) {
+        return {
+          isValid: false,
+          message: `문제 ${i + 1}: 참/거짓 문제의 선택지는 2개여야 합니다.`,
+        };
+      }
+    } else {
+      return {
+        isValid: false,
+        message: `문제 ${i + 1}: 알 수 없는 문제 유형입니다.`,
+      };
+    }
+
+    if (
+      q.timeLimit === undefined ||
+      typeof q.timeLimit !== "number" ||
+      q.timeLimit <= 0
+    ) {
+      return {
+        isValid: false,
+        message: `문제 ${i + 1}: 시간 제한은 0보다 큰 숫자여야 합니다.`,
+      };
+    }
+  }
+
+  return { isValid: true, parsedQuestions }; // 유효하면 파싱된 questions도 반환
+};
+
 exports.createQuiz = async (req, res) => {
   try {
-    const { title, grade, subject, semester, unit, questions } = req.body;
-    const parsedQuestions = JSON.parse(questions);
+    const validationResult = validateQuizData(req.body, req.files);
+    if (!validationResult.isValid) {
+      logger.warn(
+        `Quiz creation validation failed: ${validationResult.message}`,
+        { body: req.body }
+      );
+      return res.status(400).send({ error: validationResult.message });
+    }
+
+    const { title, grade, subject, semester, unit } = req.body;
+    const parsedQuestions = validationResult.parsedQuestions;
 
     // 퀴즈 전체 이미지 처리
     const quizImageUrl = determineImageUrl(
@@ -124,6 +242,15 @@ exports.createQuiz = async (req, res) => {
     await newQuiz.save();
     res.status(201).send(newQuiz);
   } catch (error) {
+    if (error instanceof SyntaxError && error.message.includes("JSON")) {
+      logger.error("Error creating quiz: Invalid JSON format for questions", {
+        rawBody: req.body.questions,
+        error,
+      });
+      return res
+        .status(400)
+        .send({ error: "문제 목록 형식이 올바르지 않습니다." });
+    }
     logger.error("Error creating quiz:", error);
     res.status(500).send({ error: "퀴즈 생성 실패" });
   }
@@ -155,62 +282,81 @@ exports.deleteQuiz = async (req, res) => {
 
 exports.updateQuiz = async (req, res) => {
   try {
+    const validationResult = validateQuizData(req.body, req.files);
+    if (!validationResult.isValid) {
+      logger.warn(
+        `Quiz update validation failed: ${validationResult.message}`,
+        { quizId: req.params.id, body: req.body }
+      );
+      return res.status(400).send({ error: validationResult.message });
+    }
+
     const quizId = req.params.id;
-    const userId = req.user._id; // 현재 사용자 ID 가져오기
+    const userId = req.user._id;
 
     const quiz = await KahootQuizContent.findById(quizId);
     if (!quiz) {
       return res.status(404).json({ error: "퀴즈를 찾을 수 없습니다." });
     }
 
-    // 사용자가 퀴즈의 생성자인지 확인
     if (quiz.createdBy.toString() !== userId.toString()) {
       return res.status(403).json({ error: "퀴즈를 수정할 권한이 없습니다." });
     }
 
+    // req.body에서 직접 값 할당
     quiz.title = req.body.title;
     quiz.grade = req.body.grade;
     quiz.semester = req.body.semester;
     quiz.subject = req.body.subject;
     quiz.unit = req.body.unit;
 
-    // 퀴즈 전체 이미지 처리
-    // req.body.imageUrl은 클라이언트가 이미지 URL을 직접 제공하거나,
-    // 파일을 업로드하지 않고 기존 이미지를 유지하거나 삭제하려는 경우에 사용될 수 있습니다.
-    // 업데이트 시에는 명시적으로 null로 설정하지 않으면 기존 이미지가 유지될 수 있으므로,
-    // 새로운 파일이 없고 req.body.imageUrl도 없으면 null이 되도록 합니다.
     quiz.imageUrl = determineImageUrl(req.files, "image", req.body.imageUrl);
 
-    // 질문 목록을 업데이트 (새 질문 및 기존 질문 업데이트)
-    const updatedQuestions = JSON.parse(req.body.questions).map(
-      (question, index) => {
+    // const updatedQuestions = JSON.parse(req.body.questions).map( // 이미 validateQuizData에서 파싱됨
+    const parsedQuestions = validationResult.parsedQuestions;
+    const updatedQuestionsWithImages = await Promise.all(
+      // 변수명 명확화
+      parsedQuestions.map(async (question, index) => {
+        // async 추가
         const questionImageKey = `questionImages_${index}`;
-        // 문제 이미지 처리
         question.imageUrl = determineImageUrl(
           req.files,
           questionImageKey,
-          question.imageUrl // 클라이언트가 보낸 questions 배열 내의 imageUrl
+          question.imageUrl
         );
 
-        // 선택지 이미지 처리
-        question.options = question.options.map((option, optIndex) => {
-          const optionImageKey = `optionImages_${index}_${optIndex}`;
-          option.imageUrl = determineImageUrl(
-            req.files,
-            optionImageKey,
-            option.imageUrl // 클라이언트가 보낸 questions 배열 내 option의 imageUrl
-          );
-          return option;
-        });
+        question.options = await Promise.all(
+          // await 추가
+          question.options.map(async (option, optIndex) => {
+            // async 추가
+            const optionImageKey = `optionImages_${index}_${optIndex}`;
+            option.imageUrl = determineImageUrl(
+              req.files,
+              optionImageKey,
+              option.imageUrl
+            );
+            return option;
+          })
+        );
         return question;
-      }
+      })
     );
 
-    quiz.questions = updatedQuestions;
+    quiz.questions = updatedQuestionsWithImages; // 이미지 처리된 질문으로 업데이트
 
     await quiz.save();
     res.status(200).json(quiz);
   } catch (error) {
+    if (error instanceof SyntaxError && error.message.includes("JSON")) {
+      logger.error("Error updating quiz: Invalid JSON format for questions", {
+        quizId: req.params.id,
+        rawBody: req.body.questions,
+        error,
+      });
+      return res
+        .status(400)
+        .send({ error: "문제 목록 형식이 올바르지 않습니다." });
+    }
     logger.error("퀴즈 수정 중 오류:", error);
     res.status(500).json({ error: "퀴즈 수정에 실패했습니다." });
   }
@@ -533,6 +679,7 @@ exports.startQuizSession = async (req, res) => {
       teacherId: teacherId.toString(),
       pin: pin,
       quizContentId: quizId.toString(),
+      quizTitle: quizContent.title,
       currentQuestionIndex: -1,
       isQuestionActive: false,
       quizStarted: false,

@@ -37,6 +37,7 @@
     "react-markdown": "^10.1.0",
     "react-router-dom": "^6.25.0",
     "react-scripts": "^5.0.1",
+    "recharts": "^2.15.3",
     "remark-gfm": "^4.0.1",
     "typeface-montserrat": "^1.1.13",
     "typescript": "^5.5.3",

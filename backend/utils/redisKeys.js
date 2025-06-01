@@ -90,6 +90,23 @@ const getRedisChannelBroadcastToTeacher = (pin) =>
 const getRedisChannelIndividualFeedbackList = (pin) =>
   `session:${pin}:pubsub:individual_feedback_list`;
 
+/**
+ * 특정 PIN의 모든 학생 연결을 강제로 종료하기 위한 Pub/Sub 채널 키를 생성합니다.
+ * (예: 교사가 상세 결과 보기 시)
+ * @param {string} pin - 세션 PIN 번호
+ * @returns {string} Redis Pub/Sub 채널 키
+ */
+const getRedisChannelForceCloseStudents = (pin) =>
+  `session:${pin}:pubsub:force_close_students`;
+
+/**
+ * 교사가 상세 결과를 보고 있는지 여부를 나타내는 플래그 키를 생성합니다.
+ * @param {string} pin - 세션 PIN 번호
+ * @returns {string} Redis 키 (예: "session:123456:teacher_viewing_results")
+ */
+const getTeacherViewingResultsFlagKey = (pin) =>
+  `session:${pin}:teacher_viewing_results`;
+
 module.exports = {
   getSessionKey,
   getParticipantKey,
@@ -101,4 +118,6 @@ module.exports = {
   getRedisChannelBroadcastToActiveStudents,
   getRedisChannelBroadcastToTeacher,
   getRedisChannelIndividualFeedbackList,
+  getRedisChannelForceCloseStudents,
+  getTeacherViewingResultsFlagKey,
 };

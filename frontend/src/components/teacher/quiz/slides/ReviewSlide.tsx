@@ -1,5 +1,13 @@
 import React from "react";
-import { Box, Typography, Grid, Card, CardContent, IconButton, Button } from "@mui/material";
+import {
+  Box,
+  Typography,
+  Grid,
+  Card,
+  CardContent,
+  IconButton,
+  Button,
+} from "@mui/material";
 import { Add, Edit } from "@mui/icons-material";
 import { Question } from "../types";
 
@@ -17,9 +25,21 @@ const ReviewSlide: React.FC<ReviewSlideProps> = ({
   isReadOnly = false, // 기본값을 편집 가능 모드로 설정
 }) => {
   return (
-    <Box sx={{ padding: "2rem", backgroundColor: "#ffffff", borderRadius: "16px", boxShadow: "0px 6px 20px rgba(0, 0, 0, 0.1)" }}>
-      <Typography variant="h4" gutterBottom sx={{ fontWeight: "bold", color: "#333" }}>
-        {isReadOnly ? "전체 보기" : "퀴즈 검토 및 저장"} {/* 읽기 전용일 때 텍스트 변경 */}
+    <Box
+      sx={{
+        padding: "2rem",
+        backgroundColor: "#ffffff",
+        borderRadius: "16px",
+        boxShadow: "0px 6px 20px rgba(0, 0, 0, 0.1)",
+      }}
+    >
+      <Typography
+        variant="h4"
+        gutterBottom
+        sx={{ fontWeight: "bold", color: "#333" }}
+      >
+        {isReadOnly ? "전체 보기" : "퀴즈 검토 및 저장"}{" "}
+        {/* 읽기 전용일 때 텍스트 변경 */}
       </Typography>
       <Typography variant="subtitle1" gutterBottom sx={{ color: "#666" }}>
         아래에서 모든 문제를 검토하고 필요 시 수정하세요.
@@ -39,7 +59,10 @@ const ReviewSlide: React.FC<ReviewSlideProps> = ({
               }}
             >
               <CardContent>
-                <Typography variant="h6" sx={{ fontWeight: "bold", color: "#333" }}>
+                <Typography
+                  variant="h6"
+                  sx={{ fontWeight: "bold", color: "#333" }}
+                >
                   {`문제 ${index + 1}`}
                 </Typography>
                 <Typography variant="body2" gutterBottom sx={{ color: "#555" }}>
@@ -49,7 +72,11 @@ const ReviewSlide: React.FC<ReviewSlideProps> = ({
                 {(question.imageUrl || question.image) && (
                   <Box mt={1}>
                     <img
-                      src={question.image ? URL.createObjectURL(question.image) : question.imageUrl}
+                      src={
+                        question.image
+                          ? URL.createObjectURL(question.image)
+                          : question.imageUrl
+                      }
                       alt="문제 이미지"
                       style={{
                         maxWidth: "100%",
@@ -62,20 +89,40 @@ const ReviewSlide: React.FC<ReviewSlideProps> = ({
 
                 <Box mt={2}>
                   {question.options.map((option, optIndex) => (
-                    <Box key={optIndex} display="flex" alignItems="center" mb={1}>
+                    <Box
+                      key={optIndex}
+                      display="flex"
+                      alignItems="center"
+                      mb={1}
+                    >
                       <Typography
                         variant="body2"
                         sx={{
-                          fontWeight: question.correctAnswer === optIndex ? "bold" : "normal",
-                          color: question.correctAnswer === optIndex ? "#ff9800" : "#555",
+                          fontWeight:
+                            question.correctAnswer === optIndex
+                              ? "bold"
+                              : "normal",
+                          color:
+                            question.correctAnswer === optIndex
+                              ? "#ff9800"
+                              : "#555",
                         }}
                       >
-                        {`${optIndex + 1}. ${option.text || ((option.image || option.imageUrl) ? "" : "선택지를 입력하세요")}`}
+                        {`${optIndex + 1}. ${
+                          option.text ||
+                          (option.image || option.imageUrl
+                            ? ""
+                            : "선택지를 입력하세요")
+                        }`}
                       </Typography>
 
                       {(option.imageUrl || option.image) && (
                         <img
-                          src={option.image ? URL.createObjectURL(option.image) : option.imageUrl}
+                          src={
+                            option.image
+                              ? URL.createObjectURL(option.image)
+                              : option.imageUrl
+                          }
                           alt={`선택지 ${optIndex + 1} 이미지`}
                           style={{
                             width: "30px",
@@ -135,7 +182,11 @@ const ReviewSlide: React.FC<ReviewSlideProps> = ({
                 variant="outlined"
                 startIcon={<Add />}
                 onClick={addQuestion}
-                sx={{ color: "#ff9800", borderColor: "#ff9800", "&:hover": { borderColor: "#fb8c00" } }}
+                sx={{
+                  color: "#ff9800",
+                  borderColor: "#ff9800",
+                  "&:hover": { borderColor: "#fb8c00" },
+                }}
               >
                 문제 추가
               </Button>
