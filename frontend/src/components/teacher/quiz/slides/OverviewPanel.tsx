@@ -22,6 +22,7 @@ type OverviewPanelProps = {
   setSemester: (semester: string) => void;
   subject: string;
   setSubject: (subject: string) => void;
+  subjects: string[];
   unit: string;
   setUnit: (unit: string) => void;
   units: string[];
@@ -44,6 +45,7 @@ const OverviewPanel: React.FC<OverviewPanelProps> = ({
   setSemester,
   subject,
   setSubject,
+  subjects,
   unit,
   setUnit,
   units,
@@ -59,6 +61,9 @@ const OverviewPanel: React.FC<OverviewPanelProps> = ({
   const backgroundImageUrl = quizImage
     ? URL.createObjectURL(quizImage)
     : quizImageUrl || backgroundDefault;
+
+  // 실시간 제목 유효성 검사
+  const isTitleEmpty = !isReadOnly && title.trim() === "";
 
   return (
     <Box
@@ -128,6 +133,8 @@ const OverviewPanel: React.FC<OverviewPanelProps> = ({
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="퀴즈 제목 입력"
+                error={isTitleEmpty} // 제목이 비어있으면 error 상태
+                helperText={isTitleEmpty ? "퀴즈 제목을 입력해주세요." : ""} // 에러 메시지
                 sx={{
                   "& .MuiInputBase-root": {
                     borderRadius: "8px",
@@ -332,17 +339,14 @@ const OverviewPanel: React.FC<OverviewPanelProps> = ({
                     backgroundColor: "#fff",
                   },
                 }}
+                disabled={!grade || !semester || subjects.length === 0}
               >
-                <MenuItem value="국어">국어</MenuItem>
-                <MenuItem value="도덕">도덕</MenuItem>
-                <MenuItem value="수학">수학</MenuItem>
-                <MenuItem value="과학">과학</MenuItem>
-                <MenuItem value="사회">사회</MenuItem>
-                <MenuItem value="영어">영어</MenuItem>
-                <MenuItem value="음악">음악</MenuItem>
-                <MenuItem value="미술">미술</MenuItem>
-                <MenuItem value="체육">체육</MenuItem>
-                <MenuItem value="실과">실과</MenuItem>
+                <MenuItem value="">과목 선택</MenuItem>
+                {subjects.map((subj, index) => (
+                  <MenuItem key={index} value={subj}>
+                    {subj}
+                  </MenuItem>
+                ))}
               </TextField>
             )}
           </Grid>

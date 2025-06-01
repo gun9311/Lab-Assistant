@@ -18,6 +18,7 @@ import {
   Divider, // Divider for visual separation
   Tooltip as MuiTooltip, // Material-UI의 Tooltip과 이름 충돌 방지
   ListItemButton, // Tooltip for additional info
+  LinearProgress, // LinearProgress 추가
 } from "@mui/material";
 import {
   DetailedResultsPayload,
@@ -33,6 +34,7 @@ import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline"; // 
 import DangerousOutlinedIcon from "@mui/icons-material/DangerousOutlined"; // 오답, 어려운 문제
 import EmojiEventsIcon from "@mui/icons-material/EmojiEvents"; // 1등 아이콘
 import TrendingUpIcon from "@mui/icons-material/TrendingUp"; // 쉬운 문제
+import StarIcon from "@mui/icons-material/Star"; // Podium 강조용
 
 // Recharts import
 import {
@@ -46,6 +48,34 @@ import {
   Cell, // 개별 막대 색상 지정을 위해 Cell import
   LabelList, // 막대 내부에 값 표시
 } from "recharts";
+
+// --- BEGIN: 캐릭터 이미지 로딩 (WaitingPlayers.tsx 참고) ---
+declare const require: {
+  context: (
+    path: string,
+    deep?: boolean,
+    filter?: RegExp
+  ) => {
+    keys: () => string[];
+    (key: string): string;
+  };
+};
+
+const characterImageContext = require.context(
+  "../../../../assets/character", // 경로 수정: ResultComponent.tsx 기준
+  false,
+  /\.png$/
+);
+
+const characterImages = characterImageContext
+  .keys()
+  .sort((a: string, b: string) => {
+    const numA = parseInt(a.match(/\d+/)![0], 10);
+    const numB = parseInt(b.match(/\d+/)![0], 10);
+    return numA - numB;
+  })
+  .map((key: string) => characterImageContext(key));
+// --- END: 캐릭터 이미지 로딩 ---
 
 interface ResultComponentProps {
   quizResults: DetailedResultsPayload;
@@ -130,9 +160,12 @@ const ResultComponent: React.FC<ResultComponentProps> = ({
         justifyContent="center"
         alignItems="center"
         height="100vh"
+        sx={{ backgroundColor: "rgba(0,0,0,0.5)" }}
       >
-        <CircularProgress />
-        <Typography sx={{ ml: 2 }}>결과를 불러오는 중입니다...</Typography>
+        <CircularProgress color="secondary" />
+        <Typography sx={{ ml: 2, color: "white" }}>
+          결과를 불러오는 중입니다...
+        </Typography>
       </Box>
     );
   }
@@ -143,16 +176,21 @@ const ResultComponent: React.FC<ResultComponentProps> = ({
   const handleQuestionSelect = (question: QuestionDetail | null) => {
     setSelectedQuestion(question);
     if (question && currentTab !== 2) {
-      // 문제 클릭 시 문제별 분석 탭으로 자동 이동
       setCurrentTab(2);
     }
   };
 
   const getRankColor = (rank: number) => {
-    if (rank === 1) return "#FFD700"; // Gold
-    if (rank === 2) return "#C0C0C0"; // Silver
+    if (rank === 1) return "gold";
+    if (rank === 2) return "silver";
     if (rank === 3) return "#CD7F32"; // Bronze
-    return "inherit";
+    return "text.primary";
+  };
+
+  const getCharacterImage = (characterName: string | undefined) => {
+    if (!characterName) return characterImages[0]; // 기본 이미지 또는 fallback
+    const index = parseInt(characterName.replace("character", ""), 10) - 1;
+    return characterImages[index] || characterImages[0]; // 인덱스 유효성 검사 및 fallback
   };
 
   // 선택지 분포 차트 데이터 생성 함수
@@ -166,9 +204,9 @@ const ResultComponent: React.FC<ResultComponentProps> = ({
         question.correctAnswer?.toString() === opt.optionIndex.toString(),
       fill:
         question.correctAnswer?.toString() === opt.optionIndex.toString()
-          ? "#4caf50"
-          : "#2196f3", // 정답 초록, 오답 파랑
-      imageUrl: opt.imageUrl, // 이미지 URL도 데이터에 포함
+          ? "rgba(76, 175, 80, 0.8)"
+          : "rgba(33, 150, 243, 0.8)",
+      imageUrl: opt.imageUrl,
     }));
   };
 
@@ -176,27 +214,35 @@ const ResultComponent: React.FC<ResultComponentProps> = ({
     <Box
       sx={{
         width: "100%",
-        maxWidth: "1200px", // 최대 너비 설정
-        margin: "0 auto", // 중앙 정렬
-        p: { xs: 1, sm: 2, md: 3 }, // 반응형 패딩
+        maxWidth: "min(90vw, 1800px)",
+        margin: "0 auto",
         boxSizing: "border-box",
-        backgroundColor: "#f0f2f5",
-        minHeight: "100vh",
+        minHeight: "unset",
+        height: "auto",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
       }}
     >
       <Paper
-        elevation={3}
-        sx={{ borderRadius: "16px", overflow: "hidden", mb: 3 }}
+        elevation={6}
+        sx={{
+          borderRadius: "20px",
+          overflow: "hidden",
+          backgroundColor: "rgba(255, 255, 255, 0.92)",
+          width: "100%",
+          backdropFilter: "blur(5px)",
+        }}
       >
         <Box
           sx={{
             p: { xs: 2, md: 3 },
-            backgroundColor: "primary.main",
+            backgroundColor: "rgba(25, 118, 210, 0.85)",
             color: "white",
           }}
         >
           <Typography
-            variant="h4"
+            variant="h3"
             component="h1"
             gutterBottom
             sx={{ fontWeight: "bold", textAlign: { xs: "center", md: "left" } }}
@@ -208,59 +254,51 @@ const ResultComponent: React.FC<ResultComponentProps> = ({
             spacing={2}
             sx={{ textAlign: { xs: "center", md: "left" } }}
           >
-            <Grid item xs={12} sm={6} md={3}>
+            <Grid item xs={12} sm={4}>
               <Typography
-                variant="subtitle1"
+                variant="h6"
                 sx={{
                   display: "flex",
                   alignItems: "center",
                   justifyContent: { xs: "center", md: "flex-start" },
                 }}
               >
-                <SummarizeIcon sx={{ mr: 1, opacity: 0.8 }} /> 총 문항수:{" "}
-                {quizMetadata.totalQuestions}개
+                <SummarizeIcon
+                  sx={{ mr: 1, opacity: 0.9, fontSize: "1.8rem" }}
+                />{" "}
+                총 문항수: {quizMetadata.totalQuestions}개
               </Typography>
             </Grid>
-            <Grid item xs={12} sm={6} md={3}>
+            <Grid item xs={12} sm={4}>
               <Typography
-                variant="subtitle1"
+                variant="h6"
                 sx={{
                   display: "flex",
                   alignItems: "center",
                   justifyContent: { xs: "center", md: "flex-start" },
                 }}
               >
-                <LeaderboardIcon sx={{ mr: 1, opacity: 0.8 }} /> 참여 인원:{" "}
-                {quizSummary.totalParticipants}명
+                <LeaderboardIcon
+                  sx={{ mr: 1, opacity: 0.9, fontSize: "1.8rem" }}
+                />{" "}
+                참여 인원: {quizSummary.totalParticipants}명
               </Typography>
             </Grid>
-            <Grid item xs={12} sm={6} md={3}>
+            <Grid item xs={12} sm={4}>
               <Typography
-                variant="subtitle1"
+                variant="h6"
                 sx={{
                   display: "flex",
                   alignItems: "center",
                   justifyContent: { xs: "center", md: "flex-start" },
                 }}
               >
-                <QuestionAnswerIcon sx={{ mr: 1, opacity: 0.8 }} /> 평균 점수:{" "}
-                {quizSummary.averageScore.toFixed(1)}점
+                <QuestionAnswerIcon
+                  sx={{ mr: 1, opacity: 0.9, fontSize: "1.8rem" }}
+                />{" "}
+                평균 점수: {quizSummary.averageScore.toFixed(1)}점
               </Typography>
             </Grid>
-            {quizMetadata.grade && (
-              <Grid item xs={12} sm={6} md={3}>
-                <Typography variant="subtitle1">
-                  학년: {quizMetadata.grade}
-                </Typography>
-              </Grid>
-            )}
-            {quizMetadata.subject && (
-              <Grid item xs={12} sm={6} md={3}>
-                <Typography variant="subtitle1">
-                  과목: {quizMetadata.subject}
-                </Typography>
-              </Grid>
-            )}
           </Grid>
         </Box>
 
@@ -270,39 +308,58 @@ const ResultComponent: React.FC<ResultComponentProps> = ({
           centered
           variant="fullWidth"
           indicatorColor="secondary"
-          textColor="secondary"
-          sx={{ borderBottom: 1, borderColor: "divider" }}
+          sx={{
+            borderBottom: 1,
+            borderColor: "rgba(0, 0, 0, 0.12)",
+            "& .MuiTab-root": {
+              color: "text.primary",
+              opacity: 0.85,
+              fontSize: "1rem",
+              py: 1.5,
+            },
+            "& .Mui-selected": {
+              color: "secondary.main",
+              opacity: 1,
+              fontSize: "1.05rem",
+            },
+          }}
         >
           <Tab icon={<SummarizeIcon />} label="종합 요약" />
           <Tab icon={<LeaderboardIcon />} label="전체 순위" />
           <Tab icon={<QuestionAnswerIcon />} label="문제별 분석" />
         </Tabs>
 
-        <Box sx={{ p: { xs: 2, md: 3 } }}>
+        <Box
+          sx={{
+            p: { xs: 2, md: 3 },
+            minHeight: "60vh",
+          }}
+        >
           {currentTab === 0 && (
             <Box>
-              <Typography
-                variant="h5"
-                gutterBottom
-                sx={{ fontWeight: "medium", mb: 2, textAlign: "center" }}
-              >
-                퀴즈 요약
-              </Typography>
-              <Grid container spacing={3}>
+              <Grid container spacing={4}>
                 <Grid item xs={12} md={6}>
                   <Paper
                     elevation={2}
                     sx={{
-                      p: 2,
+                      p: 3,
                       borderRadius: "12px",
-                      "&:hover": { boxShadow: 5 },
+                      backgroundColor: "rgba(255, 255, 255, 0.8)",
+                      "&:hover": {
+                        boxShadow: 6,
+                        backgroundColor: "rgba(255, 255, 255, 0.85)",
+                      },
+                      height: "100%",
                     }}
                   >
                     <Typography
-                      variant="h6"
-                      sx={{ display: "flex", alignItems: "center", mb: 1.5 }}
+                      variant="h4"
+                      sx={{ display: "flex", alignItems: "center", mb: 2.5 }}
                     >
-                      <DangerousOutlinedIcon color="error" sx={{ mr: 1 }} />{" "}
+                      <DangerousOutlinedIcon
+                        color="error"
+                        sx={{ mr: 1.5, fontSize: "2.5rem" }}
+                      />{" "}
                       가장 어려웠던 문제 Top 3
                     </Typography>
                     <List disablePadding>
@@ -317,21 +374,31 @@ const ResultComponent: React.FC<ResultComponentProps> = ({
                             )
                           }
                           sx={{
-                            borderRadius: "8px",
-                            mb: 1,
-                            backgroundColor: "rgba(255, 235, 239, 0.5)",
+                            borderRadius: "10px",
+                            mb: 2,
+                            p: 2,
+                            backgroundColor: "rgba(255, 235, 239, 0.65)",
+                            "&:hover": {
+                              backgroundColor: "rgba(255, 235, 239, 0.85)",
+                            },
                           }}
                         >
                           <ListItemText
                             primary={
                               <Typography
-                                variant="body1"
+                                variant="h6"
                                 component="span"
-                                sx={{ fontWeight: "medium" }}
+                                sx={{
+                                  fontWeight: "medium",
+                                  display: "block",
+                                  mb: 0.8,
+                                  lineHeight: 1.4,
+                                }}
                               >
                                 {q.questionText}
                               </Typography>
                             }
+                            secondaryTypographyProps={{ variant: "subtitle1" }}
                             secondary={`정답률: ${(
                               q.correctAnswerRate * 100
                             ).toFixed(1)}%`}
@@ -345,17 +412,25 @@ const ResultComponent: React.FC<ResultComponentProps> = ({
                   <Paper
                     elevation={2}
                     sx={{
-                      p: 2,
+                      p: 3,
                       borderRadius: "12px",
-                      "&:hover": { boxShadow: 5 },
+                      backgroundColor: "rgba(255, 255, 255, 0.8)",
+                      "&:hover": {
+                        boxShadow: 6,
+                        backgroundColor: "rgba(255, 255, 255, 0.85)",
+                      },
+                      height: "100%",
                     }}
                   >
                     <Typography
-                      variant="h6"
-                      sx={{ display: "flex", alignItems: "center", mb: 1.5 }}
+                      variant="h4"
+                      sx={{ display: "flex", alignItems: "center", mb: 2.5 }}
                     >
-                      <TrendingUpIcon color="success" sx={{ mr: 1 }} /> 가장
-                      쉬웠던 문제 Top 3
+                      <TrendingUpIcon
+                        color="success"
+                        sx={{ mr: 1.5, fontSize: "2.5rem" }}
+                      />{" "}
+                      가장 쉬웠던 문제 Top 3
                     </Typography>
                     <List disablePadding>
                       {quizSummary.easiestQuestions.map((q) => (
@@ -369,21 +444,31 @@ const ResultComponent: React.FC<ResultComponentProps> = ({
                             )
                           }
                           sx={{
-                            borderRadius: "8px",
-                            mb: 1,
-                            backgroundColor: "rgba(232, 245, 233, 0.5)",
+                            borderRadius: "10px",
+                            mb: 2,
+                            p: 2,
+                            backgroundColor: "rgba(232, 245, 233, 0.65)",
+                            "&:hover": {
+                              backgroundColor: "rgba(232, 245, 233, 0.85)",
+                            },
                           }}
                         >
                           <ListItemText
                             primary={
                               <Typography
-                                variant="body1"
+                                variant="h6"
                                 component="span"
-                                sx={{ fontWeight: "medium" }}
+                                sx={{
+                                  fontWeight: "medium",
+                                  display: "block",
+                                  mb: 0.8,
+                                  lineHeight: 1.4,
+                                }}
                               >
                                 {q.questionText}
                               </Typography>
                             }
+                            secondaryTypographyProps={{ variant: "subtitle1" }}
                             secondary={`정답률: ${(
                               q.correctAnswerRate * 100
                             ).toFixed(1)}%`}
@@ -398,122 +483,148 @@ const ResultComponent: React.FC<ResultComponentProps> = ({
           )}
 
           {currentTab === 1 && (
-            <Box>
-              <Typography
-                variant="h5"
-                gutterBottom
-                sx={{ fontWeight: "medium", mb: 2, textAlign: "center" }}
-              >
-                🏆 전체 순위 🏆
-              </Typography>
-              <List>
-                {overallRanking.map(
-                  (student: OverallRankingStudent, index: number) => (
-                    <React.Fragment key={student.studentId}>
-                      <ListItem
-                        sx={{
-                          backgroundColor:
-                            index < 3
-                              ? `rgba(${parseInt(
-                                  getRankColor(student.rank).substring(1, 3),
-                                  16
-                                )}, ${parseInt(
-                                  getRankColor(student.rank).substring(3, 5),
-                                  16
-                                )}, ${parseInt(
-                                  getRankColor(student.rank).substring(5, 7),
-                                  16
-                                )}, 0.1)`
-                              : "background.paper",
-                          borderRadius: "8px",
-                          mb: 1,
-                          boxShadow: index < 3 ? 3 : 1,
-                          transition: "transform 0.2s",
-                          "&:hover": { transform: "scale(1.02)" },
-                        }}
+            <Box sx={{ textAlign: "center" }}>
+              <Box sx={{ maxHeight: "60vh", overflowY: "auto", pr: 1, pt: 2 }}>
+                <Grid container spacing={2.5} justifyContent="center">
+                  {overallRanking.map((student) => {
+                    const isTopThree = student.rank >= 1 && student.rank <= 3;
+                    let cardSx: any = {
+                      p: 2,
+                      textAlign: "center",
+                      borderRadius: "12px",
+                      backgroundColor: "rgba(255, 255, 255, 0.75)",
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      height: "100%",
+                      transition:
+                        "transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out",
+                      "&:hover": {
+                        transform: "scale(1.015)",
+                        boxShadow: (theme: any) => theme.shadows[6],
+                        zIndex: 2,
+                      },
+                      position: "relative",
+                      border: "1px solid transparent",
+                    };
+
+                    let avatarBorder = "none";
+                    let crownIcon = null;
+
+                    if (student.rank === 1) {
+                      cardSx.backgroundColor = "rgba(255, 215, 0, 0.20)";
+                      cardSx.borderColor = "rgba(255, 215, 0, 0.6)";
+                      avatarBorder = "3px solid gold";
+                      crownIcon = "👑";
+                    } else if (student.rank === 2) {
+                      cardSx.backgroundColor = "rgba(192, 192, 192, 0.20)";
+                      cardSx.borderColor = "rgba(192, 192, 192, 0.6)";
+                      avatarBorder = "2px solid silver";
+                      crownIcon = "🥈";
+                    } else if (student.rank === 3) {
+                      cardSx.backgroundColor = "rgba(205, 127, 50, 0.20)";
+                      cardSx.borderColor = "rgba(205, 127, 50, 0.6)";
+                      avatarBorder = "2px solid #CD7F32";
+                      crownIcon = "🥉";
+                    }
+
+                    return (
+                      <Grid
+                        item
+                        key={student.studentId}
+                        xs={6}
+                        sm={4}
+                        md={3}
+                        lg={3}
                       >
-                        <ListItemAvatar>
-                          <Avatar
+                        <Paper sx={cardSx}>
+                          {isTopThree && crownIcon && (
+                            <Typography
+                              component="span"
+                              sx={(theme) => ({
+                                fontSize:
+                                  student.rank === 1
+                                    ? "2.2rem"
+                                    : student.rank === 2
+                                    ? "2rem"
+                                    : "1.9rem",
+                                position: "absolute",
+                                top: theme.spacing(0.5),
+                                left: theme.spacing(1),
+                                zIndex: 1,
+                              })}
+                            >
+                              {crownIcon}
+                            </Typography>
+                          )}
+                          <Typography
+                            variant="h5"
                             sx={{
-                              bgcolor: getRankColor(student.rank),
-                              width: 48,
-                              height: 48,
-                              mr: 1.5,
+                              fontWeight: "bold",
+                              color: "text.secondary",
+                              mt: isTopThree ? 4 : 0.8,
+                              mb: 0.8,
                             }}
                           >
-                            {student.rank === 1 && (
-                              <EmojiEventsIcon sx={{ color: "white" }} />
-                            )}
-                            {student.rank !== 1 && (
-                              <Typography
-                                sx={{ color: "white", fontWeight: "bold" }}
-                              >
-                                {student.rank}
-                              </Typography>
-                            )}
-                          </Avatar>
-                        </ListItemAvatar>
-                        <ListItemText
-                          primary={
-                            <Typography
-                              variant="h6"
-                              component="span"
-                              sx={{ fontWeight: "medium" }}
-                            >
-                              {student.name}
-                            </Typography>
-                          }
-                          secondary={
-                            student.character
-                              ? `캐릭터: ${student.character}`
-                              : ""
-                          }
-                        />
-                        <Typography
-                          variant="h6"
-                          sx={{
-                            fontWeight: "bold",
-                            color: getRankColor(student.rank),
-                          }}
-                        >
-                          {student.score}점
-                        </Typography>
-                      </ListItem>
-                      {index < overallRanking.length - 1 && (
-                        <Divider
-                          variant="inset"
-                          component="li"
-                          sx={{ mb: 1 }}
-                        />
-                      )}
-                    </React.Fragment>
-                  )
-                )}
-              </List>
+                            {student.rank}위
+                          </Typography>
+                          <Avatar
+                            src={getCharacterImage(student.character)}
+                            alt={student.name || "학생"}
+                            sx={{
+                              width: 65,
+                              height: 65,
+                              my: 0.8,
+                              border: avatarBorder,
+                            }}
+                          />
+                          <Typography
+                            variant="h6"
+                            title={student.name}
+                            sx={{
+                              fontWeight: "medium",
+                              whiteSpace: "nowrap",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              width: "calc(100% - 16px)",
+                              px: 1,
+                              mb: 0.5,
+                            }}
+                          >
+                            {student.name}
+                          </Typography>
+                          <Typography
+                            variant="h6"
+                            sx={{
+                              fontWeight: "bold",
+                              color: "primary.main",
+                              mt: "auto",
+                              pb: 0.5,
+                            }}
+                          >
+                            {student.score}점
+                          </Typography>
+                        </Paper>
+                      </Grid>
+                    );
+                  })}
+                </Grid>
+              </Box>
             </Box>
           )}
 
           {currentTab === 2 && (
             <Box>
-              <Typography
-                variant="h5"
-                gutterBottom
-                sx={{ fontWeight: "medium", mb: 2, textAlign: "center" }}
-              >
-                문제별 상세 분석
-              </Typography>
-              <Grid container spacing={3}>
+              <Grid container spacing={3.5}>
                 <Grid item xs={12} md={4}>
-                  <Typography variant="h6" gutterBottom sx={{ mb: 1.5 }}>
-                    문제 목록
-                  </Typography>
                   <Paper
                     elevation={1}
                     sx={{
-                      maxHeight: "60vh",
+                      maxHeight: "calc(100vh - 280px)",
                       overflowY: "auto",
-                      p: 1,
+                      p: 1.5,
                       borderRadius: "12px",
+                      backgroundColor: "rgba(255, 255, 255, 0.7)",
                     }}
                   >
                     {questionDetails.map((q: QuestionDetail, index: number) => (
@@ -522,18 +633,19 @@ const ResultComponent: React.FC<ResultComponentProps> = ({
                         selected={selectedQuestion?.questionId === q.questionId}
                         onClick={() => handleQuestionSelect(q)}
                         sx={{
-                          mb: 1,
-                          borderRadius: "8px",
+                          mb: 1.5,
+                          p: 1.5,
+                          borderRadius: "10px",
                           border: 1,
                           borderColor:
                             selectedQuestion?.questionId === q.questionId
                               ? "secondary.main"
-                              : "divider",
+                              : "rgba(0,0,0,0.1)",
                           backgroundColor:
                             selectedQuestion?.questionId === q.questionId
-                              ? "secondary.A100"
-                              : "transparent", // A100은 매우 연한 색상, 테마에 따라 조정
-                          "&:hover": { backgroundColor: "action.hover" },
+                              ? "rgba(103, 58, 183, 0.2)"
+                              : "rgba(255,255,255,0.4)",
+                          "&:hover": { backgroundColor: "rgba(0,0,0,0.08)" },
                           display: "flex",
                           flexDirection: "column",
                           alignItems: "flex-start",
@@ -545,11 +657,11 @@ const ResultComponent: React.FC<ResultComponentProps> = ({
                             justifyContent: "space-between",
                             width: "100%",
                             alignItems: "center",
-                            mb: 0.5,
+                            mb: 0.8,
                           }}
                         >
                           <Typography
-                            variant="subtitle1"
+                            variant="h6"
                             sx={{ fontWeight: "medium" }}
                           >
                             문제 {index + 1}
@@ -557,16 +669,15 @@ const ResultComponent: React.FC<ResultComponentProps> = ({
                           <DifficultyChip rate={q.correctAnswerRate} />
                         </Box>
                         <Typography
-                          variant="caption"
+                          variant="body1"
                           sx={{
-                            // whiteSpace: "nowrap", // 두 줄 이상 표시 위해 주석 처리
                             overflow: "hidden",
                             textOverflow: "ellipsis",
                             display: "-webkit-box",
-                            WebkitLineClamp: 2, // 최대 두 줄
+                            WebkitLineClamp: 2,
                             WebkitBoxOrient: "vertical",
                             color: "text.secondary",
-                            lineHeight: 1.3,
+                            lineHeight: 1.4,
                           }}
                         >
                           {q.questionText}
@@ -580,20 +691,24 @@ const ResultComponent: React.FC<ResultComponentProps> = ({
                     <Paper
                       elevation={2}
                       sx={{
-                        p: { xs: 2, md: 3 },
+                        p: { xs: 2.5, md: 3.5 },
                         borderRadius: "12px",
                         height: "100%",
+                        backgroundColor: "rgba(255, 255, 255, 0.8)",
                       }}
                     >
                       <Box
                         sx={{
                           display: "flex",
                           justifyContent: "space-between",
-                          alignItems: "center",
-                          mb: 1,
+                          alignItems: "flex-start",
+                          mb: 2,
                         }}
                       >
-                        <Typography variant="h6" sx={{ fontWeight: "medium" }}>
+                        <Typography
+                          variant="h4"
+                          sx={{ fontWeight: "bold", mr: 2.5, lineHeight: 1.3 }}
+                        >
                           Q
                           {questionDetails.findIndex(
                             (q) => q.questionId === selectedQuestion.questionId
@@ -606,33 +721,36 @@ const ResultComponent: React.FC<ResultComponentProps> = ({
                       </Box>
 
                       {selectedQuestion.imageUrl && (
-                        <Box sx={{ my: 2, textAlign: "center" }}>
+                        <Box sx={{ my: 3, textAlign: "center" }}>
                           <img
                             src={selectedQuestion.imageUrl}
                             alt="Question Illustration"
                             style={{
                               maxWidth: "100%",
-                              maxHeight: "250px",
-                              borderRadius: "8px",
+                              maxHeight: "350px",
+                              borderRadius: "10px",
                               objectFit: "contain",
+                              backgroundColor: "rgba(255,255,255,0.5)",
+                              padding: "5px",
                             }}
                           />
                         </Box>
                       )}
                       <Typography
-                        variant="body1"
-                        sx={{ color: "text.secondary", mb: 2 }}
+                        variant="h6"
+                        sx={{ color: "text.secondary", mb: 3 }}
                       >
                         정답률:{" "}
                         <Typography
                           component="span"
+                          variant="h6"
                           sx={{
                             fontWeight: "bold",
                             color:
                               selectedQuestion.correctAnswerRate > 0.7
-                                ? "success.main"
+                                ? "success.dark"
                                 : selectedQuestion.correctAnswerRate < 0.3
-                                ? "error.main"
+                                ? "error.dark"
                                 : "text.primary",
                           }}
                         >
@@ -643,117 +761,183 @@ const ResultComponent: React.FC<ResultComponentProps> = ({
                         </Typography>{" "}
                         (총 {selectedQuestion.totalAttempts}명 응답)
                       </Typography>
-                      <Divider sx={{ my: 2 }} />
-                      <Typography
-                        variant="subtitle1"
-                        sx={{ mt: 2, mb: 1.5, fontWeight: "medium" }}
-                      >
-                        선택지별 응답 분포
-                      </Typography>
-                      {/* Recharts 막대 차트로 교체 */}
-                      <Box sx={{ height: 300, width: "100%", mb: 2 }}>
-                        <ResponsiveContainer width="100%" height="100%">
-                          <BarChart
-                            layout="vertical"
-                            data={generateChartData(selectedQuestion)}
-                            margin={{
-                              top: 5,
-                              right: 30,
-                              left: 20,
-                              bottom: 5,
-                            }}
-                          >
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis
-                              type="number"
-                              domain={[0, "dataMax + 5"]}
-                              allowDecimals={false}
-                            />
-                            <YAxis
-                              dataKey="name"
-                              type="category"
-                              width={100}
-                              tick={{ fontSize: 12 }}
-                            />
-                            <RechartsTooltip
-                              content={<CustomTooltip />}
-                              cursor={{ fill: "rgba(200,200,200,0.1)" }}
-                            />
-                            {/* <Legend /> // 범례는 필요 없을 수 있음 */}
-                            <Bar
-                              dataKey="응답수"
-                              barSize={30}
-                              radius={[0, 5, 5, 0]}
-                            >
-                              {generateChartData(selectedQuestion).map(
-                                (entry, index) => (
-                                  <Cell
-                                    key={`cell-${index}`}
-                                    fill={entry.fill}
-                                  />
-                                )
-                              )}
-                              <LabelList
-                                dataKey="응답수"
-                                position="right"
-                                style={{ fill: "#666", fontSize: 12 }}
-                                formatter={(value: number) => `${value}명`}
-                              />
-                            </Bar>
-                          </BarChart>
-                        </ResponsiveContainer>
-                      </Box>
-                      {/* 선택지 텍스트 및 이미지 (차트 아래 또는 옆에 추가 정보로 표시) */}
-                      {selectedQuestion.optionDistribution.map((opt) => (
-                        <Box
-                          key={opt.optionIndex}
-                          sx={{ mb: 1, display: "flex", alignItems: "center" }}
-                        >
-                          {selectedQuestion.options[opt.optionIndex] &&
-                            selectedQuestion.correctAnswer.toString() ===
-                              opt.optionIndex.toString() && (
-                              <CheckCircleOutlineIcon
-                                color="success"
-                                sx={{ fontSize: "1.1rem", mr: 0.5 }}
-                              />
-                            )}
-                          <Typography
-                            variant="body2"
-                            sx={{
-                              fontWeight:
-                                selectedQuestion.options[opt.optionIndex] &&
-                                selectedQuestion.correctAnswer.toString() ===
-                                  opt.optionIndex.toString()
-                                  ? "bold"
-                                  : "normal",
-                              color:
-                                selectedQuestion.options[opt.optionIndex] &&
-                                selectedQuestion.correctAnswer.toString() ===
-                                  opt.optionIndex.toString()
-                                  ? "success.dark"
-                                  : "text.primary",
-                            }}
-                          >
-                            {opt.text || `옵션 ${opt.optionIndex + 1}`}
-                          </Typography>
-                          {opt.imageUrl && (
-                            <MuiTooltip title="선택지 이미지">
-                              <img
-                                src={opt.imageUrl}
-                                alt={`Option ${opt.optionIndex + 1}`}
-                                style={{
-                                  width: "30px",
-                                  height: "30px",
-                                  objectFit: "contain",
-                                  marginLeft: "8px",
-                                  borderRadius: "4px",
-                                  border: "1px solid #eee",
-                                }}
-                              />
-                            </MuiTooltip>
-                          )}
-                        </Box>
-                      ))}
+                      <Divider sx={{ my: 3, borderColor: "rgba(0,0,0,0.1)" }} />
+                      <Grid container spacing={3}>
+                        {selectedQuestion.optionDistribution
+                          .sort((a, b) => a.optionIndex - b.optionIndex)
+                          .map((dist) => {
+                            const optionContent =
+                              selectedQuestion.options[dist.optionIndex];
+                            if (!optionContent) {
+                              return (
+                                <Grid
+                                  item
+                                  xs={12}
+                                  sm={6}
+                                  key={dist.optionIndex}
+                                >
+                                  <Paper
+                                    sx={{
+                                      p: 2.5,
+                                      borderRadius: "12px",
+                                      backgroundColor: "rgba(220,220,220,0.7)",
+                                    }}
+                                  >
+                                    <Typography variant="h6">
+                                      옵션 {dist.optionIndex + 1} 정보 없음
+                                    </Typography>
+                                    <Typography variant="body1">
+                                      응답: {dist.count}명 (
+                                      {(dist.percentage * 100).toFixed(1)}%)
+                                    </Typography>
+                                  </Paper>
+                                </Grid>
+                              );
+                            }
+
+                            const percentage = dist.percentage * 100;
+                            const count = dist.count;
+                            const isCorrect =
+                              selectedQuestion.correctAnswer.toString() ===
+                              dist.optionIndex.toString();
+
+                            return (
+                              <Grid item xs={12} sm={6} key={dist.optionIndex}>
+                                <Paper
+                                  elevation={isCorrect ? 5 : 3}
+                                  sx={{
+                                    p: 3,
+                                    borderRadius: "14px",
+                                    border: "1px solid",
+                                    borderColor: isCorrect
+                                      ? "success.dark"
+                                      : "rgba(0,0,0,0.2)",
+                                    backgroundColor: isCorrect
+                                      ? "rgba(202, 239, 204, 0.7)"
+                                      : "rgba(255, 255, 255, 0.9)",
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    height: "100%",
+                                    transition: "all 0.2s ease-in-out",
+                                    "&:hover": {
+                                      borderColor: isCorrect
+                                        ? "success.dark"
+                                        : "primary.dark",
+                                      boxShadow: (theme) =>
+                                        theme.shadows[isCorrect ? 7 : 5],
+                                    },
+                                  }}
+                                >
+                                  <Box
+                                    sx={{
+                                      display: "flex",
+                                      alignItems: "flex-start",
+                                      mb: 1.8,
+                                      minHeight: "2.5em",
+                                    }}
+                                  >
+                                    {isCorrect && (
+                                      <CheckCircleOutlineIcon
+                                        color="success"
+                                        sx={{
+                                          mr: 1.2,
+                                          fontSize: "1.8rem",
+                                          mt: "3px",
+                                        }}
+                                      />
+                                    )}
+                                    <Typography
+                                      variant="h5"
+                                      component="div"
+                                      sx={{
+                                        fontWeight: "medium",
+                                        flexGrow: 1,
+                                        lineHeight: 1.35,
+                                      }}
+                                    >
+                                      {String.fromCharCode(
+                                        65 + dist.optionIndex
+                                      )}
+                                      . {optionContent.text}
+                                    </Typography>
+                                  </Box>
+
+                                  {optionContent.imageUrl && (
+                                    <Box
+                                      sx={{
+                                        my: 2.5,
+                                        textAlign: "center",
+                                        flexShrink: 0,
+                                      }}
+                                    >
+                                      <img
+                                        src={optionContent.imageUrl}
+                                        alt={`선택지 ${
+                                          dist.optionIndex + 1
+                                        } 이미지`}
+                                        style={{
+                                          maxWidth: "95%",
+                                          maxHeight: "140px",
+                                          borderRadius: "10px",
+                                          objectFit: "contain",
+                                          border: "1px solid rgba(0,0,0,0.15)",
+                                          padding: "3px",
+                                          backgroundColor:
+                                            "rgba(250,250,250,0.6)",
+                                        }}
+                                      />
+                                    </Box>
+                                  )}
+
+                                  <Box sx={{ mt: "auto", pt: 2 }}>
+                                    <Box
+                                      sx={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        width: "100%",
+                                        mb: 1,
+                                      }}
+                                    >
+                                      <Box sx={{ width: "100%", mr: 2 }}>
+                                        <LinearProgress
+                                          variant="determinate"
+                                          value={percentage}
+                                          color={
+                                            isCorrect ? "success" : "primary"
+                                          }
+                                          sx={{
+                                            height: 16,
+                                            borderRadius: 8,
+                                            backgroundColor: "rgba(0,0,0,0.15)",
+                                          }}
+                                        />
+                                      </Box>
+                                      <Typography
+                                        variant="h6"
+                                        sx={{
+                                          whiteSpace: "nowrap",
+                                          fontWeight: "medium",
+                                        }}
+                                      >
+                                        {`${percentage.toFixed(1)}%`}
+                                      </Typography>
+                                    </Box>
+                                    <Typography
+                                      variant="subtitle1"
+                                      color="text.secondary"
+                                      sx={{
+                                        textAlign: "right",
+                                        display: "block",
+                                      }}
+                                    >
+                                      {count}명 선택
+                                    </Typography>
+                                  </Box>
+                                </Paper>
+                              </Grid>
+                            );
+                          })}
+                      </Grid>
                     </Paper>
                   ) : (
                     <Paper
@@ -761,7 +945,7 @@ const ResultComponent: React.FC<ResultComponentProps> = ({
                         p: 3,
                         textAlign: "center",
                         borderRadius: "12px",
-                        backgroundColor: "grey.100",
+                        backgroundColor: "rgba(224, 224, 224, 0.75)",
                         height: "100%",
                         display: "flex",
                         flexDirection: "column",
@@ -770,9 +954,9 @@ const ResultComponent: React.FC<ResultComponentProps> = ({
                       }}
                     >
                       <QuestionAnswerIcon
-                        sx={{ fontSize: 48, color: "grey.400", mb: 1 }}
+                        sx={{ fontSize: 48, color: "grey.500", mb: 1 }}
                       />
-                      <Typography variant="h6" color="textSecondary">
+                      <Typography variant="h6" color="text.secondary">
                         문제 목록에서 분석할 문제를 선택하세요.
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
@@ -792,16 +976,22 @@ const ResultComponent: React.FC<ResultComponentProps> = ({
             p: 2,
             display: "flex",
             justifyContent: "flex-end",
-            borderTop: "1px solid divider", // 테마의 divider 색상 사용
-            backgroundColor: "background.paper", // Paper 컴포넌트의 기본 배경색과 유사하게
+            borderTop: "1px solid rgba(0,0,0,0.12)",
+            backgroundColor: "rgba(255, 255, 255, 0.85)",
           }}
         >
           <Button
             variant="contained"
-            color="secondary" // 혹은 "error" 등 상황에 맞게
+            color="secondary"
             onClick={handleEndQuiz}
             disabled={isProcessingEndQuiz}
-            sx={{ fontWeight: "bold", px: 3, py: 1.2 }}
+            sx={{
+              fontWeight: "bold",
+              px: 3,
+              py: 1.2,
+              boxShadow: 3,
+              "&:hover": { boxShadow: 5 },
+            }}
             startIcon={
               isProcessingEndQuiz ? (
                 <CircularProgress size={20} color="inherit" />

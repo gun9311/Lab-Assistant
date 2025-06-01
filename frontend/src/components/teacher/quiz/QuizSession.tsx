@@ -299,8 +299,14 @@ const QuizSessionPage = ({
         // setIsProcessingEndQuiz(false); // Reset before navigating
         navigate("/manage-quizzes");
       } else if (message.type === "noStudentsRemaining") {
-        setConfirmMessage(message.message);
-        setOpenConfirmDialog(true);
+        if (!isViewingResults && !isProcessingViewResults) {
+          setConfirmMessage(message.message);
+          setOpenConfirmDialog(true);
+        } else {
+          console.log(
+            "Suppressed 'noStudentsRemaining' dialog because detailed results are being viewed or processed."
+          );
+        }
       } else if (message.type === "sessionClosedByTeacher") {
         // 학생 측에서 받을 메시지
         alert(
@@ -423,6 +429,7 @@ const QuizSessionPage = ({
         padding: "0",
         margin: "0",
         boxSizing: "border-box",
+        overflow: isViewingResults && detailedQuizResults ? "hidden" : "auto",
       }}
     >
       <IconButton
@@ -459,12 +466,25 @@ const QuizSessionPage = ({
         <FullscreenIcon />
       </IconButton>
 
-      {isViewingResults && detailedQuizResults ? ( // detailedQuizResults null 체크 추가
-        <ResultComponent
-          quizResults={detailedQuizResults} // 변경된 상태 전달
-          handleEndQuiz={handleEndQuiz}
-          isProcessingEndQuiz={isProcessingEndQuiz} // 종료 버튼 로딩 상태 전달
-        />
+      {isViewingResults && detailedQuizResults ? (
+        <Box
+          sx={{
+            width: "100%",
+            height: "100vh",
+            overflowY: "auto",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "flex-start",
+            py: { xs: 2, sm: 3, md: 4 },
+            boxSizing: "border-box",
+          }}
+        >
+          <ResultComponent
+            quizResults={detailedQuizResults}
+            handleEndQuiz={handleEndQuiz}
+            isProcessingEndQuiz={isProcessingEndQuiz}
+          />
+        </Box>
       ) : (
         <>
           {!quizStarted && (

@@ -17,6 +17,7 @@ const {
   getSessionQuestionsKey,
   getSessionStudentIdsSetKey,
   getSessionTakenCharactersSetKey,
+  getTeacherViewingResultsFlagKey,
 } = require("../utils/redisKeys");
 const {
   redisJsonGet,
@@ -922,7 +923,7 @@ exports.handleStudentWebSocketConnection = async (ws, studentId, pin) => {
       `Student WebSocket for student ${studentId} in pin ${pin} closed.`
     );
     if (kahootClients[pin] && kahootClients[pin].students) {
-      delete kahootClients[pin].students[studentId]; // 웹소켓 목록에서 제거
+      delete kahootClients[pin].students[studentId];
       logger.info(
         `Student ${studentId} removed from local kahootClients for PIN ${pin}. Remaining students: ${
           Object.keys(kahootClients[pin].students).length
@@ -930,8 +931,6 @@ exports.handleStudentWebSocketConnection = async (ws, studentId, pin) => {
       );
     }
 
-    // --- BEGIN MODIFICATION: PIN 채널 구독 해지 시도 ---
-    // 연결 종료 시 항상 구독 해지 시도 (내부적으로 조건 확인 후 실제 해지)
     try {
       await unsubscribeFromPinChannels(pin);
     } catch (unsubError) {
@@ -940,7 +939,6 @@ exports.handleStudentWebSocketConnection = async (ws, studentId, pin) => {
         unsubError
       );
     }
-    // --- END MODIFICATION: PIN 채널 구독 해지 시도 ---
 
     const pKey = getParticipantKey(pin, studentId);
     const currentParticipantState = await redisJsonGet(pKey);
@@ -954,7 +952,7 @@ exports.handleStudentWebSocketConnection = async (ws, studentId, pin) => {
         );
 
         if (
-          kahootClients[pin] && // unsubscribe로 인해 kahootClients[pin]이 먼저 삭제될 수 있으므로 확인
+          kahootClients[pin] &&
           kahootClients[pin].teacher &&
           kahootClients[pin].teacher.readyState === WebSocket.OPEN
         ) {
@@ -982,14 +980,14 @@ exports.handleStudentWebSocketConnection = async (ws, studentId, pin) => {
 
     if (!anyConnectedStudentViaWebSocket && kahootClients[pin] === undefined) {
       logger.info(
-        `[Close] kahootClients[${pin}] was deleted by unsubscribe. Assuming no students remaining for this instance. Teacher will be notified by that process if applicable across all instances via Redis.`
+        `[CloseStudent] kahootClients[${pin}] was deleted by unsubscribe. Assuming no students remaining for this instance.`
       );
     } else if (
       !anyConnectedStudentViaWebSocket &&
       kahootClients[pin] !== undefined
     ) {
       logger.info(
-        `No active WebSocket connections for students in PIN ${pin} on this instance. Checking Redis for any remaining connected/waiting participants (as kahootClients[${pin}] still exists).`
+        `[CloseStudent] No active WebSocket connections for students in PIN ${pin} on this instance. Checking Redis for any remaining connected/waiting participants.`
       );
       const studentIdsSetKey = getSessionStudentIdsSetKey(pin);
       let stillConnectedOrWaitingInRedis = false;
@@ -1001,14 +999,24 @@ exports.handleStudentWebSocketConnection = async (ws, studentId, pin) => {
 
         if (allStudentIdsInSession.length === 0) {
           logger.info(
-            `[Close] No student IDs found in Set for PIN ${pin}. Assuming no students remaining.`
+            `[CloseStudent] No student IDs found in Set for PIN ${pin}. Checking teacher_viewing_results flag.`
           );
-          await broadcastToTeacher(pin, {
-            type: "noStudentsRemaining",
-            message:
-              "모든 학생의 연결이 끊어졌거나 세션을 떠났습니다. 세션을 종료하시겠습니까?",
-          });
-          return;
+          const teacherViewingFlag = await redisClient.get(
+            getTeacherViewingResultsFlagKey(pin)
+          );
+          if (teacherViewingFlag !== "true") {
+            // 교사가 결과 보기 중이 아닐 때만 알림
+            await broadcastToTeacher(pin, {
+              type: "noStudentsRemaining",
+              message:
+                "모든 학생의 연결이 끊어졌거나 세션을 떠났습니다. 세션을 종료하시겠습니까?",
+            });
+          } else {
+            logger.info(
+              `[CloseStudent] Teacher is viewing detailed results for PIN ${pin}, suppressing noStudentsRemaining.`
+            );
+          }
+          return; // 더 이상 진행할 필요 없음
         }
 
         const participantKeys = allStudentIdsInSession.map((sid) =>
@@ -1025,21 +1033,17 @@ exports.handleStudentWebSocketConnection = async (ws, studentId, pin) => {
                 p.status === "connected_waiting")
             ) {
               stillConnectedOrWaitingInRedis = true;
-            } else if (!p) {
-              logger.warn(
-                `[Close] Participant data for studentId ${studentIdForResult} was null or invalid (MGET) for PIN ${pin}, when checking for remaining students.`
-              );
             }
           });
         } else {
           logger.error(
-            `[Close] Failed to get participant data array via MGET for PIN ${pin}, to check for remaining students.`
+            `[CloseStudent] Failed to get participant data array via MGET for PIN ${pin}, to check for remaining students.`
           );
           return;
         }
       } catch (error) {
         logger.error(
-          `[Close] Error fetching student IDs from Set or MGET participant data from Redis for PIN ${pin} to check for remaining students. Error:`,
+          `[CloseStudent] Error fetching student IDs from Set or MGET participant data from Redis for PIN ${pin} to check for remaining students. Error:`,
           error
         );
         return;
@@ -1047,16 +1051,26 @@ exports.handleStudentWebSocketConnection = async (ws, studentId, pin) => {
 
       if (!stillConnectedOrWaitingInRedis) {
         logger.info(
-          `[Close] No students found in 'connected_participating' or 'connected_waiting' state in Redis for PIN ${pin}.`
+          `[CloseStudent] No students found in 'connected_participating' or 'connected_waiting' state in Redis for PIN ${pin}. Checking teacher_viewing_results flag.`
         );
-        await broadcastToTeacher(pin, {
-          type: "noStudentsRemaining",
-          message:
-            "모든 학생의 연결이 끊어졌거나 세션을 떠났습니다. 세션을 종료하시겠습니까?",
-        });
+        const teacherViewingFlag = await redisClient.get(
+          getTeacherViewingResultsFlagKey(pin)
+        );
+        if (teacherViewingFlag !== "true") {
+          // 교사가 결과 보기 중이 아닐 때만 알림
+          await broadcastToTeacher(pin, {
+            type: "noStudentsRemaining",
+            message:
+              "모든 학생의 연결이 끊어졌거나 세션을 떠났습니다. 세션을 종료하시겠습니까?",
+          });
+        } else {
+          logger.info(
+            `[CloseStudent] Teacher is viewing detailed results for PIN ${pin}, suppressing noStudentsRemaining.`
+          );
+        }
       } else {
         logger.info(
-          `[Close] Found students still in 'connected_participating' or 'connected_waiting' state in Redis for PIN ${pin}.`
+          `[CloseStudent] Found students still in 'connected_participating' or 'connected_waiting' state in Redis for PIN ${pin}.`
         );
       }
     }
