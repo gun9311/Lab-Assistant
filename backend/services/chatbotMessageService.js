@@ -30,35 +30,35 @@ async function preprocessUserMessage(rawUserMessage, userId, clientId) {
   }
 
   // 2. OpenAI Moderation 검사
-  if (messageForProcessing && messageForProcessing.trim()) {
-    const moderationCheck = await moderationService.checkTextWithOpenAI(
-      messageForProcessing,
-      userId,
-      clientId
-    );
-    if (moderationCheck.error) {
-      return {
-        processedMessage: messageForProcessing,
-        finalUserMessageForHistory,
-        isFiltered: true,
-        refusalResponse: moderationCheck.refusalMessage,
-        filterDetails: {
-          type: "ModerationAPIError",
-          detail: moderationCheck.error.message,
-          categories: null,
-        },
-      };
-    }
-    if (moderationCheck.isFlagged) {
-      isFiltered = true;
-      refusalResponse = moderationCheck.refusalMessage;
-      filterDetails = {
-        type: "ModerationAPI",
-        detail: "Flagged by OpenAI",
-        categories: moderationCheck.categories,
-      };
-    }
-  }
+  // if (messageForProcessing && messageForProcessing.trim()) {
+  //   const moderationCheck = await moderationService.checkTextWithOpenAI(
+  //     messageForProcessing,
+  //     userId,
+  //     clientId
+  //   );
+  //   if (moderationCheck.error) {
+  //     return {
+  //       processedMessage: messageForProcessing,
+  //       finalUserMessageForHistory,
+  //       isFiltered: true,
+  //       refusalResponse: moderationCheck.refusalMessage,
+  //       filterDetails: {
+  //         type: "ModerationAPIError",
+  //         detail: moderationCheck.error.message,
+  //         categories: null,
+  //       },
+  //     };
+  //   }
+  //   if (moderationCheck.isFlagged) {
+  //     isFiltered = true;
+  //     refusalResponse = moderationCheck.refusalMessage;
+  //     filterDetails = {
+  //       type: "ModerationAPI",
+  //       detail: "Flagged by OpenAI",
+  //       categories: moderationCheck.categories,
+  //     };
+  //   }
+  // }
 
   // 3. 커스텀 금지어 필터링
   if (!isFiltered && messageForProcessing && messageForProcessing.trim()) {
@@ -100,26 +100,26 @@ async function postprocessBotResponse(rawBotResponse, userId, clientId) {
   }
 
   // 1. OpenAI Moderation 검사
-  const moderationCheck = await moderationService.checkTextWithOpenAI(
-    processedBotResponse,
-    userId,
-    `${clientId}-botResponse`
-  );
-  if (moderationCheck.error) {
-    logger.warn(
-      `[ChatbotMsgSvc] OpenAI Moderation API error for bot response. User ${userId}, Client ${clientId}. Error: ${moderationCheck.error.message}`
-    );
-    processedBotResponse =
-      moderationCheck.refusalMessage ||
-      "죄송합니다. 답변 생성 중 문제가 발생했습니다. 다른 질문을 해주시겠어요?";
-  } else if (moderationCheck.isFlagged) {
-    logger.warn(
-      `[ChatbotMsgSvc] Output flagged by Moderation API for user ${userId}, client ${clientId}. Categories: ${JSON.stringify(
-        moderationCheck.categories
-      )}`
-    );
-    processedBotResponse = moderationCheck.refusalMessage;
-  }
+  // const moderationCheck = await moderationService.checkTextWithOpenAI(
+  //   processedBotResponse,
+  //   userId,
+  //   `${clientId}-botResponse`
+  // );
+  // if (moderationCheck.error) {
+  //   logger.warn(
+  //     `[ChatbotMsgSvc] OpenAI Moderation API error for bot response. User ${userId}, Client ${clientId}. Error: ${moderationCheck.error.message}`
+  //   );
+  //   processedBotResponse =
+  //     moderationCheck.refusalMessage ||
+  //     "죄송합니다. 답변 생성 중 문제가 발생했습니다. 다른 질문을 해주시겠어요?";
+  // } else if (moderationCheck.isFlagged) {
+  //   logger.warn(
+  //     `[ChatbotMsgSvc] Output flagged by Moderation API for user ${userId}, client ${clientId}. Categories: ${JSON.stringify(
+  //       moderationCheck.categories
+  //     )}`
+  //   );
+  //   processedBotResponse = moderationCheck.refusalMessage;
+  // }
 
   // 2. PII 마스킹
   const originalBotResponseForMasking = processedBotResponse;
