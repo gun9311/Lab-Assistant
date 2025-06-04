@@ -222,7 +222,7 @@ const Navbar: React.FC<{ role: string; isQuizMode: boolean }> = ({
             height: "35px",
           }}
         >
-          <Container maxWidth="lg">
+          <Container maxWidth="xl">
             <Toolbar
               sx={{
                 display: "flex",

@@ -34,6 +34,7 @@ type OverviewPanelProps = {
   isReadOnly?: boolean;
   onStartQuiz?: () => void;
   onEditQuiz?: () => void;
+  validationAttempted?: boolean;
 };
 
 const OverviewPanel: React.FC<OverviewPanelProps> = ({
@@ -57,6 +58,7 @@ const OverviewPanel: React.FC<OverviewPanelProps> = ({
   isReadOnly = false,
   onStartQuiz,
   onEditQuiz,
+  validationAttempted = false,
 }) => {
   const backgroundImageUrl = quizImage
     ? URL.createObjectURL(quizImage)
@@ -64,6 +66,16 @@ const OverviewPanel: React.FC<OverviewPanelProps> = ({
 
   // 실시간 제목 유효성 검사
   const isTitleEmpty = !isReadOnly && title.trim() === "";
+  const displayTitleError = validationAttempted && isTitleEmpty;
+
+  // 학년, 학기, 과목 필드가 비어있는지 확인 (읽기 전용이 아닐 때)
+  const isGradeEmpty = !isReadOnly && !grade;
+  const isSemesterEmpty = !isReadOnly && !semester;
+  const isSubjectEmpty = !isReadOnly && !subject;
+
+  const displayGradeError = validationAttempted && isGradeEmpty;
+  const displaySemesterError = validationAttempted && isSemesterEmpty;
+  const displaySubjectError = validationAttempted && isSubjectEmpty;
 
   return (
     <Box
@@ -133,8 +145,10 @@ const OverviewPanel: React.FC<OverviewPanelProps> = ({
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="퀴즈 제목 입력"
-                error={isTitleEmpty} // 제목이 비어있으면 error 상태
-                helperText={isTitleEmpty ? "퀴즈 제목을 입력해주세요." : ""} // 에러 메시지
+                error={displayTitleError}
+                helperText={
+                  displayTitleError ? "퀴즈 제목을 입력해주세요." : ""
+                }
                 sx={{
                   "& .MuiInputBase-root": {
                     borderRadius: "8px",
@@ -250,8 +264,11 @@ const OverviewPanel: React.FC<OverviewPanelProps> = ({
                 onChange={(e) => {
                   setGrade(e.target.value);
                   setUnit(""); // 단원 초기화
+                  setSubject(""); // 학년 변경시 과목 초기화
                 }}
                 fullWidth
+                error={displayGradeError}
+                helperText={displayGradeError ? "학년을 선택해주세요." : ""}
                 sx={{
                   "& .MuiInputBase-root": {
                     borderRadius: "8px",
@@ -292,8 +309,11 @@ const OverviewPanel: React.FC<OverviewPanelProps> = ({
                 onChange={(e) => {
                   setSemester(e.target.value);
                   setUnit(""); // 단원 초기화
+                  setSubject(""); // 학기 변경시 과목 초기화
                 }}
                 fullWidth
+                error={displaySemesterError}
+                helperText={displaySemesterError ? "학기를 선택해주세요." : ""}
                 sx={{
                   "& .MuiInputBase-root": {
                     borderRadius: "8px",
@@ -333,6 +353,8 @@ const OverviewPanel: React.FC<OverviewPanelProps> = ({
                   setUnit(""); // 단원 초기화
                 }}
                 fullWidth
+                error={displaySubjectError}
+                helperText={displaySubjectError ? "과목을 선택해주세요." : ""}
                 sx={{
                   "& .MuiInputBase-root": {
                     borderRadius: "8px",

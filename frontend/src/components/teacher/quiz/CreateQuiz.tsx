@@ -6,11 +6,11 @@ const CreateQuizPage: React.FC = () => {
   return (
     <Box
       sx={{
-        padding: { xs: "1.5rem", md: "2.5rem" },  // 작은 화면에서는 좁게, 큰 화면에서는 넓게
+        padding: { xs: "1.5rem", md: "2.5rem" }, // 작은 화면에서는 좁게, 큰 화면에서는 넓게
         borderRadius: "16px",
         boxShadow: "0px 6px 20px rgba(0, 0, 0, 0.1)",
         backgroundColor: "#ffffff",
-        maxWidth: "lg",                         // 전체 화면의 90% 너비 사용
+        maxWidth: "xl", // 전체 화면의 90% 너비 사용
         width: "100%",
         margin: "40px auto",
       }}

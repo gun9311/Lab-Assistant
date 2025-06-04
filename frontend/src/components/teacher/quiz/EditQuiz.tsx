@@ -28,7 +28,12 @@ const EditQuizPage: React.FC = () => {
 
   if (loading) {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" height="100vh">
+      <Box
+        display="flex"
+        justifyContent="center"
+        alignItems="center"
+        height="100vh"
+      >
         <CircularProgress color="primary" />
       </Box>
     );
@@ -41,7 +46,7 @@ const EditQuizPage: React.FC = () => {
         borderRadius: "16px",
         boxShadow: "0px 6px 20px rgba(0, 0, 0, 0.1)",
         backgroundColor: "#ffffff",
-        maxWidth: "lg",
+        maxWidth: "xl",
         width: "100%",
         margin: "40px auto",
       }}

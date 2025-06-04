@@ -42,6 +42,7 @@ import SaveIcon from "@mui/icons-material/Save";
 import CancelIcon from "@mui/icons-material/Cancel";
 import HubIcon from "@mui/icons-material/Hub";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+import NotesIcon from "@mui/icons-material/Notes";
 
 interface Student {
   _id: string;
@@ -242,6 +243,10 @@ const ReportComponent: React.FC<ReportComponentProps> = ({
     setEditedCommentText("");
   };
 
+  const calculateByteSize = (str: string) => {
+    return new TextEncoder().encode(str).length;
+  };
+
   const handleSaveEdit = async (reportId: string) => {
     if (editedCommentText.trim() === "") {
       setSnackbarMessage("평어 내용은 비워둘 수 없습니다.");
@@ -413,9 +418,8 @@ const ReportComponent: React.FC<ReportComponentProps> = ({
                         title={
                           <Box>
                             <Typography variant="caption">
-                              NEIS 전송 기능은 Chrome 브라우저에서
-                              확장 프로그램이 설치되어 있어야 원활하게
-                              작동합니다.
+                              NEIS 전송 기능은 Chrome 브라우저에서 확장
+                              프로그램이 설치되어 있어야 원활하게 작동합니다.
                             </Typography>
                             <Typography
                               variant="caption"
@@ -625,8 +629,32 @@ const ReportComponent: React.FC<ReportComponentProps> = ({
                                           }
                                           variant="outlined"
                                           size="small"
-                                          sx={{ mb: 1 }}
+                                          sx={{ mb: 0.5 }}
                                         />
+                                        <Box
+                                          sx={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            justifyContent: "flex-end",
+                                            color: "text.disabled",
+                                            mb: 1,
+                                            gap: 0.5,
+                                          }}
+                                        >
+                                          <NotesIcon
+                                            sx={{ fontSize: "0.8rem" }}
+                                          />
+                                          <Typography
+                                            variant="caption"
+                                            sx={{ fontSize: "0.7rem" }}
+                                          >
+                                            {editedCommentText.length}자 /{" "}
+                                            {calculateByteSize(
+                                              editedCommentText
+                                            )}
+                                            bytes
+                                          </Typography>
+                                        </Box>
                                         <Box sx={{ display: "flex", gap: 1 }}>
                                           <Button
                                             variant="contained"
@@ -659,6 +687,30 @@ const ReportComponent: React.FC<ReportComponentProps> = ({
                                             toggleCommentExpansion(commentKey)
                                           }
                                         />
+                                        <Box
+                                          sx={{
+                                            position: "absolute",
+                                            bottom: "4px",
+                                            right: "52px",
+                                            display: "flex",
+                                            alignItems: "center",
+                                            color: "text.disabled",
+                                            gap: 0.5,
+                                            zIndex: 1,
+                                          }}
+                                        >
+                                          <NotesIcon
+                                            sx={{ fontSize: "0.8rem" }}
+                                          />
+                                          <Typography
+                                            variant="caption"
+                                            sx={{ fontSize: "0.7rem" }}
+                                          >
+                                            {report.comment.length}자 /{" "}
+                                            {calculateByteSize(report.comment)}
+                                            bytes
+                                          </Typography>
+                                        </Box>
                                         <Box
                                           sx={{
                                             position: "absolute",

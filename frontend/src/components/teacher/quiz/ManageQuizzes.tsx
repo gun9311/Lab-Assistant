@@ -198,7 +198,7 @@ const ManageQuizzesPage: React.FC = () => {
   };
 
   return (
-    <Box sx={{ maxWidth: "lg", margin: "0 auto", padding: "2rem", mt: 2 }}>
+    <Box sx={{ maxWidth: "xl", margin: "0 auto", padding: "2rem", mt: 2 }}>
       <Paper
         elevation={3}
         sx={{
@@ -329,7 +329,7 @@ const ManageQuizzesPage: React.FC = () => {
               </Grid>
             ) : (
               quizzes.map((quiz) => (
-                <Grid item xs={12} sm={6} md={4} key={quiz._id}>
+                <Grid item xs={12} sm={6} md={4} lg={3} key={quiz._id}>
                   <QuizCard
                     quiz={quiz}
                     onDelete={handleDelete}
@@ -367,11 +367,14 @@ const ManageQuizzesPage: React.FC = () => {
       <Dialog
         open={isModalOpen}
         onClose={handleCloseModal}
-        maxWidth="md"
+        maxWidth="lg"
         fullWidth
+        PaperProps={{
+          sx: {
+            width: "80%",
+          },
+        }}
       >
-        {/* <DialogTitle>
-          퀴즈 확인 */}
         <IconButton
           aria-label="close"
           onClick={handleCloseModal}
@@ -384,7 +387,6 @@ const ManageQuizzesPage: React.FC = () => {
         >
           <CloseIcon />
         </IconButton>
-        {/* </DialogTitle> */}
         <DialogContent>
           {selectedQuiz && (
             <QuizContainer

@@ -47,7 +47,7 @@ const ReviewSlide: React.FC<ReviewSlideProps> = ({
 
       <Grid container spacing={3}>
         {questions.map((question, index) => (
-          <Grid item xs={12} sm={6} md={4} key={index}>
+          <Grid item xs={12} sm={6} md={4} lg={3} key={index}>
             <Card
               variant="outlined"
               sx={{
@@ -162,7 +162,7 @@ const ReviewSlide: React.FC<ReviewSlideProps> = ({
 
         {/* 문제 추가 카드: 읽기 전용이 아닐 때만 표시 */}
         {!isReadOnly && (
-          <Grid item xs={12} sm={6} md={4}>
+          <Grid item xs={12} sm={6} md={4} lg={3}>
             <Card
               variant="outlined"
               sx={{
