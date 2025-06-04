@@ -134,7 +134,8 @@ const TeacherHomePage: React.FC = () => {
     if (isChrome && chrome?.runtime?.sendMessage) {
       try {
         chrome.runtime.sendMessage(
-          "mlaphiokjhimgcjgcjkpcmmdgdajmjka", // Extension ID
+          // "mlaphiokjhimgcjgcjkpcmmdgdajmjka", // Extension ID
+          "jefkdeojjfmmcdbanibhdfmaggceehbb",
           { type: "PING" },
           (response) => {
             if (chrome.runtime.lastError) {
