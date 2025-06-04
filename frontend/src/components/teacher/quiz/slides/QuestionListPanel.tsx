@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   Box,
   List,
@@ -7,10 +7,34 @@ import {
   Typography,
   Button,
   IconButton,
+  Checkbox,
+  TextField,
+  MenuItem,
+  Select,
+  FormControl,
+  InputLabel,
+  FormGroup,
+  FormControlLabel,
+  Divider,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
+  Tooltip,
 } from "@mui/material";
 import { DragDropContext, Draggable, Droppable } from "react-beautiful-dnd";
 import { Question } from "../types";
-import { CheckCircle, DragIndicator, ErrorOutline } from "@mui/icons-material";
+import {
+  CheckCircle,
+  DragIndicator,
+  ErrorOutline,
+  SettingsApplications,
+  ExpandMore as ExpandMoreIcon,
+  ChevronLeft as ChevronLeftIcon,
+  ChevronRight as ChevronRightIcon,
+  ViewList as ViewListIcon,
+  Add as AddIcon,
+  DeleteSweep as DeleteSweepIcon,
+} from "@mui/icons-material";
 
 type QuestionListPanelProps = {
   questions: Question[];
@@ -19,7 +43,18 @@ type QuestionListPanelProps = {
   reorderQuestions: (startIndex: number, endIndex: number) => void;
   goToReview: () => void;
   isReviewSlide: boolean;
-  isReadOnly?: boolean; // NEW: 읽기 전용 모드 추가
+  isReadOnly?: boolean;
+  selectedQuestionIndexes: number[];
+  onSelectQuestion: (index: number, isSelected: boolean) => void;
+  onBatchUpdate: (
+    updateType: "timeLimit" | "questionType",
+    value: any,
+    target: "all" | "selected"
+  ) => void;
+  isCollapsed: boolean;
+  onToggleCollapse: () => void;
+  addQuestion: () => void;
+  removeSelectedQuestions: () => void;
 };
 
 const QuestionListPanel: React.FC<QuestionListPanelProps> = ({
@@ -29,13 +64,27 @@ const QuestionListPanel: React.FC<QuestionListPanelProps> = ({
   reorderQuestions,
   goToReview,
   isReviewSlide,
-  isReadOnly = false, // 기본값은 편집 모드
+  isReadOnly = false,
+  selectedQuestionIndexes,
+  onSelectQuestion,
+  onBatchUpdate,
+  isCollapsed,
+  onToggleCollapse,
+  addQuestion,
+  removeSelectedQuestions,
 }) => {
+  const [batchTimeLimit, setBatchTimeLimit] = useState<number>(30);
+  const [batchQuestionType, setBatchQuestionType] =
+    useState<string>("multiple-choice");
+  const [selectAll, setSelectAll] = useState(false);
+  const [isBatchToolsExpanded, setIsBatchToolsExpanded] = useState(false);
+
   const handleDragEnd = (result: any) => {
     const { destination, source } = result;
     if (!destination || destination.index === source.index) return;
     reorderQuestions(source.index, destination.index);
-    moveToSlide(currentSlideIndex);
+    onSelectQuestion(-1, false);
+    setSelectAll(false);
   };
 
   const isQuestionInvalid = (q: Question): boolean => {
@@ -51,147 +100,507 @@ const QuestionListPanel: React.FC<QuestionListPanelProps> = ({
     );
   };
 
+  const handleSelectAll = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const isChecked = event.target.checked;
+    setSelectAll(isChecked);
+    questions.forEach((_, index) => {
+      onSelectQuestion(index, isChecked);
+    });
+  };
+
+  const handleApplyBatchTimeLimit = (target: "all" | "selected") => {
+    if (batchTimeLimit <= 0) {
+      alert("시간 제한은 0보다 커야 합니다.");
+      return;
+    }
+    onBatchUpdate("timeLimit", batchTimeLimit, target);
+  };
+
+  const handleApplyBatchQuestionType = (target: "all" | "selected") => {
+    onBatchUpdate("questionType", batchQuestionType, target);
+  };
+
   return (
     <Box
       sx={{
-        padding: "1rem",
+        padding: isCollapsed ? "0.5rem 0" : "1rem",
         backgroundColor: "#f9f9f9",
-        borderRadius: "12px",
-        boxShadow: "0px 4px 12px rgba(0, 0, 0, 0.05)",
+        display: "flex",
+        flexDirection: "column",
+        height: "100%",
+        position: "relative",
       }}
     >
-      <Typography
-        variant="h6"
-        sx={{ fontWeight: "bold", color: "#333", marginBottom: "1rem" }}
+      <Tooltip
+        title={isCollapsed ? "목록 펼치기" : "목록 접기"}
+        placement="right"
       >
-        문제 목록
-      </Typography>
+        <IconButton
+          onClick={onToggleCollapse}
+          sx={{
+            position: "absolute",
+            top: isCollapsed ? "calc(50% - 20px)" : "8px",
+            right: isCollapsed ? "-18px" : "8px",
+            zIndex: 10,
+            backgroundColor: "#fff",
+            border: "1px solid #ddd",
+            boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
+            padding: "6px",
+            transition: "top 0.3s ease, right 0.3s ease",
+            "&:hover": {
+              backgroundColor: "#f5f5f5",
+            },
+          }}
+        >
+          {isCollapsed ? <ChevronRightIcon /> : <ChevronLeftIcon />}
+        </IconButton>
+      </Tooltip>
 
-      <DragDropContext onDragEnd={isReadOnly ? undefined : handleDragEnd}>
-        <Droppable droppableId="question-list">
-          {(provided: any) => (
-            <List {...provided.droppableProps} ref={provided.innerRef}>
-              {questions.map((question, index) => (
-                <Draggable
-                  key={index}
-                  draggableId={String(index)}
-                  index={index}
-                  isDragDisabled={isReadOnly} // NEW: 읽기 전용일 때 드래그 비활성화
+      {!isCollapsed && (
+        <>
+          <Typography
+            variant="h6"
+            sx={{
+              fontWeight: "bold",
+              color: "#333",
+              marginBottom: "1rem",
+              textAlign: isCollapsed ? "center" : "left",
+            }}
+          >
+            {isCollapsed ? <ViewListIcon /> : "문제 목록"}
+          </Typography>
+
+          {!isReadOnly && (
+            <Accordion
+              expanded={isBatchToolsExpanded}
+              onChange={() => setIsBatchToolsExpanded(!isBatchToolsExpanded)}
+              sx={{
+                mb: 2,
+                boxShadow: "none",
+                border: "1px solid #e0e0e0",
+                borderRadius: "8px !important",
+                "&:before": { display: "none" },
+                backgroundColor: isBatchToolsExpanded ? "#f0f0f0" : "#f9f9f9",
+              }}
+            >
+              <AccordionSummary
+                expandIcon={<ExpandMoreIcon />}
+                aria-controls="batch-tools-content"
+                id="batch-tools-header"
+                sx={{
+                  minHeight: "48px !important",
+                  "& .MuiAccordionSummary-content": {
+                    margin: "10px 0 !important",
+                    alignItems: "center",
+                  },
+                }}
+              >
+                <SettingsApplications sx={{ mr: 1, color: "primary.main" }} />
+                <Typography variant="subtitle1" sx={{ fontWeight: "medium" }}>
+                  일괄 변경 도구
+                </Typography>
+              </AccordionSummary>
+              <AccordionDetails
+                sx={{
+                  p: 1.5,
+                  pt: 0,
+                  backgroundColor: "#f0f0f0",
+                  borderTop: "1px solid #e0e0e0",
+                }}
+              >
+                <FormControl fullWidth margin="dense">
+                  <TextField
+                    label="시간 제한 (초)"
+                    type="number"
+                    size="small"
+                    value={batchTimeLimit}
+                    onChange={(e) =>
+                      setBatchTimeLimit(parseInt(e.target.value, 10) || 1)
+                    }
+                    InputProps={{ inputProps: { min: 1 } }}
+                    sx={{
+                      "& .MuiInputBase-root": {
+                        borderRadius: "6px",
+                        backgroundColor: "#fff",
+                      },
+                    }}
+                  />
+                </FormControl>
+                <Box sx={{ display: "flex", gap: 1, mt: 0.5 }}>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={() => handleApplyBatchTimeLimit("selected")}
+                    sx={{
+                      flexGrow: 1,
+                      backgroundColor: "#fff",
+                      "&:hover": { backgroundColor: "#f5f5f5" },
+                    }}
+                    disabled={selectedQuestionIndexes.length === 0}
+                  >
+                    선택 적용
+                  </Button>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={() => handleApplyBatchTimeLimit("all")}
+                    sx={{
+                      flexGrow: 1,
+                      backgroundColor: "#fff",
+                      "&:hover": { backgroundColor: "#f5f5f5" },
+                    }}
+                  >
+                    전체 적용
+                  </Button>
+                </Box>
+
+                <FormControl fullWidth margin="dense" sx={{ mt: 1.5 }}>
+                  <InputLabel
+                    id="batch-question-type-label"
+                    sx={{
+                      fontSize: "0.85rem",
+                      transform: batchQuestionType
+                        ? "translate(10px, -7px) scale(0.75)"
+                        : "translate(10px, 7px) scale(1)",
+                      backgroundColor: batchQuestionType
+                        ? "transparent"
+                        : "#fff",
+                    }}
+                  >
+                    문제 유형
+                  </InputLabel>
+                  <Select
+                    labelId="batch-question-type-label"
+                    value={batchQuestionType}
+                    onChange={(e) => setBatchQuestionType(e.target.value)}
+                    size="small"
+                    sx={{
+                      "& .MuiSelect-select": {
+                        borderRadius: "6px",
+                        backgroundColor: "#fff",
+                      },
+                    }}
+                  >
+                    <MenuItem value="multiple-choice">선택형</MenuItem>
+                    <MenuItem value="true-false">참/거짓</MenuItem>
+                  </Select>
+                </FormControl>
+                <Box sx={{ display: "flex", gap: 1, mt: 0.5 }}>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={() => handleApplyBatchQuestionType("selected")}
+                    sx={{
+                      flexGrow: 1,
+                      backgroundColor: "#fff",
+                      "&:hover": { backgroundColor: "#f5f5f5" },
+                    }}
+                    disabled={selectedQuestionIndexes.length === 0}
+                  >
+                    선택 적용
+                  </Button>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={() => handleApplyBatchQuestionType("all")}
+                    sx={{
+                      flexGrow: 1,
+                      backgroundColor: "#fff",
+                      "&:hover": { backgroundColor: "#f5f5f5" },
+                    }}
+                  >
+                    전체 적용
+                  </Button>
+                </Box>
+
+                <Button
+                  fullWidth
+                  variant="outlined"
+                  color="error"
+                  startIcon={<DeleteSweepIcon />}
+                  onClick={removeSelectedQuestions}
+                  disabled={selectedQuestionIndexes.length === 0}
+                  sx={{
+                    mt: 1.5,
+                    backgroundColor: "#fff",
+                    borderColor: "#d32f2f",
+                    color: "#d32f2f",
+                    "&:hover": {
+                      backgroundColor: "rgba(211, 47, 47, 0.04)",
+                      borderColor: "#c62828",
+                    },
+                  }}
                 >
-                  {(provided: any, snapshot: any) => (
-                    <ListItem
-                      button
-                      selected={currentSlideIndex === index + 1}
-                      onClick={() => moveToSlide(index + 1)}
-                      ref={provided.innerRef}
-                      {...provided.draggableProps}
-                      {...(!isReadOnly && provided.dragHandleProps)} // NEW: 읽기 전용일 때 드래그 핸들 제거
-                      sx={{
-                        display: "flex",
-                        alignItems: "center",
-                        borderRadius: "8px",
-                        marginBottom: "8px",
-                        backgroundColor:
-                          currentSlideIndex === index + 1 ? "#fff9e6" : "#fff",
-                        boxShadow: snapshot.isDragging
-                          ? "0px 4px 8px rgba(0, 0, 0, 0.15)"
-                          : "0px 2px 4px rgba(0, 0, 0, 0.1)",
-                        transition: "background-color 0.3s ease",
-                        padding: "0.5rem 1rem",
-                      }}
-                    >
-                      {/* 드래그 핸들 아이콘 (읽기 전용일 때 비활성화) */}
-                      {!isReadOnly && (
-                        <IconButton
-                          edge="start"
-                          sx={{
-                            color: "#ccc",
-                            cursor: "move",
-                            "&:hover": { color: "#888" },
-                          }}
-                        >
-                          <DragIndicator fontSize="small" />
-                        </IconButton>
-                      )}
-
-                      {/* 문제 텍스트 일부 표시, 텍스트가 없을 경우 '비어있음' 표시 */}
-                      <ListItemText
-                        primary={`${index + 1}. ${
-                          question.questionText
-                            ? question.questionText.slice(0, 10) + "..."
-                            : "문제 없음"
-                        }`}
-                        primaryTypographyProps={{
-                          fontSize: "1rem",
-                          fontWeight:
-                            currentSlideIndex === index + 1 ? "bold" : "normal",
-                          color:
-                            currentSlideIndex === index + 1
-                              ? "#f57c00"
-                              : isQuestionInvalid(question)
-                              ? "#d32f2f"
-                              : "#333",
-                        }}
-                      />
-
-                      {isQuestionInvalid(question) && !isReadOnly && (
-                        <ErrorOutline
-                          sx={{
-                            color: "#d32f2f",
-                            fontSize: "1.1rem",
-                            marginLeft: "auto",
-                            marginRight:
-                              currentSlideIndex === index + 1 ? "0.5rem" : 0,
-                          }}
-                        />
-                      )}
-
-                      {/* 선택된 문제 아이콘 */}
-                      {currentSlideIndex === index + 1 && (
-                        <CheckCircle
-                          sx={{
-                            color: "#f57c00",
-                            fontSize: "1rem",
-                            marginLeft: isQuestionInvalid(question)
-                              ? "0.2rem"
-                              : "auto",
-                          }}
-                        />
-                      )}
-                    </ListItem>
-                  )}
-                </Draggable>
-              ))}
-              {provided.placeholder}
-            </List>
+                  선택 문제 삭제 ({selectedQuestionIndexes.length}개)
+                </Button>
+              </AccordionDetails>
+            </Accordion>
           )}
-        </Droppable>
-      </DragDropContext>
 
-      {/* 검토 버튼: 읽기 전용일 때는 "전체 보기" 텍스트로 표시 */}
-      <Button
-        variant="contained"
-        onClick={goToReview}
-        fullWidth
-        disabled={isReviewSlide} // 리뷰 슬라이드일 때 비활성화
-        sx={{
-          marginTop: "1.5rem",
-          borderRadius: "8px",
-          backgroundColor: isReviewSlide ? "#bdbdbd" : "#ff9800",
-          color: "#fff",
-          fontWeight: "bold",
-          fontSize: "1rem",
-          paddingY: "0.8rem",
-          boxShadow: "0px 4px 10px rgba(0, 0, 0, 0.1)",
-          "&:hover": { backgroundColor: isReviewSlide ? "#bdbdbd" : "#fb8c00" },
-        }}
-      >
-        {isReadOnly
-          ? "전체 보기"
-          : isReviewSlide
-          ? "퀴즈 검토 중"
-          : "퀴즈 검토 및 저장"}
-      </Button>
+          {!isReadOnly && questions.length > 0 && (
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={
+                    selectAll &&
+                    questions.length > 0 &&
+                    selectedQuestionIndexes.length === questions.length
+                  }
+                  onChange={handleSelectAll}
+                  disabled={isReadOnly || questions.length === 0}
+                  size="small"
+                />
+              }
+              label={
+                selectedQuestionIndexes.length > 0
+                  ? `${selectedQuestionIndexes.length} / ${questions.length}개 선택`
+                  : "전체 선택"
+              }
+              sx={{
+                mb: 1,
+                color:
+                  questions.length === 0 ? "text.disabled" : "text.primary",
+                height: "30px",
+                lineHeight: "30px",
+              }}
+            />
+          )}
+
+          <Box
+            sx={{ flexGrow: 1, overflowY: "auto", pr: isCollapsed ? 0 : "4px" }}
+          >
+            <DragDropContext onDragEnd={isReadOnly ? undefined : handleDragEnd}>
+              <Droppable droppableId="question-list">
+                {(provided: any) => (
+                  <List
+                    {...provided.droppableProps}
+                    ref={provided.innerRef}
+                    dense
+                    sx={{ pt: 0 }}
+                  >
+                    {questions.map((question, index) => (
+                      <Draggable
+                        key={`q-item-${index}`}
+                        draggableId={`q-drag-${index}`}
+                        index={index}
+                        isDragDisabled={isReadOnly}
+                      >
+                        {(providedDraggable: any, snapshot: any) => (
+                          <ListItem
+                            button={!isReadOnly}
+                            selected={currentSlideIndex === index + 1}
+                            onClick={() => moveToSlide(index + 1)}
+                            ref={providedDraggable.innerRef}
+                            {...providedDraggable.draggableProps}
+                            sx={{
+                              display: "flex",
+                              alignItems: "center",
+                              borderRadius: "8px",
+                              mb: "8px",
+                              backgroundColor:
+                                currentSlideIndex === index + 1
+                                  ? "#fff9e6"
+                                  : snapshot.isDragging
+                                  ? "#e3f2fd"
+                                  : selectedQuestionIndexes.includes(index)
+                                  ? "#e8eaf6"
+                                  : "#fff",
+                              boxShadow: snapshot.isDragging
+                                ? "0px 4px 8px rgba(0, 0, 0, 0.15)"
+                                : "0px 1px 3px rgba(0, 0, 0, 0.1)",
+                              transition:
+                                "background-color 0.2s ease-out, box-shadow 0.2s ease-out",
+                              padding: "4px 8px",
+                              minHeight: "52px",
+                              border:
+                                currentSlideIndex === index + 1
+                                  ? "1px solid #f57c00"
+                                  : selectedQuestionIndexes.includes(index)
+                                  ? "1px solid #3f51b5"
+                                  : "1px solid #eee",
+                            }}
+                          >
+                            {!isReadOnly && (
+                              <>
+                                <Checkbox
+                                  edge="start"
+                                  checked={selectedQuestionIndexes.includes(
+                                    index
+                                  )}
+                                  onChange={(e) =>
+                                    onSelectQuestion(index, e.target.checked)
+                                  }
+                                  size="small"
+                                  sx={{ padding: "2px", mr: "6px" }}
+                                  onClick={(e) => e.stopPropagation()}
+                                />
+                                <IconButton
+                                  edge="start"
+                                  {...providedDraggable.dragHandleProps}
+                                  sx={{
+                                    color: "#757575",
+                                    cursor: "grab",
+                                    "&:hover": {
+                                      color: "#333",
+                                      backgroundColor: "rgba(0,0,0,0.04)",
+                                    },
+                                    padding: "4px",
+                                    mr: "6px",
+                                  }}
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <DragIndicator fontSize="small" />
+                                </IconButton>
+                              </>
+                            )}
+
+                            <ListItemText
+                              primary={`${index + 1}. ${
+                                question.questionText
+                                  ? question.questionText.length >
+                                    (isReadOnly ? 15 : 12)
+                                    ? question.questionText.slice(
+                                        0,
+                                        isReadOnly ? 15 : 12
+                                      ) + "..."
+                                    : question.questionText
+                                  : "문제 내용 없음"
+                              }`}
+                              secondary={
+                                isReadOnly
+                                  ? `유형: ${
+                                      question.questionType ===
+                                      "multiple-choice"
+                                        ? "선택형"
+                                        : "참/거짓"
+                                    }, 시간: ${question.timeLimit}초`
+                                  : null
+                              }
+                              primaryTypographyProps={{
+                                fontSize: "0.875rem",
+                                fontWeight:
+                                  currentSlideIndex === index + 1
+                                    ? "600"
+                                    : "500",
+                                color:
+                                  currentSlideIndex === index + 1
+                                    ? "#f57c00"
+                                    : isQuestionInvalid(question) && !isReadOnly
+                                    ? "#d32f2f"
+                                    : "#212121",
+                                whiteSpace: "nowrap",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                              }}
+                              secondaryTypographyProps={{
+                                fontSize: "0.7rem",
+                                color: "text.secondary",
+                                whiteSpace: "nowrap",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                              }}
+                              sx={{ my: 0 }}
+                            />
+
+                            {isQuestionInvalid(question) && !isReadOnly && (
+                              <ErrorOutline
+                                sx={{
+                                  color: "#d32f2f",
+                                  fontSize: "1rem",
+                                  marginLeft: "auto",
+                                  mr:
+                                    currentSlideIndex === index + 1 ? "4px" : 0,
+                                }}
+                              />
+                            )}
+
+                            {currentSlideIndex === index + 1 && (
+                              <CheckCircle
+                                sx={{
+                                  color: "#f57c00",
+                                  fontSize: "1rem",
+                                  marginLeft:
+                                    isQuestionInvalid(question) && !isReadOnly
+                                      ? "2px"
+                                      : "auto",
+                                }}
+                              />
+                            )}
+                          </ListItem>
+                        )}
+                      </Draggable>
+                    ))}
+                    {provided.placeholder}
+                  </List>
+                )}
+              </Droppable>
+            </DragDropContext>
+          </Box>
+
+          <Divider sx={{ my: 1 }} />
+
+          {!isReadOnly && (
+            <Button
+              variant="outlined"
+              startIcon={<AddIcon />}
+              onClick={addQuestion}
+              fullWidth
+              sx={{
+                mt: 1,
+                mb: 1,
+                borderRadius: "8px",
+                borderColor: "#ff9800",
+                color: "#ff9800",
+                fontWeight: "medium",
+                fontSize: "0.85rem",
+                paddingY: "0.5rem",
+                boxShadow: "0px 1px 3px rgba(0, 0, 0, 0.05)",
+                "&:hover": {
+                  backgroundColor: "rgba(255, 152, 0, 0.04)",
+                  borderColor: "#fb8c00",
+                },
+              }}
+            >
+              문제 추가
+            </Button>
+          )}
+
+          <Button
+            variant="contained"
+            onClick={goToReview}
+            fullWidth
+            disabled={isReviewSlide && !isReadOnly}
+            sx={{
+              marginTop: "auto",
+              borderRadius: "8px",
+              backgroundColor:
+                isReviewSlide && !isReadOnly ? "#bdbdbd" : "#ff9800",
+              color: "#fff",
+              fontWeight: "bold",
+              fontSize: "0.9rem",
+              paddingY: "0.6rem",
+              boxShadow: "0px 2px 6px rgba(0, 0, 0, 0.1)",
+              "&:hover": {
+                backgroundColor:
+                  isReviewSlide && !isReadOnly ? "#bdbdbd" : "#fb8c00",
+              },
+            }}
+          >
+            {isReadOnly
+              ? "전체 보기"
+              : isReviewSlide
+              ? "퀴즈 검토 중"
+              : "퀴즈 검토 및 저장"}
+          </Button>
+        </>
+      )}
+      {isCollapsed && (
+        <Box sx={{ textAlign: "center", mt: 2 }}>
+          <Tooltip title="문제 목록">
+            <ViewListIcon fontSize="large" sx={{ color: "#757575" }} />
+          </Tooltip>
+        </Box>
+      )}
     </Box>
   );
 };

@@ -1,16 +1,41 @@
-import React, { useState, useEffect } from "react";
-import { Box, Snackbar, Divider } from "@mui/material";
+import React, { useState, useEffect, useCallback } from "react";
+import {
+  Box,
+  Snackbar,
+  Divider,
+  IconButton,
+  Button,
+  Paper,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
+} from "@mui/material";
 import OverviewPanel from "./slides/OverviewPanel";
 import QuizSlide from "./slides/QuizSlide";
 import ReviewSlide from "./slides/ReviewSlide";
 import SlideNavigation from "./slides/SlideNavigation";
 import ImageUploadDialog from "./ImageUploadDialog";
 import QuestionListPanel from "./slides/QuestionListPanel";
-import { Question } from "./types";
+import { Question, Option } from "./types";
 import { initialQuestion } from "./utils";
 import { getUnits, createQuiz, updateQuiz } from "../../../utils/quizApi";
 import { getSubjects } from "../../../utils/api";
 import { useNavigate } from "react-router-dom";
+import QuizPreviewModal from "./QuizPreviewModal";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Save as SaveIcon,
+  Visibility as VisibilityIcon,
+  DeleteSweep as DeleteSweepIcon,
+} from "@mui/icons-material";
+import {
+  Question as QuestionType,
+  // QuizContent, // Removed as it's not defined in the provided types.ts
+  // QuizMode, // Removed as it's not defined in the provided types.ts
+} from "./types"; // Corrected path from ../types to ./types
 
 interface QuizContainerProps {
   isEdit?: boolean;
@@ -19,6 +44,12 @@ interface QuizContainerProps {
   onStartQuiz?: () => void; // 퀴즈 시작 핸들러 추가
   onEditQuiz?: () => void; // 퀴즈 편집 핸들러 추가
 }
+
+// localStorage 키 정의
+const TEMP_QUIZ_DATA_KEY = "tempQuizData";
+const QUESTION_LIST_PANEL_WIDTH = "280px"; // 패널 너비 상수로 정의 (기존 260px + 패딩 고려)
+const QUESTION_LIST_PANEL_COLLAPSED_WIDTH = "60px"; // 접혔을 때 너비
+const FIXED_ACTION_BAR_HEIGHT = "72px"; // 액션 바 높이 (패딩 포함)
 
 const QuizContainer: React.FC<QuizContainerProps> = ({
   isEdit = false,
@@ -37,26 +68,21 @@ const QuizContainer: React.FC<QuizContainerProps> = ({
   const [quizImage, setQuizImage] = useState<File | null>(null);
   const [quizImageUrl, setQuizImageUrl] = useState(initialData?.imageUrl || "");
 
-  // 초기 데이터가 있을 경우 correctAnswer를 숫자로 변환
   const processedInitialQuestions = initialData?.questions
     ? initialData.questions.map((q: any) => ({
         ...q,
-        // correctAnswer를 숫자로 변환합니다.
-        // MongoDB에서 문자열로 오므로, 프론트엔드 타입(number)에 맞춥니다.
         correctAnswer:
           q.correctAnswer !== undefined &&
           q.correctAnswer !== null &&
           !isNaN(Number(q.correctAnswer))
             ? Number(q.correctAnswer)
-            : -1, // 변환 실패 시 또는 값이 없을 경우 기본값 -1
+            : -1,
         options: q.options.map((opt: any) => ({
-          // 옵션도 imageUrl, image 필드 확인
           text: opt.text || "",
           imageUrl: opt.imageUrl || "",
-          image: opt.image || null,
+          image: null, // 초기 데이터에서 파일 객체는 불러오지 않음
         })),
-        // 문제 자체의 image와 imageUrl도 확인
-        image: q.image || null,
+        image: null, // 초기 데이터에서 파일 객체는 불러오지 않음
         imageUrl: q.imageUrl || "",
       }))
     : [initialQuestion];
@@ -69,6 +95,99 @@ const QuizContainer: React.FC<QuizContainerProps> = ({
   const [imageDialogOpen, setImageDialogOpen] = useState(false);
   const [isReviewSlide, setIsReviewSlide] = useState(false);
   const [subjects, setSubjects] = useState<string[]>([]);
+  const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
+  const [selectedQuestionIndexes, setSelectedQuestionIndexes] = useState<
+    number[]
+  >([]); // 선택된 문제 인덱스 상태
+  const [isQuestionListCollapsed, setIsQuestionListCollapsed] = useState(false); // 문제 목록 패널 접힘 상태
+  const [validationAttempted, setValidationAttempted] = useState(false); // 유효성 검사 시도 상태 추가
+  const [showDeleteConfirmDialog, setShowDeleteConfirmDialog] = useState(false); // 일괄 삭제 확인 다이얼로그
+
+  useEffect(() => {
+    if (!isEdit && !initialData && !isReadOnly) {
+      try {
+        const savedDataString = localStorage.getItem(TEMP_QUIZ_DATA_KEY);
+        if (savedDataString) {
+          const userAgreesToRestore = window.confirm(
+            "이전에 작업하던 퀴즈 내용이 있습니다. 이어서 작업하시겠습니까?\n(취소 시 이전 내용은 삭제됩니다.)"
+          );
+
+          if (userAgreesToRestore) {
+            const savedData = JSON.parse(savedDataString);
+            if (savedData) {
+              setTitle(savedData.title || "");
+              setGrade(savedData.grade || "");
+              setSemester(savedData.semester || "");
+              setSubject(savedData.subject || "");
+              setUnit(savedData.unit || "");
+              setQuizImageUrl(savedData.quizImageUrl || "");
+              const restoredQuestions = (
+                savedData.questions || [initialQuestion]
+              ).map((q: any) => ({
+                ...q,
+                correctAnswer:
+                  q.correctAnswer !== undefined &&
+                  q.correctAnswer !== null &&
+                  !isNaN(Number(q.correctAnswer))
+                    ? Number(q.correctAnswer)
+                    : -1,
+                options: q.options.map((opt: any) => ({
+                  text: opt.text || "",
+                  imageUrl: opt.imageUrl || "",
+                  image: null,
+                })),
+                image: null,
+                imageUrl: q.imageUrl || "",
+              }));
+              setQuestions(restoredQuestions);
+              setError(
+                "이전에 작업하던 내용을 불러왔습니다. 이미지는 필요한 경우 다시 첨부해주세요."
+              );
+            }
+          } else {
+            // 사용자가 복원을 원하지 않으면 임시 데이터 삭제
+            localStorage.removeItem(TEMP_QUIZ_DATA_KEY);
+          }
+        }
+      } catch (e) {
+        console.error("임시 저장된 퀴즈 데이터를 처리하는 데 실패했습니다.", e);
+        localStorage.removeItem(TEMP_QUIZ_DATA_KEY); // 오류 발생 시 안전하게 데이터 제거
+      }
+    }
+  }, [isEdit, initialData, isReadOnly]);
+
+  useEffect(() => {
+    if (!isEdit && !isReadOnly) {
+      try {
+        const dataToSave = {
+          title,
+          grade,
+          semester,
+          subject,
+          unit,
+          quizImageUrl,
+          questions: questions.map((q) => ({
+            ...q,
+            image: null,
+            options: q.options.map((opt) => ({ ...opt, image: null })),
+          })),
+        };
+        localStorage.setItem(TEMP_QUIZ_DATA_KEY, JSON.stringify(dataToSave));
+      } catch (e) {
+        console.error("퀴즈 데이터를 임시 저장하는 데 실패했습니다.", e);
+      }
+    }
+  }, [
+    title,
+    grade,
+    semester,
+    subject,
+    unit,
+    quizImageUrl,
+    questions,
+    isEdit,
+    isReadOnly,
+  ]);
 
   useEffect(() => {
     setIsReviewSlide(currentSlideIndex > questions.length);
@@ -81,7 +200,7 @@ const QuizContainer: React.FC<QuizContainerProps> = ({
     }
   }, [grade, semester, subject, isReadOnly]);
 
-  const fetchUnits = async () => {
+  const fetchUnits = useCallback(async () => {
     if (grade && semester && subject) {
       try {
         const { units: fetchedUnits } = await getUnits(
@@ -96,9 +215,9 @@ const QuizContainer: React.FC<QuizContainerProps> = ({
     } else {
       setUnits([]);
     }
-  };
+  }, [grade, semester, subject]);
 
-  const fetchSubjects = async () => {
+  const fetchSubjects = useCallback(async () => {
     if (grade && semester) {
       try {
         const response = await getSubjects(parseInt(grade), [semester]);
@@ -107,6 +226,10 @@ const QuizContainer: React.FC<QuizContainerProps> = ({
         if (subject && !fetchedSubjectsData.includes(subject)) {
           setSubject("");
           setUnit("");
+        } else if (!subject && fetchedSubjectsData.length > 0) {
+          // 만약 과목이 설정되지 않았고, 가져온 과목 목록이 있다면
+          // 기본값으로 첫번째 과목을 설정하거나, 사용자가 선택하도록 둘 수 있습니다.
+          // 여기서는 기존 로직대로 둡니다.
         }
       } catch (error) {
         setError("과목 목록을 가져오는 중 오류가 발생했습니다.");
@@ -114,23 +237,34 @@ const QuizContainer: React.FC<QuizContainerProps> = ({
       }
     } else {
       setSubjects([]);
+      // 학년이나 학기가 없어지면 과목 및 단원도 초기화
+      // setSubject(""); // 이 부분은 사용자가 직접 선택하는것이 나을 수 있어 주석처리
+      // setUnit("");
     }
-  };
+  }, [grade, semester, subject]);
 
   const addQuestion = () => {
     setQuestions([...questions, initialQuestion]);
     setCurrentSlideIndex(questions.length + 1);
+    setValidationAttempted(false); // 새 문제 추가 시 유효성 검사 시도 상태 초기화
   };
 
   const updateQuestion = (index: number, updatedQuestion: Question) => {
     const updatedQuestions = [...questions];
     updatedQuestions[index] = updatedQuestion;
     setQuestions(updatedQuestions);
+    setValidationAttempted(false); // 문제 순서 변경 시 유효성 검사 시도 상태 초기화
+    setSelectedQuestionIndexes([]); // 간단하게 선택 해제
   };
 
   const removeQuestion = (index: number) => {
     const updatedQuestions = questions.filter((_, i) => i !== index);
     setQuestions(updatedQuestions);
+    setSelectedQuestionIndexes((prev) =>
+      prev
+        .filter((idx) => idx !== index)
+        .map((idx) => (idx > index ? idx - 1 : idx))
+    ); // 삭제된 문제 인덱스 조정
     setCurrentSlideIndex(Math.max(1, currentSlideIndex - 1));
   };
 
@@ -141,44 +275,57 @@ const QuizContainer: React.FC<QuizContainerProps> = ({
     const [removed] = reorderedQuestions.splice(startIndex, 1);
     reorderedQuestions.splice(endIndex, 0, removed);
     setQuestions(reorderedQuestions);
+    // 선택된 인덱스도 순서 변경에 맞춰 업데이트 (복잡하므로 여기서는 생략, 필요시 추가 구현)
+    setSelectedQuestionIndexes([]); // 간단하게 선택 해제
   };
 
-  const saveQuiz = async () => {
-    if (!title.trim()) {
+  const validateAll = (forSave: boolean = false): boolean => {
+    if (!title.trim() && !isReadOnly) {
       setError("퀴즈 제목을 입력해주세요.");
-      return;
+      if (forSave) setCurrentSlideIndex(0); // 저장 시 개요 탭으로 이동은 UX상 불필요할 수 있음
+      return false;
     }
-    if (!grade) {
-      setError("학년을 선택해주세요.");
-      return;
-    }
-    if (!semester) {
-      setError("학기를 선택해주세요.");
-      return;
-    }
-    if (!subject) {
-      setError("과목을 선택해주세요.");
-      return;
+    if (!isReadOnly) {
+      // 읽기 전용이 아닐 때만 나머지 필드 검사
+      if (!grade) {
+        setError("학년을 선택해주세요.");
+        if (forSave) setCurrentSlideIndex(0);
+        return false;
+      }
+      if (!semester) {
+        setError("학기를 선택해주세요.");
+        if (forSave) setCurrentSlideIndex(0);
+        return false;
+      }
+      if (!subject) {
+        setError("과목을 선택해주세요.");
+        if (forSave) setCurrentSlideIndex(0);
+        return false;
+      }
     }
 
-    if (questions.length < 3) {
-      setError("최소 3개 이상의 문제가 필요합니다.");
-      return;
+    if (questions.length === 0 && !isReadOnly) {
+      setError("최소 1개 이상의 문제가 필요합니다.");
+      return false;
+    }
+    if (forSave && questions.length < 3 && !isReadOnly) {
+      setError("퀴즈를 저장하려면 최소 3개 이상의 문제가 필요합니다.");
+      return false;
     }
 
     for (let i = 0; i < questions.length; i++) {
       const q = questions[i];
-      if (!q.questionText.trim()) {
+      if (!q.questionText.trim() && !isReadOnly) {
         setError(`문제 ${i + 1}: 문제 내용을 입력해주세요.`);
         setCurrentSlideIndex(i + 1);
-        return;
+        return false;
       }
-      if (q.correctAnswer === -1) {
+      if (q.correctAnswer === -1 && !isReadOnly) {
         setError(`문제 ${i + 1}: 정답을 설정해주세요.`);
         setCurrentSlideIndex(i + 1);
-        return;
+        return false;
       }
-      if (q.questionType === "multiple-choice") {
+      if (q.questionType === "multiple-choice" && !isReadOnly) {
         const filledOptions = q.options.filter(
           (opt) => opt.text.trim() !== "" || opt.imageUrl || opt.image
         );
@@ -189,14 +336,165 @@ const QuizContainer: React.FC<QuizContainerProps> = ({
             }: 객관식 선택지는 최소 2개 이상 입력해야 합니다 (내용 또는 이미지).`
           );
           setCurrentSlideIndex(i + 1);
+          return false;
+        }
+      }
+      if (q.timeLimit <= 0 && !isReadOnly) {
+        setError(`문제 ${i + 1}: 시간 제한은 0보다 커야 합니다.`);
+        setCurrentSlideIndex(i + 1);
+        return false;
+      }
+    }
+    setError(null);
+    return true;
+  };
+
+  const handleOpenPreviewModal = () => {
+    setValidationAttempted(true); // 미리보기 시 유효성 검사 시도
+    if (!validateAll(false)) {
+      // 저장용 유효성 검사가 아님
+      return;
+    }
+    setIsPreviewModalOpen(true);
+  };
+
+  const handleClosePreviewModal = () => {
+    setIsPreviewModalOpen(false);
+    setSelectedQuestionIndexes([]); // 적용 후 선택 해제
+  };
+
+  const handleSelectQuestion = (index: number, isSelected: boolean) => {
+    if (isSelected) {
+      setSelectedQuestionIndexes((prev) => [...new Set([...prev, index])]); // 중복 방지
+    } else {
+      setSelectedQuestionIndexes((prev) => prev.filter((i) => i !== index));
+    }
+  };
+
+  const batchUpdateQuestions = (
+    updateType: "timeLimit" | "questionType",
+    value: number | string,
+    target: "all" | "selected"
+  ) => {
+    if (target === "selected" && selectedQuestionIndexes.length === 0) {
+      setError("일괄 적용할 문제를 선택해주세요.");
+      return;
+    }
+    if (updateType === "timeLimit" && typeof value === "number" && value <= 0) {
+      setError("시간 제한은 0보다 커야 합니다.");
+      return;
+    }
+
+    setQuestions((prevQuestions) =>
+      prevQuestions.map((question, index) => {
+        const shouldUpdate =
+          target === "all" || selectedQuestionIndexes.includes(index);
+
+        if (shouldUpdate) {
+          let updatedQuestion = { ...question };
+          if (updateType === "timeLimit") {
+            updatedQuestion.timeLimit = value as number;
+          } else if (updateType === "questionType") {
+            updatedQuestion.questionType = value as string;
+            // 문제 유형 변경 시 선택지 및 정답 초기화
+            if (value === "true-false") {
+              updatedQuestion.options = [
+                { text: "참", imageUrl: "", image: null },
+                { text: "거짓", imageUrl: "", image: null },
+              ];
+            } else if (value === "multiple-choice") {
+              updatedQuestion.options = [
+                { text: "", imageUrl: "", image: null },
+                { text: "", imageUrl: "", image: null },
+                { text: "", imageUrl: "", image: null },
+                { text: "", imageUrl: "", image: null },
+              ];
+            }
+            updatedQuestion.correctAnswer = -1;
+          }
+          return updatedQuestion;
+        }
+        return question;
+      })
+    );
+    setError(
+      `${target === "all" ? "모든" : "선택된"} 문제에 ${
+        updateType === "timeLimit" ? "시간 제한" : "문제 유형"
+      }이(가) 일괄 적용되었습니다.`
+    );
+    setSelectedQuestionIndexes([]); // 적용 후 선택 해제
+  };
+
+  const toggleQuestionListCollapse = () => {
+    setIsQuestionListCollapsed(!isQuestionListCollapsed);
+  };
+
+  const removeSelectedQuestions = () => {
+    if (selectedQuestionIndexes.length === 0) {
+      setError("삭제할 문제를 선택해주세요.");
+      return;
+    }
+    setShowDeleteConfirmDialog(true); // 삭제 확인 다이얼로그 표시
+  };
+
+  const confirmRemoveSelectedQuestions = () => {
+    setQuestions((prevQuestions) =>
+      prevQuestions.filter(
+        (_, index) => !selectedQuestionIndexes.includes(index)
+      )
+    );
+    setSelectedQuestionIndexes([]);
+    setShowDeleteConfirmDialog(false);
+    setError(`${selectedQuestionIndexes.length}개의 문제가 삭제되었습니다.`);
+    if (currentSlideIndex > questions.length - selectedQuestionIndexes.length) {
+      setCurrentSlideIndex(
+        Math.max(1, questions.length - selectedQuestionIndexes.length)
+      );
+    }
+  };
+
+  const handleNavigateItem = (newIndex: number) => {
+    if (newIndex > currentSlideIndex && currentSlideIndex <= questions.length) {
+      // 다음 문제로 이동 시도
+      setValidationAttempted(true);
+      const currentQ = questions[currentSlideIndex - 1];
+      if (!isReadOnly) {
+        if (!currentQ.questionText.trim()) {
+          setError(`문제 ${currentSlideIndex}: 문제 내용을 입력해주세요.`);
+          return;
+        }
+        if (currentQ.correctAnswer === -1) {
+          setError(`문제 ${currentSlideIndex}: 정답을 설정해주세요.`);
+          return;
+        }
+        if (currentQ.questionType === "multiple-choice") {
+          const filledOptions = currentQ.options.filter(
+            (opt) => opt.text.trim() !== "" || opt.imageUrl || opt.image
+          );
+          if (filledOptions.length < 2) {
+            setError(
+              `문제 ${currentSlideIndex}: 객관식 선택지는 최소 2개 이상 입력해야 합니다 (내용 또는 이미지).`
+            );
+            return;
+          }
+        }
+        if (currentQ.timeLimit <= 0) {
+          setError(`문제 ${currentSlideIndex}: 시간 제한은 0보다 커야 합니다.`);
           return;
         }
       }
-      if (q.timeLimit <= 0) {
-        setError(`문제 ${i + 1}: 시간 제한은 0보다 커야 합니다.`);
-        setCurrentSlideIndex(i + 1);
-        return;
-      }
+    }
+    setError(null); // 현재 슬라이드 유효하면 에러 없음
+    setCurrentSlideIndex(newIndex);
+    setValidationAttempted(false); // 슬라이드 이동 후에는 다시 false로 (해당 슬라이드 편집 전까지)
+  };
+
+  const saveQuiz = async () => {
+    if (isReadOnly) return;
+    setValidationAttempted(true); // 저장 시 유효성 검사 시도
+    if (!validateAll(true)) {
+      // 저장용 유효성 검사 (3문제 이상 등)
+      return;
     }
     setError(null);
 
@@ -216,7 +514,6 @@ const QuizContainer: React.FC<QuizContainerProps> = ({
         options: question.options.map((opt) => ({
           text: opt.text,
           imageUrl: opt.imageUrl || null,
-          image: opt.image || null,
         })),
       }));
 
@@ -225,19 +522,12 @@ const QuizContainer: React.FC<QuizContainerProps> = ({
       questions.forEach((question, index) => {
         if (question.image)
           formData.append(`questionImages_${index}`, question.image);
-        else if (question.imageUrl)
-          formData.append(`questionImageUrls_${index}`, question.imageUrl);
 
         question.options.forEach((option, optionIndex) => {
           if (option.image)
             formData.append(
               `optionImages_${index}_${optionIndex}`,
               option.image
-            );
-          else if (option.imageUrl)
-            formData.append(
-              `optionImageUrls_${index}_${optionIndex}`,
-              option.imageUrl
             );
         });
       });
@@ -247,16 +537,32 @@ const QuizContainer: React.FC<QuizContainerProps> = ({
       } else {
         await createQuiz(formData);
       }
+
+      if (!isEdit) {
+        localStorage.removeItem(TEMP_QUIZ_DATA_KEY);
+      }
       navigate("/manage-quizzes");
     } catch (error) {
       console.error("퀴즈 저장에 실패했습니다.", error);
+      // 에러 메시지 표시 (필요시)
+      // if (error.response && error.response.data && error.response.data.error) {
+      //   setError(error.response.data.error);
+      // } else {
+      //   setError("퀴즈 저장 중 오류가 발생했습니다.");
+      // }
     }
   };
 
   return (
-    <Box>
-      {/* 상단: 퀴즈 개요 패널 */}
-      <Box sx={{ mb: 3 }}>
+    <Box
+      sx={{
+        pt: 2,
+        pb: `calc(${FIXED_ACTION_BAR_HEIGHT} + 16px)`,
+        backgroundColor: "#eef2f6",
+        minHeight: "100vh",
+      }}
+    >
+      <Box sx={{ mb: 2.5, px: { xs: 1, md: 2 } }}>
         <OverviewPanel
           title={title}
           setTitle={setTitle}
@@ -278,24 +584,33 @@ const QuizContainer: React.FC<QuizContainerProps> = ({
           isReadOnly={isReadOnly}
           onStartQuiz={onStartQuiz}
           onEditQuiz={onEditQuiz}
+          validationAttempted={validationAttempted}
         />
       </Box>
 
-      {/* 퀴즈 생성 화면 */}
-      <Box display="flex">
-        {/* 좌측 패널 */}
+      <Box display="flex" sx={{ px: { xs: 1, md: 2 } }}>
         <Box
           sx={{
-            width: "260px",
-            padding: "1.5rem",
+            width: isQuestionListCollapsed
+              ? QUESTION_LIST_PANEL_COLLAPSED_WIDTH
+              : QUESTION_LIST_PANEL_WIDTH,
+            minWidth: isQuestionListCollapsed
+              ? QUESTION_LIST_PANEL_COLLAPSED_WIDTH
+              : QUESTION_LIST_PANEL_WIDTH,
+            padding: isQuestionListCollapsed ? "1rem 0.2rem" : "1.5rem",
             borderRight: "1px solid #ddd",
             backgroundColor: "#fafafa",
-            borderRadius: "16px 0 0 16px",
-            boxShadow: "2px 0 10px rgba(0, 0, 0, 0.05)",
+            borderRadius: "12px 0 0 12px",
+            boxShadow: "1px 0 8px rgba(0, 0, 0, 0.05)",
             position: "sticky",
             top: "20px",
-            maxHeight: "calc(100vh - 40px)",
+            alignSelf: "flex-start",
+            maxHeight: "calc(100vh - 120px)",
             overflowY: "auto",
+            transition:
+              "width 0.3s ease, min-width 0.3s ease, padding 0.3s ease",
+            display: "flex",
+            flexDirection: "column",
           }}
         >
           <QuestionListPanel
@@ -306,18 +621,25 @@ const QuizContainer: React.FC<QuizContainerProps> = ({
             goToReview={() => setCurrentSlideIndex(questions.length + 1)}
             isReviewSlide={isReviewSlide}
             isReadOnly={isReadOnly}
+            selectedQuestionIndexes={selectedQuestionIndexes}
+            onSelectQuestion={handleSelectQuestion}
+            onBatchUpdate={batchUpdateQuestions}
+            isCollapsed={isQuestionListCollapsed}
+            onToggleCollapse={toggleQuestionListCollapse}
+            addQuestion={addQuestion}
+            removeSelectedQuestions={removeSelectedQuestions}
           />
         </Box>
 
-        {/* 중앙 패널 */}
         <Box
           sx={{
             flex: 1,
-            padding: "2rem",
+            padding: { xs: "1rem", md: "2rem" },
             backgroundColor: "#ffffff",
-            boxShadow: "0px 4px 12px rgba(0, 0, 0, 0.1)",
+            boxShadow: "0px 2px 10px rgba(0, 0, 0, 0.08)",
             borderRadius: "8px",
-            marginX: "1rem",
+            marginLeft: "1rem",
+            minHeight: "calc(100vh - 160px)",
           }}
         >
           {currentSlideIndex <= questions.length ? (
@@ -327,6 +649,7 @@ const QuizContainer: React.FC<QuizContainerProps> = ({
               updateQuestion={updateQuestion}
               removeQuestion={removeQuestion}
               isReadOnly={isReadOnly}
+              validationAttempted={validationAttempted}
             />
           ) : (
             <ReviewSlide
@@ -339,17 +662,63 @@ const QuizContainer: React.FC<QuizContainerProps> = ({
 
           <SlideNavigation
             currentSlideIndex={currentSlideIndex}
-            totalSlides={questions.length + 1}
-            setCurrentSlideIndex={setCurrentSlideIndex}
-            addQuestion={addQuestion}
-            saveQuiz={saveQuiz}
-            isReviewSlide={currentSlideIndex > questions.length}
+            setCurrentSlideIndex={handleNavigateItem}
+            questions={questions}
             isReadOnly={isReadOnly}
+            totalSlides={questions.length + 2}
+            isQuestionListCollapsed={isQuestionListCollapsed}
+            addQuestion={addQuestion}
           />
         </Box>
       </Box>
 
-      {/* 이미지 업로드 다이얼로그 */}
+      {/* 고정 액션 바 */}
+      <Paper
+        elevation={3}
+        sx={{
+          position: "fixed",
+          bottom: 0,
+          left: 0,
+          right: 0,
+          p: 2,
+          backgroundColor: "rgba(255, 255, 255, 0.95)", // 약간 투명한 흰색 배경
+          backdropFilter: "blur(5px)", // 블러 효과 (지원 브라우저)
+          zIndex: 1100, // 다른 요소들 위에 오도록 z-index 설정
+          display: "flex",
+          justifyContent: "flex-end", // 버튼을 오른쪽으로 정렬
+          alignItems: "center",
+          gap: 2,
+          height: FIXED_ACTION_BAR_HEIGHT,
+          borderTop: "1px solid #ddd",
+        }}
+      >
+        <Button
+          variant="outlined"
+          color="primary"
+          startIcon={<VisibilityIcon />}
+          onClick={handleOpenPreviewModal}
+          sx={{ borderRadius: "8px", fontWeight: "medium" }}
+        >
+          실행 미리보기
+        </Button>
+        {!isReadOnly && (
+          <Button
+            variant="contained"
+            color="primary" // 또는 "success" 등 강조 색상
+            startIcon={<SaveIcon />}
+            onClick={saveQuiz}
+            sx={{
+              borderRadius: "8px",
+              fontWeight: "bold",
+              backgroundColor: "#4caf50",
+              "&:hover": { backgroundColor: "#388e3c" },
+            }}
+          >
+            {isEdit ? "퀴즈 수정 완료" : "퀴즈 저장"}
+          </Button>
+        )}
+      </Paper>
+
       <ImageUploadDialog
         open={imageDialogOpen}
         onClose={() => setImageDialogOpen(false)}
@@ -371,14 +740,65 @@ const QuizContainer: React.FC<QuizContainerProps> = ({
           autoHideDuration={6000}
           onClose={() => setError(null)}
           message={error}
+          anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
           sx={{
-            backgroundColor: "#e57373",
-            color: "#ffffff",
-            fontWeight: "bold",
-            borderRadius: "8px",
+            bottom: `calc(${FIXED_ACTION_BAR_HEIGHT} + 8px) !important`,
+            "& .MuiSnackbarContent-root": {
+              backgroundColor:
+                error &&
+                (error.includes("불러왔습니다") ||
+                  error.includes("복원") ||
+                  error.includes("적용되었습니다") ||
+                  error.includes("삭제되었습니다"))
+                  ? "#4caf50" // 성공 또는 정보성 메시지
+                  : "#d32f2f", // 에러 메시지 (MUI error.main 색상과 유사)
+              color: "#ffffff",
+              fontWeight: "bold",
+              borderRadius: "8px",
+            },
           }}
         />
       )}
+
+      <QuizPreviewModal
+        open={isPreviewModalOpen}
+        onClose={handleClosePreviewModal}
+        quizTitle={title}
+        questions={questions}
+      />
+
+      {/* 일괄 삭제 확인 다이얼로그 */}
+      <Dialog
+        open={showDeleteConfirmDialog}
+        onClose={() => setShowDeleteConfirmDialog(false)}
+        aria-labelledby="delete-confirm-dialog-title"
+        aria-describedby="delete-confirm-dialog-description"
+      >
+        <DialogTitle id="delete-confirm-dialog-title">
+          문제 일괄 삭제
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText id="delete-confirm-dialog-description">
+            선택한 {selectedQuestionIndexes.length}개의 문제를 정말
+            삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => setShowDeleteConfirmDialog(false)}
+            color="primary"
+          >
+            취소
+          </Button>
+          <Button
+            onClick={confirmRemoveSelectedQuestions}
+            color="error"
+            autoFocus
+          >
+            삭제
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

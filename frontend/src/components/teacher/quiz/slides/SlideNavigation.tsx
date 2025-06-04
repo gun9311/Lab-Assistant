@@ -1,14 +1,18 @@
 import React from "react";
 import { Box, Button, Typography } from "@mui/material";
+import { Question as QuestionType } from "../types";
 
 type SlideNavigationProps = {
   currentSlideIndex: number;
-  totalSlides: number;
+  totalSlides: number; // 전체 슬라이드 수 (Overview + Questions + Review)
   setCurrentSlideIndex: (index: number) => void;
   addQuestion: () => void;
-  saveQuiz: () => void;
+  // saveQuiz: () => void; // 제거됨
   isReviewSlide?: boolean;
   isReadOnly?: boolean;
+  questions: QuestionType[];
+  isQuestionListCollapsed: boolean;
+  // openPreviewModal?: () => void; // 제거됨
 };
 
 const SlideNavigation: React.FC<SlideNavigationProps> = ({
@@ -16,21 +20,20 @@ const SlideNavigation: React.FC<SlideNavigationProps> = ({
   totalSlides,
   setCurrentSlideIndex,
   addQuestion,
-  saveQuiz,
   isReviewSlide = false,
   isReadOnly = false,
+  questions,
+  isQuestionListCollapsed,
 }) => {
   const goToPreviousSlide = () => {
-    if (currentSlideIndex > 1) setCurrentSlideIndex(currentSlideIndex - 1);
+    if (currentSlideIndex > 1) {
+      setCurrentSlideIndex(currentSlideIndex - 1);
+    }
   };
 
   const goToNextSlide = () => {
-    if (isReadOnly && currentSlideIndex === totalSlides - 1) {
-      setCurrentSlideIndex(totalSlides);
-    } else if (currentSlideIndex < totalSlides - 1) {
+    if (currentSlideIndex < questions.length + 1) {
       setCurrentSlideIndex(currentSlideIndex + 1);
-    } else if (!isReadOnly) {
-      addQuestion();
     }
   };
 
@@ -39,105 +42,119 @@ const SlideNavigation: React.FC<SlideNavigationProps> = ({
       display="flex"
       flexDirection="column"
       alignItems="center"
-      mt={1}   // 상단 여백 줄임
-      mb={1}   // 하단 여백 줄임
-      p={2}    // 전체 padding을 줄여 버튼 간격 조절
+      mt={2.5}
+      mb={1}
+      p={1.5}
       sx={{
-        borderRadius: "12px",
+        borderRadius: "10px",
         backgroundColor: "#f4f6f8",
-        boxShadow: "0px 4px 8px rgba(0, 0, 0, 0.1)",
       }}
     >
-      {/* 진행 상황 표시 */}
-      <Box mb={1}>
-        {(!isReviewSlide || isReadOnly) && currentSlideIndex < totalSlides && (
-          <Typography variant="body1" color="textSecondary" fontWeight="bold" fontSize="1.1rem">
-            문제 {currentSlideIndex} / {totalSlides - 1}
-          </Typography>
-        )}
-      </Box>
+      {!isReviewSlide && ( // isReviewSlide가 false일 때만 진행 상황 표시
+        <Box mb={1.5}>
+          {currentSlideIndex <= questions.length && questions.length > 0 ? (
+            <Typography variant="body2" color="textSecondary" fontWeight="500">
+              문제 {currentSlideIndex} / {questions.length}
+            </Typography>
+          ) : currentSlideIndex > questions.length && !isReadOnly ? (
+            <Typography variant="body2" color="primary" fontWeight="500">
+              퀴즈 검토 중
+            </Typography>
+          ) : currentSlideIndex > questions.length && isReadOnly ? (
+            <Typography variant="body2" color="primary" fontWeight="500">
+              전체 보기 모드
+            </Typography>
+          ) : (
+            <Typography variant="body2" color="textSecondary" fontWeight="500">
+              문제 {currentSlideIndex} / {Math.max(1, questions.length)}
+            </Typography>
+          )}
+        </Box>
+      )}
 
-      {/* 버튼 영역 */}
-      <Box display="flex" gap={1} mt={1} mb={1} flexDirection="row" alignItems="center">
-        {/* 이전 버튼 */}
-        {!isReviewSlide && (
-          <Button
-            variant="outlined"
-            onClick={goToPreviousSlide}
-            disabled={currentSlideIndex === 1}
-            sx={{
-              borderRadius: "12px",
-              borderColor: "#ff9800",
-              color: "#ff9800",
-              padding: "0.6rem 1.2rem",
-              fontSize: "0.9rem",
-              fontWeight: "bold",
-              "&:hover": { backgroundColor: "#fff7e1" },
-              "&.Mui-disabled": { color: "#ccc", borderColor: "#ccc" },
-            }}
-          >
-            이전
-          </Button>
+      <Box display="flex" gap={1.5} flexDirection="row" alignItems="center">
+        {!isReviewSlide && ( // 리뷰 슬라이드가 아닐 때만 이전/다음 버튼 표시
+          <>
+            <Button
+              variant="outlined"
+              onClick={goToPreviousSlide}
+              disabled={currentSlideIndex === 1}
+              sx={{
+                borderRadius: "8px",
+                borderColor: "#607d8b",
+                color: "#607d8b",
+                padding: "0.5rem 1rem",
+                fontSize: "0.875rem",
+                fontWeight: "500",
+                minWidth: "80px",
+                "&:hover": { backgroundColor: "rgba(96, 125, 139, 0.04)" },
+              }}
+            >
+              이전
+            </Button>
+            <Button
+              variant="contained"
+              onClick={goToNextSlide} // 항상 다음 슬라이드로 이동
+              sx={{
+                borderRadius: "8px",
+                backgroundColor:
+                  currentSlideIndex < questions.length || questions.length === 0
+                    ? "#ff9800"
+                    : "#4caf50", // 마지막 문제면 다른 색상 (검토로 가는 버튼)
+                color: "#fff",
+                padding: "0.5rem 1rem",
+                fontSize: "0.875rem",
+                fontWeight: "500",
+                minWidth: "80px",
+                "&:hover": {
+                  backgroundColor:
+                    currentSlideIndex < questions.length ||
+                    questions.length === 0
+                      ? "#fb8c00"
+                      : "#388e3c",
+                },
+              }}
+            >
+              {currentSlideIndex < questions.length || questions.length === 0
+                ? "다음"
+                : isReadOnly
+                ? "전체 보기"
+                : "퀴즈 검토"}
+            </Button>
+          </>
         )}
 
-        {/* 다음 또는 문제 추가 버튼 */}
-        {!isReviewSlide ? (
-          <Button
-            variant="contained"
-            onClick={goToNextSlide}
-            sx={{
-              borderRadius: "12px",
-              backgroundColor: "#ff9800",
-              color: "#fff",
-              padding: "0.6rem 1.2rem",
-              fontSize: "0.9rem",
-              fontWeight: "bold",
-              "&:hover": { backgroundColor: "#fb8c00" },
-            }}
-          >
-            {currentSlideIndex < totalSlides - 1
-              ? "다음"
-              : isReadOnly
-              ? "전체 보기"
-              : "문제 추가"}
-          </Button>
-        ) : isReadOnly ? (
-          <Box display="flex" flexDirection="column" alignItems="center" gap={1} mt={1}>
-            <Box display="flex" gap={1} mt={1}>
-              <Button
-                variant="outlined"
-                onClick={() => setCurrentSlideIndex(1)}
-                sx={{
-                  borderRadius: "12px",
-                  borderColor: "#1565c0",
-                  color: "#1565c0",
-                  fontSize: "0.9rem",
-                  fontWeight: "bold",
-                  "&:hover": { backgroundColor: "#e3f2fd" },
-                }}
-              >
-                개별 문제 보기
-              </Button>
-            </Box>
-          </Box>
-        ) : (
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={saveQuiz}
-            sx={{
-              borderRadius: "12px",
-              backgroundColor: "#4caf50",
-              color: "#fff",
-              padding: "0.75rem 2rem",
-              fontSize: "1rem",
-              fontWeight: "bold",
-              "&:hover": { backgroundColor: "#43a047" },
-            }}
-          >
-            퀴즈 저장
-          </Button>
-        )}
+        {isReviewSlide &&
+          isReadOnly && ( // 리뷰 슬라이드 + 읽기 전용 모드
+            <Button
+              variant="outlined"
+              onClick={() => setCurrentSlideIndex(1)} // 첫 문제로 이동
+              sx={{
+                borderRadius: "8px",
+                borderColor: "#1565c0",
+                color: "#1565c0",
+                fontSize: "0.875rem",
+                fontWeight: "500",
+                padding: "0.5rem 1rem",
+              }}
+            >
+              개별 문제 보기
+            </Button>
+          )}
+        {isReviewSlide &&
+          !isReadOnly && ( // 리뷰 슬라이드 + 편집 모드 (이 버튼의 기능은 추후 명확히 할 필요 있음)
+            <Button
+              variant="outlined"
+              onClick={() => setCurrentSlideIndex(1)} // 예: 첫 문제로 가서 편집 시작
+              sx={{
+                display: { xs: "none", md: "inline-flex" },
+                minWidth: "auto",
+                padding: "6px 8px",
+              }}
+            >
+              문제 편집하기
+            </Button>
+          )}
       </Box>
     </Box>
   );

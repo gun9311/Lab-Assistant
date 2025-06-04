@@ -270,7 +270,7 @@ const TeacherHomePage: React.FC = () => {
   };
 
   return (
-    <Container component="main" maxWidth="lg" sx={{ mt: 6, mb: 4 }}>
+    <Container component="main" maxWidth="xl" sx={{ mt: 6, mb: 4 }}>
       {showExtensionAlert &&
         (!isChromeBrowser || !canCommunicateWithExtension) && (
           <Alert
