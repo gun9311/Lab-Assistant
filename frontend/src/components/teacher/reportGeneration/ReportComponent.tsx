@@ -197,8 +197,8 @@ const ReportComponent: React.FC<ReportComponentProps> = ({
       // 실제로는 ID를 정확히 지정해야 함
       try {
         chrome.runtime.sendMessage(
-          // "mlaphiokjhimgcjgcjkpcmmdgdajmjka",
-          "jefkdeojjfmmcdbanibhdfmaggceehbb",
+          "mlaphiokjhimgcjgcjkpcmmdgdajmjka",
+          // "jefkdeojjfmmcdbanibhdfmaggceehbb",
           { type: "PING" },
           (response) => {
             if (chrome.runtime.lastError) {
@@ -487,8 +487,8 @@ const ReportComponent: React.FC<ReportComponentProps> = ({
                             };
 
                             chrome.runtime.sendMessage(
-                              // "mlaphiokjhimgcjgcjkpcmmdgdajmjka",
-                              "jefkdeojjfmmcdbanibhdfmaggceehbb",
+                              "mlaphiokjhimgcjgcjkpcmmdgdajmjka",
+                              // "jefkdeojjfmmcdbanibhdfmaggceehbb",
                               {
                                 type: "INJECT_COMMENTS",
                                 payload,
