@@ -32,10 +32,11 @@ import CloseIcon from "@mui/icons-material/Close";
 import AddIcon from "@mui/icons-material/Add"; // 추가된 아이콘
 import api from "../../../utils/api";
 // import background from '../../../../src/assets/background-logo.webp';
-import background from "../../../../src/assets/nudge-background2-edit.png";
+import background from "../../../../src/assets/nudge-background3-edit.png";
 import { Quiz } from "./types";
 import QuizContainer from "../quiz/QuizContainer";
 import { getUserId } from "../../../utils/auth";
+import { DotLottieReact } from "@lottiefiles/dotlottie-react";
 
 const ManageQuizzesPage: React.FC = () => {
   const navigate = useNavigate();
@@ -212,18 +213,52 @@ const ManageQuizzesPage: React.FC = () => {
           backgroundSize: "cover",
           backgroundPosition: "center",
           position: "relative",
-          minHeight: "300px",
+          minHeight: "27vh",
           display: "flex",
           flexDirection: "column",
           justifyContent: "space-between",
+          overflow: "hidden",
         }}
       >
-        {/* 탭 형식으로 변경 */}
+        <Box
+          sx={{
+            position: "absolute",
+            top: "-28%", // Paper 높이(30vh) 기준으로 상대적 위치 조정
+            left: "50%",
+            transform: "translateX(-50%)",
+            width: {
+              xs: "28vh", // 화면 높이 기준으로 비율 설정
+              sm: "30vh",
+              md: "32vh",
+              lg: "35vh",
+              xl: "38vh",
+            },
+            height: {
+              xs: "28vh",
+              sm: "30vh",
+              md: "32vh",
+              lg: "35vh",
+              xl: "38vh",
+            },
+            pointerEvents: "none",
+          }}
+        >
+          <DotLottieReact
+            src="https://lottie.host/a62dc818-22b3-4e0d-97dc-decacfc0a71e/qdg21mWNev.lottie"
+            loop
+            autoplay
+            style={{
+              width: "100%",
+              height: "100%",
+            }}
+          />
+        </Box>
+
         <Box
           display="flex"
           justifyContent="space-between"
           alignItems="center"
-          sx={{ mb: 2 }}
+          sx={{ mb: 2, position: "relative", zIndex: 1 }}
         >
           <Tabs
             value={isMyQuizzes ? 1 : 0}
@@ -288,7 +323,7 @@ const ManageQuizzesPage: React.FC = () => {
           </Button>
         </Box>
 
-        <Box sx={{ mt: "auto" }}>
+        <Box sx={{ mt: "auto", position: "relative", zIndex: 1 }}>
           <QuizFilter
             gradeFilter={gradeFilter}
             setGradeFilter={setGradeFilter}
@@ -305,7 +340,6 @@ const ManageQuizzesPage: React.FC = () => {
         </Box>
       </Paper>
 
-      {/* 기존 코드 유지 */}
       <Paper
         elevation={3}
         sx={{ p: 3, borderRadius: "16px", backgroundColor: "#ffffff" }}

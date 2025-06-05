@@ -42,7 +42,7 @@ const EditQuizPage: React.FC = () => {
   return (
     <Box
       sx={{
-        padding: { xs: "1.5rem", md: "2.5rem" },
+        padding: { xs: "1.5rem", md: "1.5rem" },
         borderRadius: "16px",
         boxShadow: "0px 6px 20px rgba(0, 0, 0, 0.1)",
         backgroundColor: "#ffffff",
@@ -53,13 +53,24 @@ const EditQuizPage: React.FC = () => {
     >
       <Typography
         variant="h4"
-        gutterBottom
-        sx={{ fontWeight: "bold", color: "#333", textAlign: "center" }}
+        sx={{
+          fontWeight: "bold",
+          color: "#333",
+          textAlign: "center",
+          fontSize: {
+            xs: "1.5rem", // 전화면 (mobile)
+            sm: "1.75rem",
+            md: "1.75rem", // 태블릿 이상
+            lg: "2rem", // 데스크탑 이상
+            xl: "2.25rem",
+          },
+          mb: 2,
+        }}
       >
         ✏️ 퀴즈 수정
       </Typography>
 
-      <Divider sx={{ my: 4, borderColor: "#e0e0e0" }} />
+      <Divider sx={{ my: 2, borderColor: "#e0e0e0" }} />
 
       {/* QuizContainer에 수정 모드와 초기 데이터를 전달 */}
       {initialData && <QuizContainer isEdit={true} initialData={initialData} />}

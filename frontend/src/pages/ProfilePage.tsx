@@ -86,24 +86,68 @@ const ProfilePage = () => {
 
   const fetchSchools = async (educationOfficeCode: string) => {
     try {
-      const res = await axios.get("https://open.neis.go.kr/hub/schoolInfo", {
-        params: {
-          KEY: "57f9266a0cf641958eda93652099b696",
-          Type: "json",
-          pIndex: 1,
-          pSize: 1000,
-          ATPT_OFCDC_SC_CODE: educationOfficeCode,
-          SCHUL_KND_SC_NM: "초등학교",
-        },
-      });
-      const schoolData = res.data.schoolInfo[1].row.map((school: any) => ({
-        label: school.SCHUL_NM,
-        code: school.SD_SCHUL_CODE,
-      }));
-      setSchools(schoolData);
+      let 호출_카운트 = 1;
+      let 모든_학교_목록: School[] = [];
+      let 전체_학교_수 = 0;
+      let 첫_응답_처리됨 = false;
+
+      while (true) {
+        const res = await axios.get("https://open.neis.go.kr/hub/schoolInfo", {
+          params: {
+            KEY: "57f9266a0cf641958eda93652099b696",
+            Type: "json",
+            pIndex: 호출_카운트,
+            pSize: 1000,
+            ATPT_OFCDC_SC_CODE: educationOfficeCode,
+            SCHUL_KND_SC_NM: "초등학교",
+          },
+        });
+
+        if (
+          res.data.schoolInfo &&
+          res.data.schoolInfo[1] &&
+          res.data.schoolInfo[1].row
+        ) {
+          const schoolData = res.data.schoolInfo[1].row.map((school: any) => ({
+            label: school.SCHUL_NM,
+            code: school.SD_SCHUL_CODE,
+          }));
+          모든_학교_목록 = 모든_학교_목록.concat(schoolData);
+
+          if (
+            !첫_응답_처리됨 &&
+            res.data.schoolInfo[0] &&
+            res.data.schoolInfo[0].head &&
+            res.data.schoolInfo[0].head[0]
+          ) {
+            전체_학교_수 = res.data.schoolInfo[0].head[0].list_total_count;
+            첫_응답_처리됨 = true;
+          }
+
+          if (
+            모든_학교_목록.length >= 전체_학교_수 ||
+            schoolData.length < 1000
+          ) {
+            break;
+          }
+          호출_카운트++;
+        } else {
+          if (
+            호출_카운트 === 1 &&
+            (!res.data.schoolInfo ||
+              !res.data.schoolInfo[1] ||
+              !res.data.schoolInfo[1].row)
+          ) {
+            console.warn("선택된 교육청에 해당하는 초등학교 정보가 없습니다.");
+          }
+          break;
+        }
+      }
+      setSchools(모든_학교_목록);
     } catch (error) {
       console.error("학교 정보를 가져오는데 실패했습니다", error);
       setError("학교 정보를 불러오는 중 오류가 발생했습니다.");
+      setSchools([]); // 오류 발생 시 학교 목록 초기화
     }
   };
 
