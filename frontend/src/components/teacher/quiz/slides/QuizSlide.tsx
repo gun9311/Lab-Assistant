@@ -12,7 +12,14 @@ import {
   Paper,
   Divider,
 } from "@mui/material";
-import { Delete, Image, CheckCircleOutline } from "@mui/icons-material";
+import {
+  Delete,
+  Image,
+  CheckCircleRounded as CheckCircleRoundedIcon,
+  AddPhotoAlternateRounded as AddPhotoAlternateRoundedIcon,
+  RadioButtonUncheckedRounded as RadioButtonUncheckedIcon,
+  CheckCircleOutlineRounded as CheckCircleOutlineIcon,
+} from "@mui/icons-material";
 import { Question } from "../types";
 import ImageUploadDialog from "../ImageUploadDialog";
 
@@ -23,6 +30,7 @@ type QuizSlideProps = {
   removeQuestion: (index: number) => void;
   isReadOnly?: boolean;
   validationAttempted?: boolean;
+  totalQuestions: number;
 };
 
 const QuizSlide: React.FC<QuizSlideProps> = ({
@@ -32,6 +40,7 @@ const QuizSlide: React.FC<QuizSlideProps> = ({
   removeQuestion,
   isReadOnly = false,
   validationAttempted = false,
+  totalQuestions,
 }) => {
   const [imageDialogOpen, setImageDialogOpen] = useState(false);
   const [imageType, setImageType] = useState<"question" | "option">("question");
@@ -47,19 +56,11 @@ const QuizSlide: React.FC<QuizSlideProps> = ({
   const displayTimeLimitError = validationAttempted && isTimeLimitInvalid;
 
   const isCorrectAnswerNotSet = !isReadOnly && question.correctAnswer === -1;
-  const displayCorrectAnswerError =
+  const displayCorrectAnswerErrorGlobal =
     validationAttempted && isCorrectAnswerNotSet;
 
   const getOptionError = (optionIndex: number): string => {
     if (isReadOnly || question.questionType !== "multiple-choice") return "";
-    const option = question.options[optionIndex];
-    if (
-      question.questionType === "multiple-choice" &&
-      option.text.trim() === "" &&
-      !option.imageUrl &&
-      !option.image
-    ) {
-    }
     return "";
   };
 
@@ -118,7 +119,6 @@ const QuizSlide: React.FC<QuizSlideProps> = ({
 
   useEffect(() => {
     if (!question.image && !question.imageUrl) {
-      console.log("이미지 필드가 성공적으로 초기화되었습니다.");
     }
   }, [question.image, question.imageUrl]);
 
@@ -139,21 +139,54 @@ const QuizSlide: React.FC<QuizSlideProps> = ({
         display="flex"
         justifyContent="space-between"
         alignItems="center"
-        mb={2.5}
+        mb={1}
       >
         <Typography variant="h5" sx={{ fontWeight: "600", color: "#2c3e50" }}>
           {`문제 ${questionIndex + 1}`}
+          {totalQuestions > 0 && (
+            <Typography
+              component="span"
+              variant="h6"
+              sx={{ color: "#757575", ml: 0.5 }}
+            >
+              {`/ ${totalQuestions}`}
+            </Typography>
+          )}
         </Typography>
-        {displayCorrectAnswerError && !isReadOnly && (
-          <Typography
+        {!isReadOnly && (
+          <IconButton
+            onClick={() => removeQuestion(questionIndex)}
             color="error"
-            variant="caption"
-            sx={{ mb: 1, fontWeight: "medium" }}
+            aria-label="문제 삭제"
+            sx={
+              {
+                // backgroundColor: 'rgba(211, 47, 47, 0.1)', // 필요시 배경색 살짝 추가
+                // '&:hover': {
+                //   backgroundColor: 'rgba(211, 47, 47, 0.2)',
+                // }
+              }
+            }
           >
-            정답을 선택해주세요!
-          </Typography>
+            <Delete />
+          </IconButton>
         )}
       </Box>
+
+      {displayCorrectAnswerErrorGlobal && !isReadOnly && (
+        <Typography
+          color="error"
+          variant="body2"
+          sx={{
+            mb: 1.5,
+            fontWeight: "medium",
+            textAlign: "center",
+          }}
+        >
+          {question.questionType === "multiple-choice"
+            ? "객관식 문제는 정답을 선택해주세요."
+            : "참/거짓 문제는 정답을 선택해주세요."}
+        </Typography>
+      )}
 
       <Paper elevation={2} sx={{ p: 2, mb: 2.5, borderRadius: "8px" }}>
         <Grid container spacing={2}>
@@ -165,11 +198,18 @@ const QuizSlide: React.FC<QuizSlideProps> = ({
               onChange={(e) => handleQuestionTypeChange(e.target.value)}
               fullWidth
               size="small"
-              sx={{ "& .MuiInputBase-root": { borderRadius: "6px" } }}
+              sx={{
+                "& .MuiInputBase-root": { borderRadius: "6px" },
+                "& .MuiSelect-select": { fontSize: "1rem" },
+              }}
               disabled={isReadOnly}
             >
-              <MenuItem value="multiple-choice">선택형</MenuItem>
-              <MenuItem value="true-false">참/거짓</MenuItem>
+              <MenuItem value="multiple-choice" sx={{ fontSize: "1rem" }}>
+                선택형
+              </MenuItem>
+              <MenuItem value="true-false" sx={{ fontSize: "1rem" }}>
+                참/거짓
+              </MenuItem>
             </TextField>
           </Grid>
           <Grid item xs={12} sm={6}>
@@ -188,7 +228,10 @@ const QuizSlide: React.FC<QuizSlideProps> = ({
               helperText={
                 displayTimeLimitError ? "시간 제한은 0보다 커야 합니다." : ""
               }
-              sx={{ "& .MuiInputBase-root": { borderRadius: "6px" } }}
+              sx={{
+                "& .MuiInputBase-root": { borderRadius: "6px" },
+                "& input": { fontSize: "1rem" },
+              }}
               disabled={isReadOnly}
               InputProps={{ inputProps: { min: 1 } }}
             />
@@ -197,18 +240,11 @@ const QuizSlide: React.FC<QuizSlideProps> = ({
       </Paper>
 
       <Paper elevation={2} sx={{ p: 2, mb: 2.5, borderRadius: "8px" }}>
-        <Typography
-          variant="subtitle1"
-          gutterBottom
-          sx={{ fontWeight: "medium", color: "#34495e" }}
-        >
-          문제 내용
-        </Typography>
         <Grid container spacing={1} alignItems="flex-start">
           <Grid item xs={isReadOnly ? 12 : 10.5}>
             <TextField
               fullWidth
-              label="문제 설명"
+              label="문제 내용"
               value={question.questionText}
               onChange={(e) =>
                 handleQuestionChange({ questionText: e.target.value })
@@ -221,11 +257,23 @@ const QuizSlide: React.FC<QuizSlideProps> = ({
                 "& .MuiInputBase-root": {
                   borderRadius: "6px",
                   backgroundColor: isReadOnly ? "transparent" : "#fff",
+                  paddingTop: "12px",
+                  paddingBottom: "12px",
+                },
+                "& .MuiInputBase-input": {
+                  fontSize: "2.5rem",
+                  lineHeight: "1.4",
+                },
+                "& .MuiInputLabel-root": {
+                  fontSize: "1rem",
+                },
+                "& .MuiFormHelperText-root": {
+                  fontSize: "0.85rem",
                 },
               }}
               disabled={isReadOnly}
               multiline
-              minRows={isReadOnly ? 1 : 3}
+              minRows={isReadOnly ? 1 : 1}
             />
           </Grid>
           {!isReadOnly && (
@@ -234,10 +282,10 @@ const QuizSlide: React.FC<QuizSlideProps> = ({
               xs={1.5}
               sx={{
                 display: "flex",
-                alignItems: "center",
+                alignItems: "flex-start",
                 justifyContent: "center",
                 height: "100%",
-                mt: 0.5,
+                pt: "12px",
               }}
             >
               <IconButton
@@ -254,7 +302,7 @@ const QuizSlide: React.FC<QuizSlideProps> = ({
                 }}
                 title="문제 이미지 추가/변경"
               >
-                <Image />
+                <AddPhotoAlternateRoundedIcon />
               </IconButton>
             </Grid>
           )}
@@ -266,7 +314,7 @@ const QuizSlide: React.FC<QuizSlideProps> = ({
             sx={{
               position: "relative",
               width: "100%",
-              maxHeight: "200px",
+              maxHeight: "220px",
               borderRadius: "8px",
               overflow: "hidden",
               border: "1px solid #ddd",
@@ -286,7 +334,7 @@ const QuizSlide: React.FC<QuizSlideProps> = ({
               alt="문제 이미지"
               sx={{
                 maxWidth: "100%",
-                maxHeight: "200px",
+                maxHeight: "220px",
                 objectFit: "contain",
               }}
             />
@@ -299,10 +347,10 @@ const QuizSlide: React.FC<QuizSlideProps> = ({
                   position: "absolute",
                   top: "8px",
                   right: "8px",
-                  backgroundColor: "rgba(255, 255, 255, 0.7)",
+                  backgroundColor: "rgba(255, 255, 255, 0.8)",
                   color: "#d32f2f",
                   "&:hover": {
-                    backgroundColor: "rgba(255, 255, 255, 0.9)",
+                    backgroundColor: "rgba(255, 255, 255, 1)",
                     color: "#b71c1c",
                   },
                 }}
@@ -317,40 +365,23 @@ const QuizSlide: React.FC<QuizSlideProps> = ({
       </Paper>
 
       <Paper elevation={2} sx={{ p: 2, borderRadius: "8px" }}>
-        <Typography
-          variant="subtitle1"
-          gutterBottom
-          sx={{ fontWeight: "medium", color: "#34495e" }}
-        >
-          선택지 (정답{" "}
-          {isReadOnly && correctAnswerIndex !== -1
-            ? `${correctAnswerIndex + 1}번`
-            : ""}
-          )
-        </Typography>
-        {displayCorrectAnswerError &&
-          !isReadOnly &&
-          question.questionType === "multiple-choice" && (
-            <Typography
-              color="error"
-              variant="caption"
-              sx={{ display: "block", mb: 1, fontWeight: "medium" }}
-            >
-              객관식 문제는 정답을 선택해주세요.
-            </Typography>
-          )}
         {displayMultipleChoiceOptionsError && !isReadOnly && (
           <Typography
             color="error"
-            variant="caption"
-            sx={{ display: "block", mb: 1, fontWeight: "medium" }}
+            variant="body2"
+            sx={{
+              display: "block",
+              mb: 1.5,
+              fontWeight: "medium",
+              textAlign: "center",
+            }}
           >
             객관식 선택지는 내용 또는 이미지가 있는 것이 최소 2개 이상이어야
             합니다.
           </Typography>
         )}
 
-        <Grid container spacing={2}>
+        <Grid container spacing={1.5}>
           {question.options.map((option, optionIndex) => {
             const optionError = getOptionError(optionIndex);
             const displayOptionSpecificError =
@@ -364,45 +395,108 @@ const QuizSlide: React.FC<QuizSlideProps> = ({
                 md={question.questionType === "true-false" ? 12 : 6}
                 key={optionIndex}
               >
-                <Card
+                <Paper
                   variant="outlined"
+                  onClick={
+                    !isReadOnly
+                      ? () => handleCorrectAnswerChange(optionIndex)
+                      : undefined
+                  }
                   sx={{
                     borderRadius: "8px",
-                    backgroundColor:
-                      isReadOnly && isCorrect
-                        ? "#e6ffed"
-                        : isReadOnly && !isCorrect
-                        ? "#fff"
-                        : !isReadOnly && isCorrect
-                        ? "#fff9e6"
-                        : "#ffffff",
-                    border:
-                      isReadOnly && isCorrect
-                        ? "1.5px solid #4caf50"
-                        : !isReadOnly && isCorrect
-                        ? `1.5px solid #ffb300`
-                        : displayOptionSpecificError
-                        ? "1.5px solid #d32f2f"
-                        : "1px solid #e0e0e0",
+                    padding: "8px 12px",
                     position: "relative",
-                    transition: "border-color 0.2s, background-color 0.2s",
+                    cursor: isReadOnly ? "default" : "pointer",
+                    backgroundColor: isCorrect
+                      ? (theme) =>
+                          theme.palette.mode === "light"
+                            ? theme.palette.success.light + "30"
+                            : theme.palette.success.dark + "30"
+                      : "#ffffff",
+                    border: isCorrect
+                      ? (theme) => `2px solid ${theme.palette.success.main}`
+                      : displayOptionSpecificError
+                      ? (theme) => `1px solid ${theme.palette.error.main}`
+                      : (theme) => `1px solid ${theme.palette.divider}`,
+                    transition:
+                      "border-color 0.2s, background-color 0.2s, box-shadow 0.2s",
+                    minHeight: "64px",
+                    display: "flex",
+                    alignItems: "center",
+                    "&:hover": {
+                      borderColor: isReadOnly
+                        ? undefined
+                        : (theme) =>
+                            isCorrect
+                              ? theme.palette.success.dark
+                              : theme.palette.primary.main,
+                      boxShadow: isReadOnly
+                        ? undefined
+                        : (theme) =>
+                            `0 0 0 2px ${theme.palette.primary.light + "50"}`,
+                      backgroundColor: isReadOnly
+                        ? undefined
+                        : (theme) =>
+                            isCorrect
+                              ? theme.palette.mode === "light"
+                                ? theme.palette.success.light + "50"
+                                : theme.palette.success.dark + "50"
+                              : theme.palette.action.hover,
+                    },
                   }}
                 >
-                  <CardContent sx={{ p: "12px !important" }}>
+                  {!isReadOnly && (
+                    <IconButton
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleCorrectAnswerChange(optionIndex);
+                      }}
+                      sx={{
+                        mr: 1,
+                        padding: "4px",
+                        color: isCorrect ? "success.main" : "action.active",
+                      }}
+                      aria-label={
+                        isCorrect ? "정답으로 선택됨" : "정답으로 선택"
+                      }
+                    >
+                      {isCorrect ? (
+                        <CheckCircleOutlineIcon fontSize="medium" />
+                      ) : (
+                        <RadioButtonUncheckedIcon fontSize="medium" />
+                      )}
+                    </IconButton>
+                  )}
+                  {isReadOnly && isCorrect && (
+                    <CheckCircleOutlineIcon
+                      fontSize="medium"
+                      sx={{ color: "success.main", mr: 1 }}
+                    />
+                  )}
+
+                  <Box
+                    sx={{
+                      flexGrow: 1,
+                      display: "flex",
+                      flexDirection: "column",
+                      justifyContent: "center",
+                    }}
+                  >
                     {(option.image || option.imageUrl) && (
                       <Box
                         sx={{
                           position: "relative",
                           width: "100%",
-                          height: "120px",
-                          borderRadius: "6px",
+                          height: "90px",
+                          borderRadius: "4px",
                           overflow: "hidden",
-                          border: "1px solid #eee",
-                          mb: 1,
+                          border: (theme) =>
+                            `1px solid ${theme.palette.divider}`,
+                          mb: option.text ? 0.5 : 0,
                           display: "flex",
                           justifyContent: "center",
                           alignItems: "center",
-                          backgroundColor: "#f5f5f5",
+                          backgroundColor: (theme) => theme.palette.grey[50],
                         }}
                       >
                         <img
@@ -414,27 +508,27 @@ const QuizSlide: React.FC<QuizSlideProps> = ({
                           alt={`선택지 ${optionIndex + 1} 이미지`}
                           style={{
                             maxWidth: "100%",
-                            maxHeight: "120px",
+                            maxHeight: "90px",
                             objectFit: "contain",
                           }}
                         />
                         {!isReadOnly && (
                           <IconButton
-                            onClick={() =>
+                            onClick={(e) => {
+                              e.stopPropagation();
                               handleOptionChange(optionIndex, {
                                 image: null,
                                 imageUrl: "",
-                              })
-                            }
+                              });
+                            }}
                             sx={{
                               position: "absolute",
-                              top: "4px",
-                              right: "4px",
-                              backgroundColor: "rgba(255, 255, 255, 0.7)",
-                              color: "#d32f2f",
+                              top: "2px",
+                              right: "2px",
+                              backgroundColor: "rgba(0, 0, 0, 0.4)",
+                              color: "white",
                               "&:hover": {
-                                backgroundColor: "rgba(255, 255, 255, 0.9)",
-                                color: "#b71c1c",
+                                backgroundColor: "rgba(0, 0, 0, 0.6)",
                               },
                               padding: "2px",
                             }}
@@ -449,33 +543,53 @@ const QuizSlide: React.FC<QuizSlideProps> = ({
 
                     <TextField
                       fullWidth
-                      label={
+                      placeholder={
                         question.questionType === "true-false"
                           ? `선택지 ${optionIndex + 1}`
                           : `선택지 ${optionIndex + 1} 내용`
                       }
                       value={option.text}
-                      onChange={(e) =>
+                      onChange={(e) => {
+                        if (
+                          isReadOnly ||
+                          (question.questionType === "true-false" &&
+                            !isReadOnly)
+                        )
+                          return;
+                        e.stopPropagation();
                         handleOptionChange(optionIndex, {
                           text: e.target.value,
-                        })
-                      }
-                      error={displayOptionSpecificError}
-                      helperText={displayOptionSpecificError ? optionError : ""}
+                        });
+                      }}
+                      onClick={(e) => {
+                        if (
+                          isReadOnly ||
+                          (question.questionType === "true-false" &&
+                            !isReadOnly)
+                        )
+                          return;
+                        e.stopPropagation();
+                      }}
                       sx={{
+                        width: "100%",
                         "& .MuiInputBase-root": {
-                          borderRadius: "6px",
+                          borderRadius: "4px",
                           backgroundColor: isReadOnly ? "transparent" : "#fff",
                           fontSize:
                             question.questionType === "true-false" && isReadOnly
-                              ? "1.1rem"
-                              : "0.9rem",
+                              ? "2rem"
+                              : "2rem",
                           fontWeight:
                             question.questionType === "true-false" && isReadOnly
                               ? "medium"
                               : "normal",
                         },
-                        mb: isReadOnly ? 0 : 1,
+                        mr:
+                          !isReadOnly &&
+                          question.questionType === "multiple-choice" &&
+                          !(option.image || option.imageUrl)
+                            ? 1
+                            : 0,
                       }}
                       disabled={
                         isReadOnly ||
@@ -483,119 +597,44 @@ const QuizSlide: React.FC<QuizSlideProps> = ({
                       }
                       multiline={question.questionType !== "true-false"}
                       minRows={1}
+                      variant="outlined"
+                      size="small"
                     />
+                  </Box>
 
-                    {!isReadOnly && (
-                      <Box
-                        display="flex"
-                        justifyContent={
-                          question.questionType === "multiple-choice"
-                            ? "space-between"
-                            : "flex-end"
-                        }
-                        alignItems="center"
-                        mt={0.5}
-                      >
-                        {question.questionType === "multiple-choice" && (
-                          <IconButton
-                            onClick={() => {
-                              setImageDialogOpen(true);
-                              setImageType("option");
-                              setSelectedOptionIndex(optionIndex);
-                            }}
-                            sx={{
-                              color: "#546e7a",
-                              backgroundColor: "#eceff1",
-                              borderRadius: "6px",
-                              padding: "6px",
-                              "&:hover": { backgroundColor: "#cfd8dc" },
-                            }}
-                            size="small"
-                            title="선택지 이미지 추가/변경"
-                          >
-                            <Image fontSize="small" />
-                          </IconButton>
-                        )}
-
-                        <Button
-                          onClick={() => handleCorrectAnswerChange(optionIndex)}
-                          variant={isCorrect ? "contained" : "outlined"}
-                          size="small"
-                          sx={{
-                            minWidth: "80px",
-                            borderRadius: "6px",
-                            fontSize: "0.8rem",
-                            color: isCorrect
-                              ? "#fff"
-                              : question.questionType === "true-false"
-                              ? "#4caf50"
-                              : "#ff9800",
-                            backgroundColor: isCorrect
-                              ? question.questionType === "true-false"
-                                ? "#4caf50"
-                                : "#ff9800"
-                              : "transparent",
-                            borderColor: isCorrect
-                              ? undefined
-                              : question.questionType === "true-false"
-                              ? "#4caf50"
-                              : "#ff9800",
-                            "&:hover": {
-                              backgroundColor: isCorrect
-                                ? question.questionType === "true-false"
-                                  ? "#388e3c"
-                                  : "#fb8c00"
-                                : question.questionType === "true-false"
-                                ? "rgba(76, 175, 80, 0.08)"
-                                : "rgba(255, 152, 0, 0.08)",
-                            },
-                          }}
-                          startIcon={
-                            isCorrect ? (
-                              <CheckCircleOutline fontSize="small" />
-                            ) : null
-                          }
-                        >
-                          {isCorrect ? "정답" : "정답으로"}
-                        </Button>
-                      </Box>
-                    )}
-                    {isReadOnly && isCorrect && (
-                      <CheckCircleOutline
-                        fontSize="small"
-                        sx={{
-                          color: "success.main",
-                          position: "absolute",
-                          top: "10px",
-                          right: "10px",
+                  {!isReadOnly &&
+                    question.questionType === "multiple-choice" && (
+                      <IconButton
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setImageDialogOpen(true);
+                          setImageType("option");
+                          setSelectedOptionIndex(optionIndex);
                         }}
-                      />
+                        sx={{
+                          color: "text.secondary",
+                          backgroundColor: (theme) => theme.palette.grey[200],
+                          borderRadius: "6px",
+                          padding: "6px",
+                          alignSelf: "flex-start",
+                          mt: option.image || option.imageUrl ? 0 : "4px",
+                          ml: 1,
+                          "&:hover": {
+                            backgroundColor: (theme) => theme.palette.grey[300],
+                          },
+                        }}
+                        size="small"
+                        title="선택지 이미지 추가/변경"
+                      >
+                        <AddPhotoAlternateRoundedIcon fontSize="small" />
+                      </IconButton>
                     )}
-                  </CardContent>
-                </Card>
+                </Paper>
               </Grid>
             );
           })}
         </Grid>
       </Paper>
-
-      {!isReadOnly && (
-        <Box display="flex" justifyContent="flex-end" mt={2.5}>
-          <Button
-            variant="outlined"
-            color="error"
-            onClick={() => removeQuestion(questionIndex)}
-            startIcon={<Delete />}
-            sx={{
-              borderRadius: "8px",
-              textTransform: "none",
-              fontWeight: "medium",
-            }}
-          >
-            문제 삭제
-          </Button>
-        </Box>
-      )}
 
       <ImageUploadDialog
         open={imageDialogOpen}

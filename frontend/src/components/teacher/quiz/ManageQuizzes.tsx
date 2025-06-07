@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import {
   Box,
   Button,
@@ -15,6 +15,8 @@ import {
   Pagination,
   Tabs,
   Tab,
+  useTheme,
+  useMediaQuery,
 } from "@mui/material";
 import QuizIcon from "@mui/icons-material/Quiz"; // 전체 퀴즈 아이콘
 import PersonIcon from "@mui/icons-material/Person"; // 내 퀴즈 아이콘
@@ -34,7 +36,11 @@ import api from "../../../utils/api";
 // import background from '../../../../src/assets/background-logo.webp';
 import background from "../../../../src/assets/nudge-background3-edit.png";
 import { Quiz } from "./types";
-import QuizContainer from "../quiz/QuizContainer";
+import QuizContainer, {
+  QuizContainerRef,
+  ActionBarState,
+} from "../quiz/QuizContainer";
+import ActionBar, { FIXED_ACTION_BAR_HEIGHT } from "../quiz/ActionBar";
 import { getUserId } from "../../../utils/auth";
 import { DotLottieReact } from "@lottiefiles/dotlottie-react";
 
@@ -57,14 +63,59 @@ const ManageQuizzesPage: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const [page, setPage] = useState(1);
-  const [limit] = useState(6);
+  const [limit, setLimit] = useState(8);
   const [totalCount, setTotalCount] = useState(0);
 
   const [isMyQuizzes, setIsMyQuizzes] = useState(false);
+  const quizContainerRef = useRef<QuizContainerRef>(null);
+  const [actionBarState, setActionBarState] = useState<ActionBarState | null>(
+    null
+  );
+  const [activeLottie, setActiveLottie] = useState<"existing" | "new">("new"); // Lottie 상태 추가. 'new'가 먼저 시작되도록 변경
 
   const userId = getUserId();
 
-  // 퀴즈 목록 가져오기
+  const theme = useTheme();
+  const isXl = useMediaQuery(theme.breakpoints.up("xl"));
+  const isLg = useMediaQuery(theme.breakpoints.only("lg"));
+  const isMd = useMediaQuery(theme.breakpoints.only("md"));
+  const isSm = useMediaQuery(theme.breakpoints.only("sm"));
+
+  useEffect(() => {
+    if (isXl) {
+      setLimit(10);
+    } else if (isLg) {
+      setLimit(8);
+    } else if (isMd) {
+      setLimit(6);
+    } else if (isSm) {
+      setLimit(6);
+    } else {
+      setLimit(5);
+    }
+  }, [isXl, isLg, isMd, isSm]);
+
+  // Lottie 애니메이션 순차 재생을 위한 useEffect
+  useEffect(() => {
+    const LOTTIE_EXISTING_DURATION = 10000; // 10초
+    const LOTTIE_NEW_DURATION = 7000; // 7초
+
+    let timerId: NodeJS.Timeout;
+
+    if (activeLottie === "existing") {
+      timerId = setTimeout(() => {
+        setActiveLottie("new");
+      }, LOTTIE_EXISTING_DURATION);
+    } else {
+      // activeLottie === 'new'
+      timerId = setTimeout(() => {
+        setActiveLottie("existing");
+      }, LOTTIE_NEW_DURATION);
+    }
+
+    return () => clearTimeout(timerId); // 컴포넌트 언마운트 시 타이머 제거
+  }, [activeLottie]);
+
   useEffect(() => {
     const fetchQuizzes = async () => {
       setLoading(true);
@@ -90,6 +141,7 @@ const ManageQuizzesPage: React.FC = () => {
     fetchQuizzes();
   }, [
     page,
+    limit,
     gradeFilter,
     semesterFilter,
     subjectFilter,
@@ -124,6 +176,14 @@ const ManageQuizzesPage: React.FC = () => {
 
   const handlePageChange = (event: any, value: any) => {
     setPage(value);
+  };
+
+  const handleNavigate = (direction: "prev" | "next") => {
+    quizContainerRef.current?.navigate(direction);
+  };
+
+  const handlePreview = () => {
+    quizContainerRef.current?.openPreview();
   };
 
   const totalPages = Math.ceil(totalCount / limit);
@@ -171,6 +231,11 @@ const ManageQuizzesPage: React.FC = () => {
       const quizData = await getQuizById(quizId);
       setSelectedQuiz(quizData);
       setIsModalOpen(true);
+      setActionBarState({
+        currentSlideIndex: 1,
+        totalQuestions: quizData.questions.length,
+        isReviewSlide: false,
+      });
     } catch (err) {
       setError("퀴즈 데이터를 가져오는 중 오류가 발생했습니다.");
     }
@@ -179,6 +244,7 @@ const ManageQuizzesPage: React.FC = () => {
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setSelectedQuiz(null);
+    setActionBarState(null);
   };
 
   const handleStartQuiz = async (quizId: string) => {
@@ -220,39 +286,71 @@ const ManageQuizzesPage: React.FC = () => {
           overflow: "hidden",
         }}
       >
-        <Box
-          sx={{
-            position: "absolute",
-            top: "-28%", // Paper 높이(30vh) 기준으로 상대적 위치 조정
-            left: "50%",
-            transform: "translateX(-50%)",
-            width: {
-              xs: "28vh", // 화면 높이 기준으로 비율 설정
-              sm: "30vh",
-              md: "32vh",
-              lg: "35vh",
-              xl: "38vh",
-            },
-            height: {
-              xs: "28vh",
-              sm: "30vh",
-              md: "32vh",
-              lg: "35vh",
-              xl: "38vh",
-            },
-            pointerEvents: "none",
-          }}
-        >
-          <DotLottieReact
-            src="https://lottie.host/a62dc818-22b3-4e0d-97dc-decacfc0a71e/qdg21mWNev.lottie"
-            loop
-            autoplay
-            style={{
-              width: "100%",
-              height: "100%",
+        {activeLottie === "existing" && (
+          <Box
+            sx={{
+              position: "absolute",
+              top: "-38%",
+              left: "calc(50% - 17vh)", // 중앙에서 왼쪽으로
+              transform: "translateX(-50%)",
+              width: {
+                xs: "32vh",
+                sm: "35vh",
+                md: "38vh",
+                lg: "40vh",
+                xl: "43vh",
+              },
+              height: {
+                xs: "32vh",
+                sm: "35vh",
+                md: "38vh",
+                lg: "40vh",
+                xl: "43vh",
+              },
+              pointerEvents: "none",
             }}
-          />
-        </Box>
+          >
+            <DotLottieReact
+              src="https://lottie.host/a62dc818-22b3-4e0d-97dc-decacfc0a71e/qdg21mWNev.lottie"
+              loop
+              autoplay
+              style={{ width: "100%", height: "100%" }}
+            />
+          </Box>
+        )}
+
+        {activeLottie === "new" && (
+          <Box
+            sx={{
+              position: "absolute",
+              top: "-38%",
+              left: "calc(50% + 17vh)", // 중앙에서 오른쪽으로
+              transform: "translateX(-50%) scaleX(-1)", // 좌우 반전
+              width: {
+                xs: "28vh",
+                sm: "30vh",
+                md: "32vh",
+                lg: "35vh",
+                xl: "38vh",
+              },
+              height: {
+                xs: "28vh",
+                sm: "30vh",
+                md: "32vh",
+                lg: "35vh",
+                xl: "38vh",
+              },
+              pointerEvents: "none",
+            }}
+          >
+            <DotLottieReact
+              src="https://lottie.host/b346ae84-f7df-4864-b978-155db9f1576f/uekDctlmz7.lottie"
+              loop
+              autoplay
+              style={{ width: "100%", height: "100%" }}
+            />
+          </Box>
+        )}
 
         <Box
           display="flex"
@@ -363,7 +461,7 @@ const ManageQuizzesPage: React.FC = () => {
               </Grid>
             ) : (
               quizzes.map((quiz) => (
-                <Grid item xs={12} sm={6} md={4} lg={3} key={quiz._id}>
+                <Grid item xs={12} sm={6} md={4} lg={3} xl={2.4} key={quiz._id}>
                   <QuizCard
                     quiz={quiz}
                     onDelete={handleDelete}
@@ -406,6 +504,10 @@ const ManageQuizzesPage: React.FC = () => {
         PaperProps={{
           sx: {
             width: "80%",
+            height: "90vh",
+            display: "flex",
+            flexDirection: "column",
+            maxHeight: "900px",
           },
         }}
       >
@@ -421,16 +523,42 @@ const ManageQuizzesPage: React.FC = () => {
         >
           <CloseIcon />
         </IconButton>
-        <DialogContent>
-          {selectedQuiz && (
-            <QuizContainer
-              isReadOnly={true}
-              initialData={selectedQuiz}
-              onStartQuiz={() => handleStartQuiz(selectedQuiz._id)}
-              onEditQuiz={handleEditQuiz}
-            />
-          )}
+        <DialogContent
+          sx={{
+            p: 0,
+            overflow: "hidden",
+            flex: "1 1 auto",
+            display: "flex",
+            flexDirection: "column",
+          }}
+        >
+          <Box sx={{ flex: "1 1 auto", overflowY: "auto" }}>
+            {selectedQuiz && (
+              <QuizContainer
+                ref={quizContainerRef}
+                isReadOnly={true}
+                initialData={selectedQuiz}
+                onStateChange={setActionBarState}
+              />
+            )}
+          </Box>
         </DialogContent>
+        {isModalOpen && selectedQuiz && actionBarState && (
+          <ActionBar
+            variant="dialog"
+            isReadOnly={true}
+            canNavigateBack={actionBarState.currentSlideIndex > 1}
+            canNavigateForward={
+              !actionBarState.isReviewSlide &&
+              actionBarState.totalQuestions > 0 &&
+              actionBarState.currentSlideIndex <= actionBarState.totalQuestions
+            }
+            onNavigate={handleNavigate}
+            onPreview={handlePreview}
+            onEdit={handleEditQuiz}
+            onStart={() => handleStartQuiz(selectedQuiz._id)}
+          />
+        )}
       </Dialog>
     </Box>
   );
