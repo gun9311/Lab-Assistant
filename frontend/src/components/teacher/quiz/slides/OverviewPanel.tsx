@@ -32,8 +32,6 @@ type OverviewPanelProps = {
   setQuizImageUrl: (url: string) => void;
   setImageDialogOpen: (open: boolean) => void;
   isReadOnly?: boolean;
-  onStartQuiz?: () => void;
-  onEditQuiz?: () => void;
   validationAttempted?: boolean;
 };
 
@@ -56,8 +54,6 @@ const OverviewPanel: React.FC<OverviewPanelProps> = ({
   setQuizImageUrl,
   setImageDialogOpen,
   isReadOnly = false,
-  onStartQuiz,
-  onEditQuiz,
   validationAttempted = false,
 }) => {
   const backgroundImageUrl = quizImage
@@ -413,45 +409,6 @@ const OverviewPanel: React.FC<OverviewPanelProps> = ({
             )}
           </Grid>
         </Grid>
-
-        {isReadOnly && (
-          <Box display="flex" justifyContent="flex-end" gap={2} mt={1}>
-            <IconButton
-              onClick={onStartQuiz}
-              sx={{
-                background: "linear-gradient(145deg, #ff9800, #ffc107)", // 밝은 그라데이션 색상
-                color: "#ffffff",
-                borderRadius: "50%", // 원형 버튼
-                boxShadow: "0 6px 12px rgba(0, 0, 0, 0.2)", // 더 강한 그림자
-                "&:hover": {
-                  background: "linear-gradient(145deg, #fb8c00, #ff9800)", // 호버 시 더 진한 그라데이션
-                  boxShadow: "0 8px 14px rgba(0, 0, 0, 0.3)",
-                },
-                padding: "0.7rem",
-                transition: "all 0.3s ease",
-              }}
-            >
-              <PlayArrow sx={{ fontSize: "2rem" }} /> {/* 퀴즈 시작 아이콘 */}
-            </IconButton>
-            <IconButton
-              onClick={onEditQuiz}
-              sx={{
-                background: "linear-gradient(145deg, #607d8b, #78909c)", // 밝은 회색-블루 그라데이션
-                color: "#ffffff",
-                borderRadius: "50%", // 원형 버튼
-                boxShadow: "0 6px 12px rgba(0, 0, 0, 0.2)",
-                "&:hover": {
-                  background: "linear-gradient(145deg, #546e7a, #607d8b)", // 호버 시 더 진한 색상
-                  boxShadow: "0 8px 14px rgba(0, 0, 0, 0.3)",
-                },
-                padding: "0.7rem",
-                transition: "all 0.3s ease",
-              }}
-            >
-              <Edit sx={{ fontSize: "1.8rem" }} /> {/* 수정 아이콘 */}
-            </IconButton>
-          </Box>
-        )}
       </Box>
     </Box>
   );

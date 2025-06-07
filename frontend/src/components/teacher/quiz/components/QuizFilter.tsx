@@ -71,6 +71,9 @@ const QuizFilter: React.FC<QuizFilterProps> = ({
                 <MenuItem value="">
                   <em>전체</em>
                 </MenuItem>
+                <MenuItem value={1}>1학년</MenuItem>
+                <MenuItem value={2}>2학년</MenuItem>
+                <MenuItem value={3}>3학년</MenuItem>
                 <MenuItem value={4}>4학년</MenuItem>
                 <MenuItem value={5}>5학년</MenuItem>
                 <MenuItem value={6}>6학년</MenuItem>

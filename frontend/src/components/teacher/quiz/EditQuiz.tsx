@@ -1,7 +1,11 @@
 // EditQuizPage.tsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { Box, Typography, Divider, CircularProgress } from "@mui/material";
-import QuizContainer from "./QuizContainer";
+import QuizContainer, {
+  QuizContainerRef,
+  ActionBarState,
+} from "./QuizContainer";
+import ActionBar, { FIXED_ACTION_BAR_HEIGHT } from "./ActionBar";
 import { useParams } from "react-router-dom";
 import { getQuizById } from "../../../utils/quizApi"; // 이미 구현된 API
 
@@ -9,6 +13,12 @@ const EditQuizPage: React.FC = () => {
   const { quizId } = useParams<{ quizId: string }>();
   const [initialData, setInitialData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const quizContainerRef = useRef<QuizContainerRef>(null);
+  const [actionBarState, setActionBarState] = useState<ActionBarState>({
+    currentSlideIndex: 1,
+    totalQuestions: 1,
+    isReviewSlide: false,
+  });
 
   useEffect(() => {
     const fetchQuizData = async () => {
@@ -26,6 +36,21 @@ const EditQuizPage: React.FC = () => {
     fetchQuizData();
   }, [quizId]);
 
+  const handleSave = () => {
+    quizContainerRef.current?.save();
+  };
+  const handlePreview = () => {
+    quizContainerRef.current?.openPreview();
+  };
+  const handleNavigate = (direction: "prev" | "next") => {
+    quizContainerRef.current?.navigate(direction);
+  };
+
+  const canNavigateForward =
+    !actionBarState.isReviewSlide &&
+    actionBarState.totalQuestions > 0 &&
+    actionBarState.currentSlideIndex <= actionBarState.totalQuestions;
+
   if (loading) {
     return (
       <Box
@@ -40,41 +65,59 @@ const EditQuizPage: React.FC = () => {
   }
 
   return (
-    <Box
-      sx={{
-        padding: { xs: "1.5rem", md: "1.5rem" },
-        borderRadius: "16px",
-        boxShadow: "0px 6px 20px rgba(0, 0, 0, 0.1)",
-        backgroundColor: "#ffffff",
-        maxWidth: "xl",
-        width: "100%",
-        margin: "40px auto",
-      }}
-    >
-      <Typography
-        variant="h4"
+    <>
+      <Box
         sx={{
-          fontWeight: "bold",
-          color: "#333",
-          textAlign: "center",
-          fontSize: {
-            xs: "1.5rem", // 전화면 (mobile)
-            sm: "1.75rem",
-            md: "1.75rem", // 태블릿 이상
-            lg: "2rem", // 데스크탑 이상
-            xl: "2.25rem",
-          },
-          mb: 2,
+          padding: { xs: "1.5rem", md: "1.5rem" },
+          borderRadius: "16px",
+          boxShadow: "0px 6px 20px rgba(0, 0, 0, 0.1)",
+          backgroundColor: "#ffffff",
+          maxWidth: "xl",
+          width: "100%",
+          margin: "40px auto",
+          mb: `calc(${FIXED_ACTION_BAR_HEIGHT} + 40px)`, // 액션바 공간 확보
         }}
       >
-        ✏️ 퀴즈 수정
-      </Typography>
+        <Typography
+          variant="h4"
+          sx={{
+            fontWeight: "bold",
+            color: "#333",
+            textAlign: "center",
+            fontSize: {
+              xs: "1.5rem", // 전화면 (mobile)
+              sm: "1.75rem",
+              md: "1.75rem", // 태블릿 이상
+              lg: "2rem", // 데스크탑 이상
+              xl: "2.25rem",
+            },
+            mb: 2,
+          }}
+        >
+          ✏️ 퀴즈 수정
+        </Typography>
 
-      <Divider sx={{ my: 2, borderColor: "#e0e0e0" }} />
+        <Divider sx={{ my: 2, borderColor: "#e0e0e0" }} />
 
-      {/* QuizContainer에 수정 모드와 초기 데이터를 전달 */}
-      {initialData && <QuizContainer isEdit={true} initialData={initialData} />}
-    </Box>
+        {initialData && (
+          <QuizContainer
+            ref={quizContainerRef}
+            isEdit={true}
+            initialData={initialData}
+            onStateChange={setActionBarState}
+          />
+        )}
+      </Box>
+      <ActionBar
+        isEdit={true}
+        isReadOnly={false}
+        canNavigateBack={actionBarState.currentSlideIndex > 1}
+        canNavigateForward={canNavigateForward}
+        onNavigate={handleNavigate}
+        onPreview={handlePreview}
+        onSave={handleSave}
+      />
+    </>
   );
 };
 

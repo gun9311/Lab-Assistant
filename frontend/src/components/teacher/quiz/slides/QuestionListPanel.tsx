@@ -197,7 +197,7 @@ const QuestionListPanel: React.FC<QuestionListPanelProps> = ({
               >
                 <SettingsApplications sx={{ mr: 1, color: "primary.main" }} />
                 <Typography variant="subtitle1" sx={{ fontWeight: "medium" }}>
-                  일괄 변경 도구
+                  일괄 변경
                 </Typography>
               </AccordionSummary>
               <AccordionDetails
@@ -331,7 +331,7 @@ const QuestionListPanel: React.FC<QuestionListPanelProps> = ({
                     },
                   }}
                 >
-                  선택 문제 삭제 ({selectedQuestionIndexes.length}개)
+                  삭제 ({selectedQuestionIndexes.length}개)
                 </Button>
               </AccordionDetails>
             </Accordion>
