@@ -101,11 +101,11 @@ const ActionBar: React.FC<ActionBarProps> = ({
               미리보기
             </Button>
             <Button
-              variant="outlined"
-              color="info"
+              variant="contained"
+              color="secondary"
               startIcon={<Edit />}
               onClick={onEdit}
-              sx={{ borderRadius: "8px", fontWeight: "medium" }}
+              sx={{ borderRadius: "8px", fontWeight: "bold" }}
             >
               편집하기
             </Button>

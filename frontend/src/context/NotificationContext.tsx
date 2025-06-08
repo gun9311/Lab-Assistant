@@ -4,6 +4,7 @@ import React, {
   useContext,
   useEffect,
   ReactNode,
+  useCallback,
 } from "react";
 import api from "../utils/api";
 
@@ -22,6 +23,7 @@ type NotificationContextType = {
   loadMoreNotifications: () => Promise<void>;
   hasMore: boolean;
   isLoading: boolean;
+  fetchNotifications: (page: number) => Promise<void>;
 };
 
 const NotificationContext = createContext<NotificationContextType | undefined>(
@@ -57,7 +59,7 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({
     }
   };
 
-  const fetchNotifications = async (page: number) => {
+  const fetchNotifications = useCallback(async (page: number) => {
     try {
       const { data } = await api.get(`/notifications?page=${page}&limit=5`);
 
@@ -79,11 +81,11 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({
     } catch (error) {
       console.error("Failed to load notifications:", error);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchNotifications(1);
-  }, []);
+  }, [fetchNotifications]);
 
   const loadMoreNotifications = async () => {
     if (isLoading || !hasMore) return;
@@ -134,6 +136,7 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({
         loadMoreNotifications,
         hasMore,
         isLoading,
+        fetchNotifications,
       }}
     >
       {children}

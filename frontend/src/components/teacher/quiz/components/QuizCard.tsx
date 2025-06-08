@@ -20,12 +20,12 @@ import {
 import FavoriteIcon from "@mui/icons-material/Favorite";
 import FavoriteBorderIcon from "@mui/icons-material/FavoriteBorder";
 import DeleteIcon from "@mui/icons-material/Delete";
-import PlayCircleFilled from "@mui/icons-material/PlayCircleFilled"; // 퀴즈 시작 버튼 아이콘으로 변경
 import { useNavigate } from "react-router-dom";
 import api from "../../../../utils/api";
 import { getUserId } from "../../../../utils/auth";
 import { Quiz } from "../types"; // 공통 Quiz 타입 import
-import backgroundDefault from "../../../../assets/background-default.webp"
+import backgroundDefault from "../../../../assets/background-default.webp";
+import playButtonImage from "../../../../assets/paly1.png";
 
 interface QuizCardProps {
   quiz: Quiz;
@@ -34,7 +34,12 @@ interface QuizCardProps {
   isMyQuizzes: boolean; // 내 퀴즈함 여부 prop 추가
 }
 
-const QuizCard: React.FC<QuizCardProps> = ({ quiz, onDelete, onOpenModal, isMyQuizzes }) => {
+const QuizCard: React.FC<QuizCardProps> = ({
+  quiz,
+  onDelete,
+  onOpenModal,
+  isMyQuizzes,
+}) => {
   const userId = getUserId();
 
   const [isLiking, setIsLiking] = useState<boolean>(false);
@@ -50,7 +55,9 @@ const QuizCard: React.FC<QuizCardProps> = ({ quiz, onDelete, onOpenModal, isMyQu
     try {
       await api.post(`/kahoot-quiz/${quiz._id}/like`);
       setLiked((prevLiked) => !prevLiked);
-      setLikeCount((prevLikeCount) => (liked ? prevLikeCount - 1 : prevLikeCount + 1));
+      setLikeCount((prevLikeCount) =>
+        liked ? prevLikeCount - 1 : prevLikeCount + 1
+      );
     } catch (error) {
       console.error("좋아요 처리 중 오류가 발생했습니다.", error);
     } finally {
@@ -111,19 +118,30 @@ const QuizCard: React.FC<QuizCardProps> = ({ quiz, onDelete, onOpenModal, isMyQu
         </Box> */}
       </CardContent>
 
-      <CardActions disableSpacing sx={{ justifyContent: "space-between", paddingX: "1rem" }}>
+      <CardActions
+        disableSpacing
+        sx={{ justifyContent: "space-between", paddingX: "1rem" }}
+      >
         <Box display="flex" alignItems="center">
           {/* 퀴즈 시작 버튼 */}
           <Tooltip title="퀴즈 시작">
-            <IconButton 
-              sx={{ 
-                color: "#FFC107", 
-                fontSize: "2.5rem", // 크기 확대
-                padding: 0, // 버튼 크기를 아이콘 크기에 맞춤
-              }} 
+            <IconButton
               onClick={handleOpenModal}
+              sx={{
+                p: 0,
+                width: 45,
+                height: 45,
+                transition: "transform 0.2s ease-in-out",
+                "&:hover": {
+                  transform: "scale(1.1)",
+                },
+              }}
             >
-              <PlayCircleFilled fontSize="inherit" /> {/* 아이콘 크기를 상속 */}
+              <img
+                src={playButtonImage}
+                alt="퀴즈 시작"
+                style={{ width: "100%", height: "100%" }}
+              />
             </IconButton>
           </Tooltip>
           {/* 삭제 버튼 ("내 퀴즈함"일 때만 표시) */}
@@ -149,13 +167,15 @@ const QuizCard: React.FC<QuizCardProps> = ({ quiz, onDelete, onOpenModal, isMyQu
 
         <Box display="flex" alignItems="center">
           {/* 좋아요 버튼 */}
-          <IconButton onClick={handleLikeToggle} disabled={isLiking} sx={{ color: "#FF5722" }}>
+          <IconButton
+            onClick={handleLikeToggle}
+            disabled={isLiking}
+            sx={{ color: "#FF5722" }}
+          >
             <Badge badgeContent={likeCount} color="error">
               {liked ? <FavoriteIcon color="error" /> : <FavoriteBorderIcon />}
             </Badge>
           </IconButton>
-
-          
         </Box>
       </CardActions>
 

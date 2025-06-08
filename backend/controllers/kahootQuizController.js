@@ -227,6 +227,16 @@ exports.createQuiz = async (req, res) => {
       })
     );
 
+    // Filter out empty options from multiple-choice questions before saving
+    const finalQuestions = updatedQuestions.map((q) => {
+      if (q.questionType === "multiple-choice") {
+        q.options = q.options.filter(
+          (opt) => (opt.text && opt.text.trim()) || opt.imageUrl
+        );
+      }
+      return q;
+    });
+
     // 새로운 퀴즈 객체 생성
     const newQuiz = new KahootQuizContent({
       title,
@@ -234,7 +244,7 @@ exports.createQuiz = async (req, res) => {
       subject,
       semester,
       unit,
-      questions: updatedQuestions,
+      questions: finalQuestions,
       createdBy: req.user._id,
       imageUrl: quizImageUrl,
     });
@@ -342,7 +352,17 @@ exports.updateQuiz = async (req, res) => {
       })
     );
 
-    quiz.questions = updatedQuestionsWithImages; // 이미지 처리된 질문으로 업데이트
+    // Filter out empty options from multiple-choice questions before saving
+    const finalQuestions = updatedQuestionsWithImages.map((q) => {
+      if (q.questionType === "multiple-choice") {
+        q.options = q.options.filter(
+          (opt) => (opt.text && opt.text.trim()) || opt.imageUrl
+        );
+      }
+      return q;
+    });
+
+    quiz.questions = finalQuestions; // 이미지 처리 및 빈 선택지 필터링된 질문으로 업데이트
 
     await quiz.save();
     res.status(200).json(quiz);

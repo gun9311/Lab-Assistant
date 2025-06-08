@@ -22,7 +22,7 @@ studentSchema.pre("save", async function (next) {
   const student = this;
   if (student.isModified("password")) {
     try {
-      student.password = await bcrypt.hash(student.password, 12);
+      student.password = await bcrypt.hash(student.password, 10);
       logger.info(`Password hashed for student: ${student.loginId}`);
     } catch (error) {
       logger.error(`Error hashing password for student ${student.loginId}:`, {

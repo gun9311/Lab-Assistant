@@ -9,7 +9,7 @@ const Layout: React.FC<{ isQuizMode: boolean }> = ({ isQuizMode }) => {
   const theme = useTheme();
   const isDesktop = useMediaQuery(theme.breakpoints.up("lg"));
 
-  const bottomNavHeight = isDesktop ? 0 : 56;
+  const bottomNavHeight = !isDesktop && !isQuizMode ? 56 : 0;
 
   return (
     <Box

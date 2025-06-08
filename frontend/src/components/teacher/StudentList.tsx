@@ -39,6 +39,7 @@ import ChatSummaryList from "./ChatSummaryList";
 import StudentReport from "./StudentReport";
 import { debounce } from "lodash";
 import ComingSoon from "../common/ComingSoon";
+import { getSubjects } from "../../utils/api";
 // type QuizResult = any; // QuizResult 타입이 현재 직접 사용되지 않아 주석 처리 또는 삭제 가능
 
 type Student = {
@@ -95,8 +96,26 @@ const StudentList: React.FC<StudentListProps> = ({
   const [selectedSubject, setSelectedSubject] = useState<string>("All");
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState<string>("");
+  const [subjects, setSubjects] = useState<string[]>([]);
   const [page, setPage] = useState(1);
   const itemsPerPage = 30;
+
+  useEffect(() => {
+    const fetchSubjects = async () => {
+      if (grade) {
+        try {
+          const response = await getSubjects(grade, ["1학기", "2학기"]);
+          setSubjects(response.data);
+        } catch (error) {
+          console.error("Failed to fetch subjects:", error);
+          setSubjects([]);
+        }
+      } else {
+        setSubjects([]);
+      }
+    };
+    fetchSubjects();
+  }, [grade]);
 
   // 함수 정의를 컴포넌트 함수 내부의 반환문 이전으로 이동
   // 공통 필터 컴포넌트 (학기, 과목)
@@ -122,16 +141,11 @@ const StudentList: React.FC<StudentListProps> = ({
           label="과목"
         >
           <MenuItem value="All">전체</MenuItem>
-          <MenuItem value="국어">국어</MenuItem>
-          <MenuItem value="도덕">도덕</MenuItem>
-          <MenuItem value="수학">수학</MenuItem>
-          <MenuItem value="과학">과학</MenuItem>
-          <MenuItem value="사회">사회</MenuItem>
-          <MenuItem value="영어">영어</MenuItem>
-          <MenuItem value="음악">음악</MenuItem>
-          <MenuItem value="미술">미술</MenuItem>
-          <MenuItem value="체육">체육</MenuItem>
-          <MenuItem value="실과">실과</MenuItem>
+          {subjects.map((s) => (
+            <MenuItem key={s} value={s}>
+              {s}
+            </MenuItem>
+          ))}
         </Select>
       </FormControl>
     </Stack>
@@ -457,16 +471,11 @@ const StudentList: React.FC<StudentListProps> = ({
                         label="과목"
                       >
                         <MenuItem value="All">전체</MenuItem>
-                        <MenuItem value="국어">국어</MenuItem>
-                        <MenuItem value="도덕">도덕</MenuItem>
-                        <MenuItem value="수학">수학</MenuItem>
-                        <MenuItem value="과학">과학</MenuItem>
-                        <MenuItem value="사회">사회</MenuItem>
-                        <MenuItem value="영어">영어</MenuItem>
-                        <MenuItem value="음악">음악</MenuItem>
-                        <MenuItem value="미술">미술</MenuItem>
-                        <MenuItem value="체육">체육</MenuItem>
-                        <MenuItem value="실과">실과</MenuItem>
+                        {subjects.map((s) => (
+                          <MenuItem key={s} value={s}>
+                            {s}
+                          </MenuItem>
+                        ))}
                       </Select>
                     </FormControl>
                     {renderSearchFilter()}

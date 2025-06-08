@@ -17,7 +17,7 @@ import {
 // import QuizComponent from "./QuizComponent";
 import QuizFilter from "./QuizFilter";
 import QuizResults from "./QuizResults";
-import { getUserId } from "../../../utils/auth";
+import { getUserId, getGradeStatus } from "../../../utils/auth";
 import api from "../../../utils/api";
 import { useNavigate } from "react-router-dom";
 import background from "../../../../src/assets/nudge-background2-edit.png";
@@ -72,7 +72,7 @@ const MyQuizzesPage: React.FC<MyQuizzesPageProps> = ({ setIsQuizMode }) => {
   const [currentQuiz, setCurrentQuiz] = useState<Quiz | null>(null);
   const [pendingQuiz, setPendingQuiz] = useState<Quiz | null>(null);
   const [selection, setSelection] = useState<Selection>({
-    grade: "",
+    grade: getGradeStatus() || "",
     semester: "",
     subject: "",
     unit: "",

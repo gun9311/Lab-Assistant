@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import {
   Box,
   FormControl,
@@ -12,6 +12,7 @@ import SchoolIcon from "@mui/icons-material/School";
 import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
 import SubjectIcon from "@mui/icons-material/Subject";
 import ListIcon from "@mui/icons-material/List";
+import { getSubjects } from "../../../../utils/api";
 
 interface QuizFilterProps {
   gradeFilter: number | null;
@@ -40,6 +41,32 @@ const QuizFilter: React.FC<QuizFilterProps> = ({
   sortBy,
   setSortBy,
 }) => {
+  const [subjects, setSubjects] = useState<string[]>([]);
+
+  useEffect(() => {
+    const fetchSubjects = async () => {
+      if (gradeFilter) {
+        try {
+          const semestersToFetch = semesterFilter
+            ? [semesterFilter]
+            : ["1학기", "2학기"];
+          const response = await getSubjects(gradeFilter, semestersToFetch);
+          setSubjects(response.data);
+          if (subjectFilter && !response.data.includes(subjectFilter)) {
+            setSubjectFilter(null);
+          }
+        } catch (error) {
+          console.error("Failed to fetch subjects:", error);
+          setSubjects([]);
+        }
+      } else {
+        setSubjects([]);
+        setSubjectFilter(null);
+      }
+    };
+    fetchSubjects();
+  }, [gradeFilter, semesterFilter, subjectFilter, setSubjectFilter]);
+
   return (
     <Box
       sx={{
@@ -127,16 +154,11 @@ const QuizFilter: React.FC<QuizFilterProps> = ({
                 <MenuItem value="">
                   <em>전체</em>
                 </MenuItem>
-                <MenuItem value="국어">국어</MenuItem>
-                <MenuItem value="도덕">도덕</MenuItem>
-                <MenuItem value="수학">수학</MenuItem>
-                <MenuItem value="과학">과학</MenuItem>
-                <MenuItem value="사회">사회</MenuItem>
-                <MenuItem value="영어">영어</MenuItem>
-                <MenuItem value="음악">음악</MenuItem>
-                <MenuItem value="미술">미술</MenuItem>
-                <MenuItem value="체육">체육</MenuItem>
-                <MenuItem value="실과">실과</MenuItem>
+                {subjects.map((s) => (
+                  <MenuItem key={s} value={s}>
+                    {s}
+                  </MenuItem>
+                ))}
               </Select>
             </Tooltip>
           </FormControl>
