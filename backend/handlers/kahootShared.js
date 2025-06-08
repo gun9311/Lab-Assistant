@@ -317,6 +317,42 @@ const unsubscribeFromPinChannels = async (pin) => {
   }
 };
 
+// 새로운 헬퍼 함수: 활성 학생 수 계산
+async function getActiveStudentCount(pin) {
+  try {
+    const studentIdsSetKey = getSessionStudentIdsSetKey(pin);
+    const allStudentIdsInSession = await redisClient.sMembers(studentIdsSetKey);
+
+    if (!allStudentIdsInSession || allStudentIdsInSession.length === 0) {
+      return 0;
+    }
+
+    const participantKeys = allStudentIdsInSession.map((studentId) =>
+      getParticipantKey(pin, studentId)
+    );
+    const participantDataArray = await redisJsonMGet(participantKeys);
+
+    if (!participantDataArray) {
+      logger.warn(
+        `MGET for participant keys returned null for PIN ${pin}. Assuming 0 active students.`
+      );
+      return 0;
+    }
+
+    const activeStudentCount = participantDataArray.reduce((count, pData) => {
+      if (pData && pData.status === "connected_participating") {
+        return count + 1;
+      }
+      return count;
+    }, 0);
+
+    return activeStudentCount;
+  } catch (error) {
+    logger.error(`Error in getActiveStudentCount for PIN ${pin}:`, error);
+    return 0; // 오류 발생 시 0 반환
+  }
+}
+
 // 특정 핀(pin)으로 세션에 연결된 교사에게 메시지 발행
 const broadcastToTeacher = async (pin, message) => {
   const channel = getRedisChannelBroadcastToTeacher(pin);
@@ -492,4 +528,5 @@ module.exports = {
   PONG_TIMEOUT_MS,
   subscribeToPinChannels, // 새로 추가된 함수
   unsubscribeFromPinChannels, // 새로 추가된 함수
+  getActiveStudentCount,
 };

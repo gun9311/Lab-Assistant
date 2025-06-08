@@ -70,7 +70,10 @@ const TopRankers: React.FC<TopRankersProps> = ({
 
     // 모든 문제에서 순차적으로 등수를 공개
     const revealRanks = async () => {
-      for (let i = 9; i > 2; i--) {
+      // 참여자 수에 맞춰서 순위 공개 시작점을 조정합니다.
+      const startingRankIndex = Math.min(9, topRankers.length - 1);
+
+      for (let i = startingRankIndex; i > 2; i--) {
         setVisibleRanks((prev) => [...prev, i]);
         await new Promise((resolve) =>
           setTimeout(resolve, isLastQuestion ? 1000 : 300)

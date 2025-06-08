@@ -15,12 +15,15 @@ import {
 } from "@mui/material";
 import { useNavigate, useLocation } from "react-router-dom";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import FullscreenIcon from "@mui/icons-material/Fullscreen";
+import VisibilityIcon from "@mui/icons-material/Visibility";
+import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
+import VpnKeyIcon from "@mui/icons-material/VpnKey";
 import { getToken } from "../../../utils/auth";
 import StudentListComponent from "./components/StudentList";
 import QuestionComponent from "./components/Question";
 import ResultComponent from "./components/ResultComponent";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
-import FullscreenIcon from "@mui/icons-material/Fullscreen";
 // import backgroundImage from '../../../assets/quiz_show_background.png';
 import "./QuizSession.css";
 const backgroundImages = [
@@ -146,7 +149,8 @@ const QuizSessionPage = ({
   const [submittedCount, setSubmittedCount] = useState(0);
   const [isQuizStarting, setIsQuizStarting] = useState(false);
   const [isPreparingNextQuestion, setIsPreparingNextQuestion] = useState(false);
-  const [totalStudents, setTotalStudents] = useState<number>(0);
+  const [totalParticipantsInQuestion, setTotalParticipantsInQuestion] =
+    useState<number>(0);
   const [allSubmitted, setAllSubmitted] = useState(false);
   const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
   const [isShowingFeedback, setIsShowingFeedback] = useState(false);
@@ -167,6 +171,7 @@ const QuizSessionPage = ({
     useState(false);
   const [isProcessingEndQuiz, setIsProcessingEndQuiz] = useState(false);
   const [isProcessingViewResults, setIsProcessingViewResults] = useState(false);
+  const [showOptions, setShowOptions] = useState<boolean>(false); // 선택지 표시/숨김 상태 추가
 
   const socketRef = React.useRef<WebSocket | null>(null);
 
@@ -210,22 +215,10 @@ const QuizSessionPage = ({
             },
           ];
         });
-        setTotalStudents((prevCount) => {
-          const studentExists = students.some(
-            (s) => s.id === message.studentId
-          );
-          return studentExists ? prevCount : prevCount + 1;
-        });
       } else if (message.type === "studentDisconnected") {
         setStudents((prevStudents) =>
           prevStudents.filter((student) => student.id !== message.studentId)
         );
-        setTotalStudents((prevCount) => {
-          const studentExists = students.some(
-            (s) => s.id === message.studentId
-          );
-          return studentExists ? Math.max(0, prevCount - 1) : prevCount;
-        });
         console.log(`Student ${message.name} disconnected`);
       } else if (message.type === "quizStartingSoon") {
         setTotalQuestions(message.totalQuestions); // 총 문제 수 설정
@@ -237,13 +230,23 @@ const QuizSessionPage = ({
         setIsShowingFeedback(false);
         setCurrentQuestion(message.currentQuestion);
         setEndTime(message.endTime);
+        if (typeof message.activeStudentCount === "number") {
+          setTotalParticipantsInQuestion(message.activeStudentCount);
+        }
       } else if (message.type === "preparingNextQuestion") {
         setCurrentQuestionIndex((prevIndex) => prevIndex + 1); // 다음 문제로 인덱스 증가
         setIsPreparingNextQuestion(true);
         setIsLastQuestion(message.isLastQuestion);
         setCurrentQuestion(null);
         setIsShowingFeedback(false);
-        setIsProcessingNextQuestion(false); // Reset loading state
+        setCurrentQuestion(message.currentQuestion);
+        setSubmittedCount(0);
+        setAllSubmitted(false);
+        setEndTime(message.endTime);
+        if (typeof message.activeStudentCount === "number") {
+          setTotalParticipantsInQuestion(message.activeStudentCount);
+        }
+        setIsProcessingNextQuestion(false); // Reset loading state also here if flow allows
       } else if (message.type === "newQuestion") {
         setIsPreparingNextQuestion(false);
         setIsShowingFeedback(false);
@@ -251,6 +254,9 @@ const QuizSessionPage = ({
         setSubmittedCount(0);
         setAllSubmitted(false);
         setEndTime(message.endTime);
+        if (typeof message.activeStudentCount === "number") {
+          setTotalParticipantsInQuestion(message.activeStudentCount);
+        }
         setIsProcessingNextQuestion(false); // Reset loading state also here if flow allows
       } else if (message.type === "studentSubmitted") {
         setStudents((prevStudents) =>
@@ -316,6 +322,10 @@ const QuizSessionPage = ({
         // 학생의 경우 여기서 추가 정리 로직 (예: 메인 화면으로 이동)
         // socketRef.current?.close(); // 이미 서버에서 닫힐 것이므로 클라이언트에서 또 닫을 필요는 없을 수 있음
         navigate("/"); // 예시: 학생을 홈으로 보냄
+      } else if (message.type === "activeStudentCountUpdated") {
+        if (typeof message.activeStudentCount === "number") {
+          setTotalParticipantsInQuestion(message.activeStudentCount);
+        }
       }
     };
 
@@ -414,6 +424,10 @@ const QuizSessionPage = ({
     }
   };
 
+  const toggleShowOptions = () => {
+    setShowOptions((prev) => !prev);
+  };
+
   return (
     <Box
       sx={{
@@ -432,22 +446,62 @@ const QuizSessionPage = ({
         overflow: isViewingResults && detailedQuizResults ? "hidden" : "auto",
       }}
     >
-      <IconButton
-        onClick={() => navigate("/manage-quizzes")}
+      <Box
         sx={{
           position: "absolute",
           top: "2vw",
           left: "3vw",
           zIndex: 1000,
-          color: "white",
-          backgroundColor: "rgba(0, 0, 0, 0.5)",
-          "&:hover": {
-            backgroundColor: "rgba(0, 0, 0, 0.7)",
-          },
+          display: "flex",
+          alignItems: "center",
+          gap: 2,
         }}
       >
-        <ArrowBackIcon />
-      </IconButton>
+        <IconButton
+          onClick={() => navigate("/manage-quizzes")}
+          sx={{
+            color: "white",
+            backgroundColor: "rgba(0, 0, 0, 0.5)",
+            "&:hover": {
+              backgroundColor: "rgba(0, 0, 0, 0.7)",
+            },
+          }}
+        >
+          <ArrowBackIcon />
+        </IconButton>
+
+        {isSessionActive &&
+          currentQuestion &&
+          !isViewingResults &&
+          !(isShowingFeedback && isLastQuestion) && (
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                backgroundColor: "rgba(0, 0, 0, 0.6)",
+                padding: "0.5rem 1.5rem",
+                borderRadius: "12px",
+              }}
+            >
+              <VpnKeyIcon
+                sx={{
+                  color: "white",
+                  mr: 1,
+                  fontSize: "clamp(1.5rem, 2.8vw, 2.3rem)",
+                }}
+              />
+              <Typography
+                sx={{
+                  color: "white",
+                  fontWeight: "bold",
+                  fontSize: "clamp(1.5rem, 2.8vw, 2.3rem)",
+                }}
+              >
+                PIN: {pin}
+              </Typography>
+            </Box>
+          )}
+      </Box>
 
       <IconButton
         onClick={handleFullscreenToggle}
@@ -606,9 +660,11 @@ const QuizSessionPage = ({
               <QuestionComponent
                 currentQuestion={currentQuestion}
                 submittedCount={submittedCount}
-                totalStudents={totalStudents}
+                totalStudents={totalParticipantsInQuestion}
                 allSubmitted={allSubmitted}
                 endTime={endTime}
+                showOptions={showOptions}
+                toggleShowOptions={toggleShowOptions}
               />
             </Box>
           )}

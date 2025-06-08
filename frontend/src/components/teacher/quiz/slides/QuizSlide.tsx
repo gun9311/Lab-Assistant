@@ -19,6 +19,7 @@ import {
   AddPhotoAlternateRounded as AddPhotoAlternateRoundedIcon,
   RadioButtonUncheckedRounded as RadioButtonUncheckedIcon,
   CheckCircleOutlineRounded as CheckCircleOutlineIcon,
+  Add as AddIcon,
 } from "@mui/icons-material";
 import { Question } from "../types";
 import ImageUploadDialog from "../ImageUploadDialog";
@@ -108,13 +109,43 @@ const QuizSlide: React.FC<QuizSlideProps> = ({
       updatedQuestion.options = [
         { text: "", imageUrl: "", image: null },
         { text: "", imageUrl: "", image: null },
-        { text: "", imageUrl: "", image: null },
-        { text: "", imageUrl: "", image: null },
       ];
     }
 
     updatedQuestion.correctAnswer = -1;
     updateQuestion(questionIndex, updatedQuestion);
+  };
+
+  const addOption = () => {
+    if (isReadOnly || question.options.length >= 6) return; // 최대 6개로 제한
+    const newOptions = [
+      ...question.options,
+      { text: "", imageUrl: "", image: null },
+    ];
+    handleQuestionChange({ options: newOptions });
+  };
+
+  const removeOption = (optionIndex: number) => {
+    if (isReadOnly || question.options.length <= 2) return; // 최소 2개는 유지
+    const updatedOptions = question.options.filter(
+      (_, index) => index !== optionIndex
+    );
+    const currentCorrectAnswer =
+      typeof question.correctAnswer === "string"
+        ? parseInt(question.correctAnswer, 10)
+        : question.correctAnswer;
+
+    let newCorrectAnswer: number = currentCorrectAnswer;
+    if (currentCorrectAnswer === optionIndex) {
+      newCorrectAnswer = -1; // 삭제된 선택지가 정답이었으면 리셋
+    } else if (currentCorrectAnswer > optionIndex) {
+      newCorrectAnswer = currentCorrectAnswer - 1; // 인덱스 조정
+    }
+
+    handleQuestionChange({
+      options: updatedOptions,
+      correctAnswer: newCorrectAnswer,
+    });
   };
 
   useEffect(() => {
@@ -445,6 +476,33 @@ const QuizSlide: React.FC<QuizSlideProps> = ({
                     },
                   }}
                 >
+                  {!isReadOnly &&
+                    question.questionType === "multiple-choice" &&
+                    question.options.length > 2 && (
+                      <IconButton
+                        aria-label="선택지 삭제"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeOption(optionIndex);
+                        }}
+                        sx={{
+                          position: "absolute",
+                          top: 4,
+                          right: 4,
+                          zIndex: 2,
+                          color: "rgba(0, 0, 0, 0.4)",
+                          backgroundColor: "rgba(255, 255, 255, 0.2)",
+                          "&:hover": {
+                            color: "error.main",
+                            backgroundColor: "rgba(255, 255, 255, 0.8)",
+                          },
+                          padding: "2px",
+                        }}
+                        size="small"
+                      >
+                        <Delete fontSize="inherit" />
+                      </IconButton>
+                    )}
                   {!isReadOnly && (
                     <IconButton
                       onClick={(e) => {
@@ -634,6 +692,25 @@ const QuizSlide: React.FC<QuizSlideProps> = ({
             );
           })}
         </Grid>
+        {question.questionType === "multiple-choice" &&
+          !isReadOnly &&
+          question.options.length < 6 && (
+            <Box mt={1.5} display="flex" justifyContent="center">
+              <Button
+                variant="outlined"
+                onClick={addOption}
+                startIcon={<AddIcon />}
+                size="small"
+                sx={{
+                  borderRadius: "20px",
+                  color: "grey.700",
+                  borderColor: "grey.400",
+                }}
+              >
+                선택지 추가
+              </Button>
+            </Box>
+          )}
       </Paper>
 
       <ImageUploadDialog

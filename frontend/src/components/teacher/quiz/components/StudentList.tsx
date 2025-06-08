@@ -2,7 +2,6 @@ import React, { useEffect, useState } from "react";
 import { Box, Typography, Button } from "@mui/material";
 import podiumImage from "../../../../assets/classic-podium.png";
 import TopRankers from "./TopRankers";
-import BottomRankers from "./BottomRankers";
 import WaitingPlayers from "./WaitingPlayers"; // 대기 화면 컴포넌트 추가
 import { ArrowForwardIos } from "@mui/icons-material";
 import "./StudentList.css";
@@ -53,7 +52,6 @@ const StudentListComponent: React.FC<StudentListComponentProps> = ({
     (a, b) => (a.rank ?? Infinity) - (b.rank ?? Infinity)
   );
   const topRankers = sortedStudents.slice(0, 10);
-  const bottomRankers = sortedStudents.slice(3);
   const [dots, setDots] = useState("");
   const [showNextButton, setShowNextButton] = useState(false);
   const [showEndButtons, setShowEndButtons] = useState(false);
@@ -68,21 +66,64 @@ const StudentListComponent: React.FC<StudentListComponentProps> = ({
   }, []);
 
   useEffect(() => {
-    if (isShowingFeedback) {
-      if (isLastQuestion) {
-        const timer = setTimeout(() => setShowEndButtons(true), 16000);
-        setShowFinalMessage(true);
-        setTimeout(() => setShowFinalMessage(false), 3000); // 3초 후 메시지 숨김
-        return () => clearTimeout(timer);
-      } else {
-        const timer = setTimeout(() => setShowNextButton(true), 4000);
-        return () => clearTimeout(timer);
-      }
-    } else {
+    if (!isShowingFeedback) {
       setShowNextButton(false);
       setShowEndButtons(false);
+      return;
     }
-  }, [isShowingFeedback, isLastQuestion]);
+
+    const getAnimationDuration = (isLast: boolean, rankersCount: number) => {
+      if (rankersCount <= 0) return 0;
+
+      const startingRankIndex = Math.min(9, rankersCount - 1);
+      let duration = 0;
+
+      // Ranks from startingRankIndex down to 3
+      const loopRanksCount = Math.max(0, startingRankIndex - 2);
+      duration += loopRanksCount * (isLast ? 1000 : 300);
+
+      // Wait before revealing rank 3
+      duration += isLast ? 1000 : 300;
+      // Wait before revealing rank 2
+      duration += isLast ? 1500 : 500;
+      // Wait before revealing rank 1
+      duration += isLast ? 2000 : 700;
+
+      return duration;
+    };
+
+    const rankersCount = topRankers.length;
+    const animationDuration = getAnimationDuration(
+      isLastQuestion,
+      rankersCount
+    );
+    const userWaitTime = 1000; // 1 second
+
+    let buttonTimer: NodeJS.Timeout;
+
+    if (isLastQuestion) {
+      const initialMessageDuration = 3000;
+      setShowFinalMessage(true);
+      const finalMessageTimer = setTimeout(
+        () => setShowFinalMessage(false),
+        initialMessageDuration
+      );
+
+      const totalDelay =
+        initialMessageDuration + animationDuration + userWaitTime;
+      buttonTimer = setTimeout(() => setShowEndButtons(true), totalDelay);
+
+      return () => {
+        clearTimeout(finalMessageTimer);
+        clearTimeout(buttonTimer);
+      };
+    } else {
+      const totalDelay = animationDuration + userWaitTime;
+      buttonTimer = setTimeout(() => setShowNextButton(true), totalDelay);
+
+      return () => clearTimeout(buttonTimer);
+    }
+  }, [isShowingFeedback, isLastQuestion, topRankers.length]);
 
   return (
     <Box
@@ -147,7 +188,7 @@ const StudentListComponent: React.FC<StudentListComponentProps> = ({
                 width: "100%",
                 maxWidth: "100%",
                 margin: "0 auto",
-                marginTop: { xs: "8vh", md: "6vh" },
+                marginTop: { xs: "13vh", md: "11vh" },
               }}
             >
               <img
@@ -168,7 +209,7 @@ const StudentListComponent: React.FC<StudentListComponentProps> = ({
           )}
           <Box
             sx={{
-              marginTop: "4.5vw",
+              marginTop: "5vw",
               display: "flex",
               justifyContent: "center",
               gap: "3vw",

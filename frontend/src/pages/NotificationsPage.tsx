@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Container,
   Typography,
@@ -23,7 +23,13 @@ const NotificationsPage: React.FC = () => {
     loadMoreNotifications,
     hasMore,
     isLoading,
+    fetchNotifications,
   } = useNotificationContext();
+
+  useEffect(() => {
+    // 페이지에 진입할 때마다 첫 페이지의 알림을 새로고침합니다.
+    fetchNotifications(1);
+  }, [fetchNotifications]);
 
   const handleNotificationClick = (id: string) => {
     markAsRead(id);

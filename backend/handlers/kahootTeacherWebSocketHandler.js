@@ -11,6 +11,7 @@ const {
   setupKeepAlive,
   subscribeToPinChannels,
   unsubscribeFromPinChannels,
+  getActiveStudentCount,
 } = require("./kahootShared");
 const {
   getSessionKey,
@@ -363,6 +364,7 @@ async function _handleStartQuiz(pin, ws, currentSessionState, questionContent) {
       const timeLimit = firstQuestion.timeLimit * 1000;
       const bufferTime = 2000;
       const endTime = currentTime + timeLimit + bufferTime;
+      const activeStudentCount = await getActiveStudentCount(pin);
 
       ws.send(
         JSON.stringify({
@@ -372,6 +374,7 @@ async function _handleStartQuiz(pin, ws, currentSessionState, questionContent) {
           questionNumber: 1,
           totalQuestions: questionContent.length,
           endTime: endTime,
+          activeStudentCount: activeStudentCount,
         })
       );
 
@@ -573,6 +576,7 @@ async function _handleNextQuestion(
         const timeLimit = nextQuestion.timeLimit * 1000;
         const bufferTime = 2000;
         const endTime = currentTime + timeLimit + bufferTime;
+        const activeStudentCount = await getActiveStudentCount(pin);
         ws.send(
           JSON.stringify({
             type: "newQuestion",
@@ -582,6 +586,7 @@ async function _handleNextQuestion(
             totalQuestions: questionContent.length,
             isLastQuestion: isLastQuestion,
             endTime: endTime,
+            activeStudentCount: activeStudentCount,
           })
         );
 

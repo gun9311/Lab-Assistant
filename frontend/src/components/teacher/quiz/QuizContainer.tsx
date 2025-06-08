@@ -29,20 +29,6 @@ import { getUnits, createQuiz, updateQuiz } from "../../../utils/quizApi";
 import { getSubjects } from "../../../utils/api";
 import { useNavigate } from "react-router-dom";
 import QuizPreviewModal from "./QuizPreviewModal";
-import {
-  ChevronLeft,
-  ChevronRight,
-  Save as SaveIcon,
-  Visibility as VisibilityIcon,
-  DeleteSweep as DeleteSweepIcon,
-  PlayArrow,
-  Edit,
-} from "@mui/icons-material";
-import {
-  Question as QuestionType,
-  // QuizContent, // Removed as it's not defined in the provided types.ts
-  // QuizMode, // Removed as it's not defined in the provided types.ts
-} from "./types"; // Corrected path from ../types to ./types
 
 export interface QuizContainerRef {
   save: () => void;
@@ -362,6 +348,15 @@ const QuizContainer = forwardRef<QuizContainerRef, QuizContainerProps>(
             setCurrentSlideIndex(i + 1);
             return false;
           }
+          if (filledOptions.length !== q.options.length) {
+            setError(
+              `문제 ${
+                i + 1
+              }: 비어있는 선택지가 있습니다. 내용을 입력하거나 선택지를 삭제해주세요.`
+            );
+            setCurrentSlideIndex(i + 1);
+            return false;
+          }
         }
         if (q.timeLimit <= 0 && !isReadOnly) {
           setError(`문제 ${i + 1}: 시간 제한은 0보다 커야 합니다.`);
@@ -545,13 +540,27 @@ const QuizContainer = forwardRef<QuizContainerRef, QuizContainerProps>(
         if (quizImage) formData.append("image", quizImage);
         else if (quizImageUrl) formData.append("imageUrl", quizImageUrl);
 
-        const formattedQuestions = questions.map((question) => ({
-          ...question,
-          options: question.options.map((opt) => ({
-            text: opt.text,
-            imageUrl: opt.imageUrl || null,
-          })),
-        }));
+        const formattedQuestions = questions.map((question) => {
+          // eslint-disable-next-line no-unused-vars
+          const { image, options, ...rest } = question;
+
+          // 객관식 문제에 대해서만 내용이 없는(텍스트, 이미지 모두 없는) 선택지를 필터링합니다.
+          const filteredOptions =
+            question.questionType === "multiple-choice"
+              ? options.filter(
+                  (opt) => opt.text.trim() !== "" || opt.imageUrl || opt.image
+                )
+              : options;
+
+          return {
+            ...rest,
+            // 필터링된 선택지로 교체하고, 각 선택지에서 File 객체(image)를 제외합니다.
+            options: filteredOptions.map((opt) => ({
+              text: opt.text,
+              imageUrl: opt.imageUrl || null,
+            })),
+          };
+        });
 
         formData.append("questions", JSON.stringify(formattedQuestions));
 

@@ -10,6 +10,7 @@ const {
   publishIndividualFeedbackList,
   subscribeToPinChannels,
   unsubscribeFromPinChannels,
+  getActiveStudentCount,
 } = require("./kahootShared");
 const {
   getSessionKey,
@@ -1074,6 +1075,26 @@ exports.handleStudentWebSocketConnection = async (ws, studentId, pin) => {
         );
       }
     }
+
+    // 실시간 참여자 수 업데이트: 퀴즈가 진행 중일 때만
+    const currentSessionOnClose = await redisJsonGet(getSessionKey(pin));
+    if (
+      currentSessionOnClose &&
+      currentSessionOnClose.quizStarted &&
+      !currentSessionOnClose.quizEndedByTeacher
+    ) {
+      const activeStudentCount = await getActiveStudentCount(pin);
+      await broadcastToTeacher(pin, {
+        type: "activeStudentCountUpdated",
+        activeStudentCount: activeStudentCount,
+      });
+      logger.info(
+        `Notified teacher of updated active student count (${activeStudentCount}) for PIN ${pin} after disconnect.`
+      );
+    }
+
+    // 학생 퇴장 후 남은 학생들이 모두 제출했는지 확인
+    await _checkSubmissionsOnStudentDisconnect(pin, studentId);
   });
 
   ws.on("error", async (error) => {

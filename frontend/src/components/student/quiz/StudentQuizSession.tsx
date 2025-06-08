@@ -441,19 +441,19 @@ const StudentQuizSessionPage: React.FC = () => {
   };
 
   return (
-    <Container
+    <Box
       component="main"
-      maxWidth="md"
       sx={{
-        mt: 4,
+        minHeight: "100vh",
+        width: "100vw",
         backgroundImage: `url(${classroom})`,
         backgroundSize: "cover",
         backgroundPosition: "center",
-        minHeight: "85vh",
         display: "flex",
         justifyContent: "center",
         alignItems: "center",
-        padding: "2rem",
+        padding: { xs: 1, sm: 2 },
+        boxSizing: "border-box",
       }}
     >
       <Paper
@@ -591,7 +591,7 @@ const StudentQuizSessionPage: React.FC = () => {
           </>
         )}
       </Paper>
-    </Container>
+    </Box>
   );
 };
 

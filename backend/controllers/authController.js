@@ -2,7 +2,7 @@ const { OAuth2Client } = require("google-auth-library");
 const Admin = require("../models/Admin");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
-const {redisClient} = require("../utils/redisClient");
+const { redisClient } = require("../utils/redisClient");
 const Teacher = require("../models/Teacher");
 const Student = require("../models/Student");
 const { SendEmailCommand } = require("@aws-sdk/client-ses");
@@ -400,6 +400,7 @@ const registerAdmin = async (req, res) => {
 };
 
 const registerStudentByTeacher = async (req, res) => {
+  const { default: pLimit } = await import("p-limit");
   const studentsData = req.body;
   const teacherId = req.user._id;
   logger.info(
@@ -466,113 +467,144 @@ const registerStudentByTeacher = async (req, res) => {
     }
     loginIdSet.add(studentData.loginId);
 
-    try {
-      const hashedPassword = await bcrypt.hash(studentData.password, 12);
-      studentsToInsert.push({
-        loginId: studentData.loginId,
-        studentId: studentData.studentId,
-        name: studentData.name,
-        password: hashedPassword,
-        grade: studentData.grade,
-        class: studentData.studentClass,
-        school: studentData.school,
-      });
-    } catch (hashError) {
-      logger.error(
-        `Password hashing failed for ${studentData.loginId} by ${teacherId}`,
-        { error: hashError }
-      );
-      results.failed.push({ studentData, error: "비밀번호 처리 중 오류 발생" });
-      continue;
-    }
+    // for 루프 안에서는 암호화하지 않고, 유효성 검사가 통과된 학생 데이터만 따로 모읍니다.
+    studentsToInsert.push(studentData);
   }
 
-  // 2. 실제 데이터베이스 삽입 시도
-  if (studentsToInsert.length > 0) {
-    const insertedLoginIds = new Set(); // 성공적으로 삽입된 loginId 추적
-    const failedDueToDbError = new Set(); // DB 오류로 실패한 loginId 추적
+  const limit = pLimit(8); // 동시성 8로 제한
 
-    try {
-      // insertMany 실행. ordered: false 설정
-      await Student.insertMany(studentsToInsert, { ordered: false });
+  // 2. 비밀번호 일괄 암호화 (병렬 처리)
+  try {
+    const studentCreationPromises = studentsToInsert.map((studentData) =>
+      limit(async () => {
+        const hashedPassword = await bcrypt.hash(studentData.password, 10); // 비용을 10으로 조정
+        return {
+          loginId: studentData.loginId,
+          studentId: studentData.studentId,
+          name: studentData.name,
+          password: hashedPassword,
+          grade: studentData.grade,
+          class: studentData.studentClass,
+          school: studentData.school,
+        };
+      })
+    );
 
-      // 오류가 발생하지 않았다면 모든 studentsToInsert가 성공
-      studentsToInsert.forEach((student) =>
-        insertedLoginIds.add(student.loginId)
-      );
-    } catch (error) {
-      logger.error(`Error during insertMany by teacher ${teacherId}:`, {
-        error: error.message,
-        writeErrors: error.writeErrors,
-      });
+    const studentsWithHashedPasswords = await Promise.all(
+      studentCreationPromises
+    );
 
-      const writeErrors = error.writeErrors || error.errors || [];
+    // 3. 실제 데이터베이스 삽입 시도
+    if (studentsWithHashedPasswords.length > 0) {
+      const insertedLoginIds = new Set(); // 성공적으로 삽입된 loginId 추적
+      const failedDueToDbError = new Set(); // DB 오류로 실패한 loginId 추적
 
-      // 실패한 학생들을 failed 목록에 추가
-      writeErrors.forEach((writeError) => {
-        // writeError.err.op 또는 writeError.op (Mongoose 버전에 따라 다름) 에서 실패한 문서 정보 가져오기
-        const failedOp = writeError.err?.op || writeError.op;
-        if (failedOp && failedOp.loginId) {
-          const originalData = loginIdToOriginalDataMap.get(failedOp.loginId);
-          let errorMessage = "DB 오류로 생성 실패";
-          if (writeError.err?.code === 11000 || writeError.code === 11000) {
-            errorMessage =
-              "사용 중인 로그인 ID입니다. 다른 식별코드를 사용하세요.";
-          }
-          // 이미 다른 이유로 실패 처리되지 않은 경우에만 추가
-          if (
-            !results.failed.some(
-              (f) => f.studentData.loginId === failedOp.loginId
-            )
-          ) {
-            results.failed.push({
-              studentData: originalData,
-              error: errorMessage,
-            });
-          }
-          failedDueToDbError.add(failedOp.loginId); // DB 오류로 실패했음을 표시
-        }
-      });
-
-      // 삽입 시도했던 학생 중 DB 오류로 실패하지 않은 학생은 성공한 것으로 간주
-      studentsToInsert.forEach((student) => {
-        if (!failedDueToDbError.has(student.loginId)) {
-          insertedLoginIds.add(student.loginId);
-        }
-      });
-    }
-
-    // 3. 성공한 학생들의 전체 정보(_id 포함) 다시 조회
-    if (insertedLoginIds.size > 0) {
       try {
-        const successfullyInsertedStudents = await Student.find({
-          loginId: { $in: Array.from(insertedLoginIds) },
-        }).select("_id loginId name school grade class studentId"); // 필요한 필드만 선택
+        // insertMany 실행. ordered: false 설정
+        await Student.insertMany(studentsWithHashedPasswords, {
+          ordered: false,
+        });
 
-        results.success = successfullyInsertedStudents.map((s) => s.toObject()); // 결과를 success 배열에 추가
-        logger.info(
-          `Fetched details for ${results.success.length} successfully inserted students by teacher ${teacherId}.`
+        // 오류가 발생하지 않았다면 모든 studentsToInsert가 성공
+        studentsWithHashedPasswords.forEach((student) =>
+          insertedLoginIds.add(student.loginId)
         );
-      } catch (fetchError) {
-        logger.error(
-          `Failed to fetch details of successfully inserted students by teacher ${teacherId}`,
-          { error: fetchError }
-        );
-        // 성공했지만 정보 조회를 실패한 경우, loginId만 가진 정보라도 반환할지 결정 필요
-        // 여기서는 일단 success 배열을 비워두거나, 최소한의 정보만 넣을 수 있음
-        insertedLoginIds.forEach((loginId) => {
-          if (!results.failed.some((f) => f.studentData.loginId === loginId)) {
-            // _id 없이 삽입 시도했던 데이터라도 넣어주기 (프론트엔드와 협의 필요)
-            // results.success.push(loginIdToOriginalDataMap.get(loginId));
-            // 또는 에러 메시지와 함께 실패 처리
-            results.failed.push({
-              studentData: loginIdToOriginalDataMap.get(loginId),
-              error: "계정은 생성되었으나 정보 조회 실패",
-            });
+      } catch (error) {
+        logger.error(`Error during insertMany by teacher ${teacherId}:`, {
+          error: error.message,
+          writeErrors: error.writeErrors,
+        });
+
+        const writeErrors = error.writeErrors || error.errors || [];
+
+        // 실패한 학생들을 failed 목록에 추가
+        writeErrors.forEach((writeError) => {
+          // writeError.err.op 또는 writeError.op (Mongoose 버전에 따라 다름) 에서 실패한 문서 정보 가져오기
+          const failedOp = writeError.err?.op || writeError.op;
+          if (failedOp && failedOp.loginId) {
+            const originalData = loginIdToOriginalDataMap.get(failedOp.loginId);
+            let errorMessage = "DB 오류로 생성 실패";
+            if (writeError.err?.code === 11000 || writeError.code === 11000) {
+              errorMessage =
+                "사용 중인 로그인 ID입니다. 다른 식별코드를 사용하세요.";
+            }
+            // 이미 다른 이유로 실패 처리되지 않은 경우에만 추가
+            if (
+              !results.failed.some(
+                (f) => f.studentData.loginId === failedOp.loginId
+              )
+            ) {
+              results.failed.push({
+                studentData: originalData,
+                error: errorMessage,
+              });
+            }
+            failedDueToDbError.add(failedOp.loginId); // DB 오류로 실패했음을 표시
+          }
+        });
+
+        // 삽입 시도했던 학생 중 DB 오류로 실패하지 않은 학생은 성공한 것으로 간주
+        studentsWithHashedPasswords.forEach((student) => {
+          if (!failedDueToDbError.has(student.loginId)) {
+            insertedLoginIds.add(student.loginId);
           }
         });
       }
+
+      // 4. 성공한 학생들의 전체 정보(_id 포함) 다시 조회
+      if (insertedLoginIds.size > 0) {
+        try {
+          const successfullyInsertedStudents = await Student.find({
+            loginId: { $in: Array.from(insertedLoginIds) },
+          }).select("_id loginId name school grade class studentId"); // 필요한 필드만 선택
+
+          results.success = successfullyInsertedStudents.map((s) =>
+            s.toObject()
+          ); // 결과를 success 배열에 추가
+          logger.info(
+            `Fetched details for ${results.success.length} successfully inserted students by teacher ${teacherId}.`
+          );
+        } catch (fetchError) {
+          logger.error(
+            `Failed to fetch details of successfully inserted students by teacher ${teacherId}`,
+            { error: fetchError }
+          );
+          // 성공했지만 정보 조회를 실패한 경우, loginId만 가진 정보라도 반환할지 결정 필요
+          // 여기서는 일단 success 배열을 비워두거나, 최소한의 정보만 넣을 수 있음
+          insertedLoginIds.forEach((loginId) => {
+            if (
+              !results.failed.some((f) => f.studentData.loginId === loginId)
+            ) {
+              // _id 없이 삽입 시도했던 데이터라도 넣어주기 (프론트엔드와 협의 필요)
+              // results.success.push(loginIdToOriginalDataMap.get(loginId));
+              // 또는 에러 메시지와 함께 실패 처리
+              results.failed.push({
+                studentData: loginIdToOriginalDataMap.get(loginId),
+                error: "계정은 생성되었으나 정보 조회 실패",
+              });
+            }
+          });
+        }
+      }
     }
+  } catch (hashError) {
+    logger.error(
+      `Password hashing failed during batch process by ${teacherId}`,
+      { error: hashError }
+    );
+    // 해싱에서 실패하면 모든 학생을 실패 처리할 수 있습니다.
+    studentsToInsert.forEach((studentData) => {
+      if (
+        !results.failed.some(
+          (f) => f.studentData.loginId === studentData.loginId
+        )
+      ) {
+        results.failed.push({
+          studentData,
+          error: "비밀번호 처리 중 오류 발생",
+        });
+      }
+    });
   }
 
   // 최종 결과 로그 및 응답

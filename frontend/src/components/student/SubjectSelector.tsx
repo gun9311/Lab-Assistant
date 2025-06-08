@@ -67,7 +67,7 @@ const SubjectSelector: React.FC<SubjectSelectorProps> = ({
     "수학",
     "과학",
     "사회",
-    "통합교과과",
+    "통합교과",
   ]);
 
   useEffect(() => {
