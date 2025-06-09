@@ -39,6 +39,7 @@ import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import ComingSoon from "../../components/common/ComingSoon";
 import GetAppIcon from "@mui/icons-material/GetApp";
+import ImageNoticeModal from "../../components/common/ImageNoticeModal";
 
 type Student = {
   _id: number;
@@ -50,6 +51,7 @@ type Student = {
   studentId: string;
   studentClass: string;
   school: string;
+  classNum: string;
 };
 
 interface FailedStudent {
@@ -125,6 +127,7 @@ const TeacherHomePage: React.FC = () => {
   const [canCommunicateWithExtension, setCanCommunicateWithExtension] =
     useState(false);
   const [showExtensionAlert, setShowExtensionAlert] = useState(true);
+  const [isNoticeModalOpen, setNoticeModalOpen] = useState<boolean>(false);
 
   useEffect(() => {
     const userAgent = navigator.userAgent.toLowerCase();
@@ -161,6 +164,15 @@ const TeacherHomePage: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    const noticeDismissed = localStorage.getItem(
+      "imageNoticeDismissed_20240614"
+    );
+    if (!noticeDismissed) {
+      setNoticeModalOpen(true);
+    }
+  }, []);
+
+  useEffect(() => {
     const fetchStudents = async () => {
       if (school && grade && classNumber && uniqueIdentifier) {
         try {
@@ -186,6 +198,13 @@ const TeacherHomePage: React.FC = () => {
 
   const handleCloseModal = () => {
     setModalOpen(false);
+  };
+
+  const handleNoticeModalClose = (dontShowAgain: boolean) => {
+    if (dontShowAgain) {
+      localStorage.setItem("imageNoticeDismissed_20240614", "true");
+    }
+    setNoticeModalOpen(false);
   };
 
   const handleCreateStudent = async (
@@ -272,6 +291,10 @@ const TeacherHomePage: React.FC = () => {
 
   return (
     <Container component="main" maxWidth="xl" sx={{ mt: 6, mb: 4 }}>
+      <ImageNoticeModal
+        open={isNoticeModalOpen}
+        onClose={handleNoticeModalClose}
+      />
       {showExtensionAlert &&
         (!isChromeBrowser || !canCommunicateWithExtension) && (
           <Alert
