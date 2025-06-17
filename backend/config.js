@@ -5,12 +5,14 @@ module.exports = {
     RECENT_HISTORY_COUNT: 4,
   },
   serverConfig: {
-    ALLOWED_ORIGINS: ["http://localhost:3000", "https://nudgeflow.co.kr"],
+    ALLOWED_ORIGINS: ["http://localhost:3000",
+                      "http://192.168.219.182:3000",
+                      "https://nudgeflow.co.kr"],
     DEFAULT_PORT: 5000,
   },
   studentServiceHours: {
-    START_HOUR: 9, // 오전 8시
-    END_HOUR: 15, // 오후 11시 (23시 전까지 허용)
+    START_HOUR: 0, // 오전 8시
+    END_HOUR: 24, // 오후 11시 (23시 전까지 허용)
     SERVER_TIMEZONE: "Asia/Seoul",
   },
   anthropicAI: {
