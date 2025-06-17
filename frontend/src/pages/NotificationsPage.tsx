@@ -12,7 +12,7 @@ import {
   Button,
   CircularProgress,
 } from "@mui/material";
-import { useNotificationContext } from "../context/NotificationContext";
+import { useNotificationContext } from "../contexts/NotificationContext";
 import { NotificationsActive, Done, CheckCircle } from "@mui/icons-material";
 
 const NotificationsPage: React.FC = () => {

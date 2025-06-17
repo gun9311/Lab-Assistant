@@ -12,3 +12,173 @@
     opacity: 1;
   }
 }
+
+/* --- 수정 및 추가된 스타일 --- */
+.fade-in {
+  animation: fadeIn 0.8s ease-in-out forwards;
+}
+
+.fade-in-out {
+  animation: fadeIn 0.8s ease-in-out forwards,
+    fadeOut 0.8s ease-in-out 2.7s forwards;
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/* 랭킹 보드 등장 애니메이션 */
+@keyframes unfoldIn {
+  0% {
+    transform: scaleY(0);
+    opacity: 0.5;
+  }
+  100% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+
+/* 랭킹 카드 등장 애니메이션 (수정) */
+@keyframes slideInFromRight {
+  from {
+    transform: translateX(40px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.ranking-board {
+  transform-origin: top;
+  animation: unfoldIn 0.9s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+}
+
+.ranking-card {
+  visibility: hidden; /* 시작 시 숨김 */
+}
+
+.ranking-card.visible {
+  visibility: visible;
+  animation: slideInFromRight 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+/* === 추가: 순위 뒤집기 애니메이션 === */
+@keyframes card-flip {
+  from {
+    transform: rotateX(0deg);
+  }
+  to {
+    transform: rotateX(1080deg); /* 3바퀴 회전 */
+  }
+}
+
+.ranking-card.is-flipping {
+  animation: card-flip 1.2s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+}
+/* ===================================== */
+
+/* === 추가: 순위 숫자 변경 시 반짝임 효과 === */
+.rank-change-flash {
+  animation: rank-flash 0.6s ease-in-out;
+}
+
+@keyframes rank-flash {
+  0%,
+  100% {
+    text-shadow: none;
+    transform: scale(1);
+  }
+  50% {
+    color: #ffd700;
+    transform: scale(1.2);
+    text-shadow: 0 0 10px rgba(255, 215, 0, 0.8),
+      0 0 20px rgba(255, 215, 0, 0.5);
+  }
+}
+
+.ranking-card-first {
+  background: linear-gradient(
+    90deg,
+    rgba(106, 75, 8, 0.5),
+    rgba(59, 41, 4, 0.5)
+  ) !important;
+  border: 1px solid rgba(255, 215, 0, 0.8);
+  box-shadow: 0 0 15px rgba(255, 215, 0, 0.5);
+}
+
+/* --- 추가: 2위, 3위 카드 스타일 --- */
+.ranking-card-second {
+  background: linear-gradient(
+    90deg,
+    rgba(105, 105, 105, 0.5),
+    rgba(70, 70, 70, 0.5)
+  ) !important;
+  border: 1px solid rgba(192, 192, 192, 0.8);
+  box-shadow: 0 0 15px rgba(192, 192, 192, 0.5);
+}
+
+.ranking-card-third {
+  background: linear-gradient(
+    90deg,
+    rgba(139, 69, 19, 0.5),
+    rgba(107, 54, 15, 0.5)
+  ) !important;
+  border: 1px solid rgba(205, 127, 50, 0.8);
+  box-shadow: 0 0 15px rgba(205, 127, 50, 0.5);
+}
+
+/* 포디움 슬라이드-업 + 페이드-인 */
+@keyframes slideUpFade {
+  0% {
+    transform: translateY(40px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* === 추가된 애니메이션 === */
+.leaderboard-title {
+  position: fixed;
+  top: 15vh;
+  left: 50%;
+  transform: translateX(-50%);
+  color: #fff;
+  font-family: "'Fredoka One', cursive";
+  font-size: 6vw;
+  font-weight: bold;
+  text-shadow: 0 0 10px #ff9800, 0 0 20px #ff9800, 0 0 30px #e65100,
+    0 0 40px #e65100;
+  z-index: 1100;
+  animation: leaderboard-reveal 2s forwards;
+  pointer-events: none;
+}
+
+@keyframes leaderboard-reveal {
+  0% {
+    opacity: 0;
+    transform: translateX(-50%) scale(0.5);
+  }
+  50% {
+    opacity: 1;
+    transform: translateX(-50%) scale(1.1);
+  }
+  80% {
+    opacity: 1;
+    transform: translateX(-50%) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-50%) scale(1);
+  }
+}

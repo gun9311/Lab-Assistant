@@ -163,14 +163,14 @@ const TeacherHomePage: React.FC = () => {
     }
   }, []);
 
-  useEffect(() => {
-    const noticeDismissed = localStorage.getItem(
-      "imageNoticeDismissed_20240614"
-    );
-    if (!noticeDismissed) {
-      setNoticeModalOpen(true);
-    }
-  }, []);
+  // useEffect(() => {
+  //   const noticeDismissed = localStorage.getItem(
+  //     "imageNoticeDismissed_20240614"
+  //   );
+  //   if (!noticeDismissed) {
+  //     setNoticeModalOpen(true);
+  //   }
+  // }, []);
 
   useEffect(() => {
     const fetchStudents = async () => {
@@ -200,12 +200,12 @@ const TeacherHomePage: React.FC = () => {
     setModalOpen(false);
   };
 
-  const handleNoticeModalClose = (dontShowAgain: boolean) => {
-    if (dontShowAgain) {
-      localStorage.setItem("imageNoticeDismissed_20240614", "true");
-    }
-    setNoticeModalOpen(false);
-  };
+  // const handleNoticeModalClose = (dontShowAgain: boolean) => {
+  //   if (dontShowAgain) {
+  //     localStorage.setItem("imageNoticeDismissed_20240614", "true");
+  //   }
+  //   setNoticeModalOpen(false);
+  // };
 
   const handleCreateStudent = async (
     submitData: UnifiedModalSubmitData
@@ -291,10 +291,10 @@ const TeacherHomePage: React.FC = () => {
 
   return (
     <Container component="main" maxWidth="xl" sx={{ mt: 6, mb: 4 }}>
-      <ImageNoticeModal
+      {/* <ImageNoticeModal
         open={isNoticeModalOpen}
         onClose={handleNoticeModalClose}
-      />
+      /> */}
       {showExtensionAlert &&
         (!isChromeBrowser || !canCommunicateWithExtension) && (
           <Alert

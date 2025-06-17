@@ -35,8 +35,8 @@ import {
   NotificationsActive,
 } from "@mui/icons-material";
 import { useNavigate, useLocation } from "react-router-dom";
-import { useChatbotContext } from "../context/ChatbotContext";
-import { useNotificationContext } from "../context/NotificationContext";
+import { useChatbotContext } from "../contexts/ChatbotContext";
+import { useNotificationContext } from "../contexts/NotificationContext";
 import { clearAuth, getUserId } from "../utils/auth";
 import logo from "../assets/nudge-navlogo.png";
 import apiNoAuth from "../utils/apiNoAuth";

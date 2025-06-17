@@ -7,14 +7,16 @@ interface Option {
   imageUrl?: string;
 }
 
+interface QuizQuestion {
+  options: Option[];
+  imageUrl?: string;
+  timeLimit: number;
+}
+
 interface QuizQuestionComponentProps {
-  currentQuestion: {
-    options: Option[];
-    imageUrl?: string;
-  };
+  currentQuestion: QuizQuestion;
   selectedAnswer: number | null;
   handleAnswerSelect: (index: number) => void;
-  timeLeft: number | null;
   isAnswerSubmitted: boolean;
 }
 
@@ -22,16 +24,8 @@ const QuizQuestionComponent: React.FC<QuizQuestionComponentProps> = ({
   currentQuestion,
   selectedAnswer,
   handleAnswerSelect,
-  timeLeft,
   isAnswerSubmitted,
 }) => {
-  const getTimerColor = () => {
-    if (timeLeft === null || isAnswerSubmitted) return "success";
-    if (timeLeft > 10) return "primary";
-    if (timeLeft > 5) return "warning";
-    return "error";
-  };
-
   return (
     <Box>
       {currentQuestion.options.map((option, index) => (
@@ -42,8 +36,8 @@ const QuizQuestionComponent: React.FC<QuizQuestionComponentProps> = ({
             onClick={() => handleAnswerSelect(index)}
             fullWidth
             sx={{
-              padding: "6px",
-              fontSize: "1.5rem !important",
+              padding: "10px",
+              fontSize: "1.7rem !important",
               fontWeight: "bold",
               fontFamily: "'Montserrat', sans-serif",
               borderRadius: "12px",
@@ -71,7 +65,7 @@ const QuizQuestionComponent: React.FC<QuizQuestionComponentProps> = ({
                 alt="선택지 이미지"
                 style={{
                   maxWidth: "100%",
-                  maxHeight: "120px",
+                  maxHeight: "140px",
                   marginBottom: "10px",
                   borderRadius: "8px",
                   objectFit: "cover",
@@ -83,32 +77,14 @@ const QuizQuestionComponent: React.FC<QuizQuestionComponentProps> = ({
         </Box>
       ))}
 
-      {timeLeft !== null && (
+      {isAnswerSubmitted && (
         <Box sx={{ mt: 4, textAlign: "center", animation: "fadeIn 0.5s" }}>
-          <Typography
-            variant="h6"
-            sx={{
-              mb: 1,
-              color: getTimerColor() === "error" ? "#f44336" : "#333",
-            }}
-          >
-            {isAnswerSubmitted ? (
-              <>
-                제출 완료: {timeLeft}초{" "}
-                <CheckCircleIcon sx={{ color: "green", ml: 1 }} />
-              </>
-            ) : (
-              `남은 시간: ${timeLeft}초`
-            )}
-          </Typography>
-          {!isAnswerSubmitted && (
-            <LinearProgress
-              variant="determinate"
-              value={(timeLeft / 30) * 100}
-              color={getTimerColor()}
-              sx={{ height: 8, borderRadius: "4px" }}
+          <Typography variant="h6" sx={{ mb: 1, color: "green" }}>
+            답변 제출 완료!
+            <CheckCircleIcon
+              sx={{ color: "green", ml: 1, verticalAlign: "middle" }}
             />
-          )}
+          </Typography>
         </Box>
       )}
     </Box>

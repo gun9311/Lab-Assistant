@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Box,
   List,
@@ -78,6 +78,45 @@ const QuestionListPanel: React.FC<QuestionListPanelProps> = ({
     useState<string>("multiple-choice");
   const [selectAll, setSelectAll] = useState(false);
   const [isBatchToolsExpanded, setIsBatchToolsExpanded] = useState(false);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // 입력 필드에 포커스가 있을 때는 키보드 탐색을 비활성화합니다.
+      const target = event.target as HTMLElement;
+      if (target.closest("input, textarea, [contenteditable=true]")) {
+        return;
+      }
+
+      if (event.key === "ArrowLeft") {
+        if (isReviewSlide) {
+          if (questions.length > 0) {
+            moveToSlide(questions.length);
+          }
+        } else if (currentSlideIndex > 1) {
+          moveToSlide(currentSlideIndex - 1);
+        }
+      } else if (event.key === "ArrowRight") {
+        if (!isReviewSlide) {
+          if (currentSlideIndex < questions.length) {
+            moveToSlide(currentSlideIndex + 1);
+          } else {
+            goToReview();
+          }
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [
+    currentSlideIndex,
+    isReviewSlide,
+    questions.length,
+    moveToSlide,
+    goToReview,
+  ]);
 
   const handleDragEnd = (result: any) => {
     const { destination, source } = result;

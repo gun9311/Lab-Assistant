@@ -1,5 +1,11 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useLayoutEffect } from "react";
 import { Box, Typography } from "@mui/material";
+import { useSprings, animated } from "react-spring";
+import { playSe, duckBgm, unduckBgm } from "../../../../utils/soundManager";
+import ReactConfetti from "react-confetti";
+import ReactDOM from "react-dom";
+import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
+import "./TopRankers.css";
 
 // 타입 정의 추가
 declare const require: {
@@ -35,133 +41,305 @@ type TopRankersProps = {
     prevRank?: number;
   }[];
   isLastQuestion: boolean;
+  onAnimationComplete: () => void;
 };
+
+// 화면 크기를 가져오는 헬퍼 훅
+const useWindowSize = () => {
+  const [size, setSize] = useState([0, 0]);
+  useLayoutEffect(() => {
+    function updateSize() {
+      setSize([window.innerWidth, window.innerHeight]);
+    }
+    window.addEventListener("resize", updateSize);
+    updateSize();
+    return () => window.removeEventListener("resize", updateSize);
+  }, []);
+  return size;
+};
+
+// 헬퍼 함수: rank를 기반으로 화면상 위치(top, left)를 계산합니다.
+const getPositionForRank = (
+  rank: number | undefined
+): { top: number; left: number } => {
+  if (rank === undefined || rank > 10) {
+    return { top: 120, left: 50 }; // % 단위
+  }
+  const index = rank - 1;
+  if (index < 3) {
+    return {
+      top: index === 0 ? 4 : index === 1 ? 35 : 36,
+      left: index === 0 ? 49 : index === 1 ? 33.5 : 63.5,
+    };
+  } else {
+    return {
+      top: 79,
+      left: 26.5 + (index - 3) * 6.7,
+    };
+  }
+};
+
+const AnimatedBox = animated(Box);
+
+// ======== NEW - reveal timing constants ========
+const LIST_START_DELAY = 1000; // 포디움 등장 후 10~4위 공개 전 대기
+const LIST_REVEAL_INTERVAL = 700; // 10~4위 공개 간격
+const BETWEEN_TOP3_DELAY = 1200; // 3·2·1위 사이 휴지기
+const TOP3_HOLD_DURATION = 1000; // 이름 공개 후 머무는 시간
+const MEDAL_APPEAR_DURATION = 500; // 메달 나타난 후 대기
+const MEDAL_FLIP_DURATION = 800; // 메달 뒤집히는 시간
+const SILHOUETTE_HOLD_DURATION = 2500; // 실루엣 유지 시간
+const SILHOUETTE_REVEAL_DURATION = 1500; // 실루엣 공개 시간
+// ==============================================
 
 const TopRankers: React.FC<TopRankersProps> = ({
   topRankers,
   isLastQuestion,
+  onAnimationComplete,
 }) => {
-  const [positions, setPositions] = useState<{
-    [id: string]: { top: string; left: string };
-  }>({});
-  const [visibleRanks, setVisibleRanks] = useState<number[]>([]);
-  const [imagesLoaded, setImagesLoaded] = useState<{ [id: string]: boolean }>(
-    {}
+  const [latchedRankers, setLatchedRankers] = useState<typeof topRankers>([]);
+  const [width, height] = useWindowSize();
+  const [visibleIndices, setVisibleIndices] = useState<number[]>([]);
+  const [showConfetti, setShowConfetti] = useState(false);
+  const [medalsToShow, setMedalsToShow] = useState<number[]>([]);
+  const [isFlipping, setIsFlipping] = useState<number[]>([]);
+  const [firstPlaceAnimState, setFirstPlaceAnimState] = useState<
+    "hidden" | "pulsing" | "revealing" | "revealed"
+  >("hidden");
+
+  useEffect(() => {
+    if (!showConfetti) {
+      document.body.style.overflow = "hidden";
+    }
+    return () => {
+      document.body.style.overflow = "auto";
+    };
+  }, [showConfetti]);
+
+  useEffect(() => {
+    if (latchedRankers.length === 0 && topRankers.length > 0) {
+      setLatchedRankers(
+        [...topRankers].sort((a, b) => (a.rank ?? 11) - (b.rank ?? 11))
+      );
+    }
+  }, [topRankers, latchedRankers]);
+
+  const springs = useSprings(
+    latchedRankers.length,
+    latchedRankers.map((_, idx) => {
+      const visible = visibleIndices.includes(idx);
+      return {
+        opacity: visible ? 1 : 0,
+        transform: visible
+          ? "translate(-50%, -100%) scale(1)"
+          : "translate(-50%, -100%) scale(0.4)",
+        config: { mass: 1, tension: 280, friction: 20 },
+      };
+    })
   );
 
   useEffect(() => {
-    const updatedPositions: { [id: string]: { top: string; left: string } } =
-      {};
-    topRankers.forEach((student, index) => {
-      if (index < 3) {
-        updatedPositions[student.id] = {
-          top: index === 0 ? "5%" : index === 1 ? "36%" : "37%",
-          left: index === 0 ? "49%" : index === 1 ? "35%" : "62%",
-        };
-      } else {
-        const leftPosition = 28.6 + (index - 3) * 6.3;
-        updatedPositions[student.id] = {
-          top: "80%",
-          left: `${leftPosition}%`,
-        };
-      }
-    });
-    setPositions(updatedPositions);
+    if (latchedRankers.length === 0) return;
 
-    // 모든 문제에서 순차적으로 등수를 공개
-    const revealRanks = async () => {
-      // 참여자 수에 맞춰서 순위 공개 시작점을 조정합니다.
-      const startingRankIndex = Math.min(9, topRankers.length - 1);
+    const timeouts: NodeJS.Timeout[] = [];
+    const wait = (ms: number) =>
+      new Promise((res) => timeouts.push(setTimeout(res, ms)));
 
-      for (let i = startingRankIndex; i > 2; i--) {
-        setVisibleRanks((prev) => [...prev, i]);
-        await new Promise((resolve) =>
-          setTimeout(resolve, isLastQuestion ? 1000 : 300)
-        ); // 마지막 문제는 1초, 중간 문제는 0.3초 대기
+    const revealNames = async () => {
+      /* ---------- 10~4위 ---------- */
+      await wait(LIST_START_DELAY);
+      for (let i = latchedRankers.length - 1; i > 2; i--) {
+        setVisibleIndices((prev) => [...prev, i]);
+        await wait(LIST_REVEAL_INTERVAL);
       }
-      await new Promise((resolve) =>
-        setTimeout(resolve, isLastQuestion ? 1000 : 300)
-      ); // 3등 대기
-      setVisibleRanks((prev) => [...prev, 2]);
-      await new Promise((resolve) =>
-        setTimeout(resolve, isLastQuestion ? 1500 : 500)
-      ); // 2등 대기
-      setVisibleRanks((prev) => [...prev, 1]);
-      await new Promise((resolve) =>
-        setTimeout(resolve, isLastQuestion ? 2000 : 700)
-      ); // 1등 대기
-      setVisibleRanks((prev) => [...prev, 0]);
+
+      /* ---------- 3위 ---------- */
+      await wait(BETWEEN_TOP3_DELAY);
+      setMedalsToShow((prev) => [...prev, 3]);
+      await wait(MEDAL_APPEAR_DURATION);
+      setIsFlipping((prev) => [...prev, 3]);
+      await wait(MEDAL_FLIP_DURATION);
+      setVisibleIndices((prev) => [...prev, 2]);
+      await wait(TOP3_HOLD_DURATION);
+
+      /* ---------- 2위 ---------- */
+      await wait(BETWEEN_TOP3_DELAY);
+      setMedalsToShow((prev) => [...prev, 2]);
+      await wait(MEDAL_APPEAR_DURATION);
+      setIsFlipping((prev) => [...prev, 2]);
+      await wait(MEDAL_FLIP_DURATION);
+      setVisibleIndices((prev) => [...prev, 1]);
+      await wait(TOP3_HOLD_DURATION);
+
+      /* ---------- 1위 ---------- */
+      await wait(BETWEEN_TOP3_DELAY + 600); // 1위는 조금 더 여유
+      duckBgm(0.3);
+      playSe("drumroll1");
+      setFirstPlaceAnimState("pulsing");
+      setVisibleIndices((prev) => [...prev, 0]);
+      await wait(SILHOUETTE_HOLD_DURATION);
+
+      setFirstPlaceAnimState("revealing");
+      setShowConfetti(true);
+      await wait(SILHOUETTE_REVEAL_DURATION);
+      setFirstPlaceAnimState("revealed");
+      unduckBgm(1000, 1.2);
+
+      await wait(TOP3_HOLD_DURATION);
+      onAnimationComplete();
     };
 
-    revealRanks();
-  }, [topRankers, isLastQuestion]);
+    revealNames();
+    return () => timeouts.forEach(clearTimeout);
+  }, [latchedRankers, onAnimationComplete]);
 
   return (
     <>
-      {topRankers.map((student, index) => {
-        if (!visibleRanks.includes(index)) return null;
+      {showConfetti &&
+        ReactDOM.createPortal(
+          <Box
+            sx={{
+              position: "fixed",
+              inset: 0, // top:0, right:0, bottom:0, left:0
+              zIndex: 1500,
+              pointerEvents: "none",
+            }}
+          >
+            <ReactConfetti width={width} height={height} gravity={0.12} />
+          </Box>,
+          document.body
+        )}
 
-        const characterIndex =
-          parseInt(student.character.replace("character", "")) - 1;
-        const imageSize = index < 3 ? (index === 0 ? "55%" : "55%") : "30%";
+      {/* === 메달 컴포넌트 렌더링 === */}
+      {latchedRankers.map((student, index) => {
+        const rank = student.rank;
+        if (!rank || (rank !== 2 && rank !== 3)) return null;
+
+        const finalPos = getPositionForRank(rank);
+        const showMedal =
+          medalsToShow.includes(rank) && !visibleIndices.includes(index);
+
+        if (!showMedal) return null;
 
         return (
           <Box
-            key={student.id}
+            key={`${student.id}-medal`}
+            className={isFlipping.includes(rank) ? "medal-flipping" : ""}
             sx={{
               position: "absolute",
-              top: positions[student.id]?.top || "0%",
-              left: positions[student.id]?.left || "0%",
+              top: `${finalPos.top}%`,
+              left: `${finalPos.left}%`,
               transform: "translate(-50%, -100%)",
+              width: "20%",
+              textAlign: "center",
+              zIndex: 2,
+            }}
+          >
+            <EmojiEventsIcon
+              sx={{
+                fontSize: "18vw",
+                color: rank === 2 ? "#C0C0C0" : "#CD7F32", // 은색, 동색
+                filter: `drop-shadow(0 0 15px ${
+                  rank === 2 ? "#E0E0E0" : "#A46628"
+                })`,
+              }}
+            />
+          </Box>
+        );
+      })}
+
+      {springs.map((props, index) => {
+        const student = latchedRankers[index];
+        const isNameVisible = visibleIndices.includes(index);
+        const imageSize =
+          student.rank! <= 3 ? (student.rank === 1 ? "62%" : "62%") : "33%";
+        const finalPos = getPositionForRank(student.rank);
+        const isWinner =
+          student.rank === 1 && firstPlaceAnimState === "revealed";
+
+        const getFirstPlaceStyles = () => {
+          if (student.rank !== 1) return {};
+
+          switch (firstPlaceAnimState) {
+            case "pulsing":
+              return {
+                animation: "pulse-glow 2s infinite ease-in-out",
+                // 실루엣 즉시 적용을 위해 트랜지션 없음
+                transition: "none",
+              };
+            case "revealing":
+              return {
+                // filter를 직접 제어하는 대신, 더 극적인 애니메이션 사용
+                animation: `dramatic-reveal ${SILHOUETTE_REVEAL_DURATION}ms forwards ease-out`,
+                // 애니메이션이 filter를 제어하므로, 기본 filter는 실루엣 상태로 유지
+                filter: "brightness(0)",
+                transition: "none",
+              };
+            default:
+              return {};
+          }
+        };
+
+        return (
+          <AnimatedBox
+            key={student.id}
+            style={{
+              ...props,
+              top: `${finalPos.top}%`,
+              left: `${finalPos.left}%`,
+            }}
+            sx={{
+              position: "absolute",
               textAlign: "center",
               width: "20%",
               height: "auto",
-              visibility: imagesLoaded[student.id] ? "visible" : "hidden",
             }}
           >
-            {(index < 3 || isLastQuestion) && (
-              <Box
+            <Box
+              sx={{
+                position: "absolute",
+                top: "-30px",
+                left: "50%",
+                transform: "translateX(-50%)",
+                display: "flex",
+                justifyContent: "center",
+                width: "100%",
+                zIndex: 1,
+                opacity: isNameVisible ? 1 : 0,
+                transition: "opacity 0.5s ease-in-out",
+              }}
+            >
+              <Typography
                 sx={{
-                  position: "absolute",
-                  top: "-30px",
-                  left: "50%",
-                  transform: "translateX(-50%)",
-                  display: "flex",
-                  justifyContent: "center",
-                  width: "100%",
+                  backgroundColor: "rgba(0, 0, 0, 0.5)",
+                  color: "#fff",
+                  borderRadius: "4px",
+                  padding: "0.2rem 0.5rem",
+                  fontWeight: "bold",
+                  fontSize: student.rank! <= 3 ? "2.3vw" : "1.5vw",
                   zIndex: 1,
                 }}
               >
-                <Typography
-                  sx={{
-                    backgroundColor: "rgba(0, 0, 0, 0.5)",
-                    color: "#fff",
-                    borderRadius: "4px",
-                    padding: "0.2rem 0.5rem",
-                    fontWeight: "bold",
-                    fontSize: index < 3 ? "2vw" : "1.3vw",
-                    animation: "fadeIn 1s ease-in-out",
-                    zIndex: 1,
-                  }}
-                >
-                  {student.name}
-                </Typography>
-              </Box>
-            )}
-            <img
-              src={characterImages[characterIndex]}
+                {student.name}
+              </Typography>
+            </Box>
+            <animated.img
+              src={
+                characterImages[
+                  parseInt(student.character.replace("character", "")) - 1
+                ]
+              }
               alt={`${student.name}'s character`}
               style={{
                 width: imageSize,
                 height: "auto",
-                animation: "fadeIn 1s ease-in-out",
                 zIndex: 0,
+                // 1위 금색 테두리(shine) 효과 제거
+                animation: isWinner ? `winner-bounce 1s ease-in-out` : "",
+                ...getFirstPlaceStyles(),
               }}
-              onLoad={() =>
-                setImagesLoaded((prev) => ({ ...prev, [student.id]: true }))
-              }
             />
-          </Box>
+          </AnimatedBox>
         );
       })}
     </>

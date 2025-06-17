@@ -1,5 +1,5 @@
 import React from "react";
-import { Paper, Box, IconButton, Button } from "@mui/material";
+import { Paper, Box, IconButton, Button, Tooltip } from "@mui/material";
 import {
   ChevronLeft,
   ChevronRight,
@@ -70,20 +70,28 @@ const ActionBar: React.FC<ActionBarProps> = ({
       </Box>
 
       <Box sx={{ display: "flex", gap: 1, justifyContent: "center" }}>
-        <IconButton
-          onClick={() => onNavigate("prev")}
-          disabled={!canNavigateBack}
-          aria-label="이전 문제"
-        >
-          <ChevronLeft sx={{ fontSize: "1.8rem" }} />
-        </IconButton>
-        <IconButton
-          onClick={() => onNavigate("next")}
-          disabled={!canNavigateForward}
-          aria-label="다음 문제"
-        >
-          <ChevronRight sx={{ fontSize: "1.8rem" }} />
-        </IconButton>
+        <Tooltip title="이전 문제 (←)">
+          <span>
+            <IconButton
+              onClick={() => onNavigate("prev")}
+              disabled={!canNavigateBack}
+              aria-label="이전 문제"
+            >
+              <ChevronLeft sx={{ fontSize: "1.8rem" }} />
+            </IconButton>
+          </span>
+        </Tooltip>
+        <Tooltip title="다음 문제 (→)">
+          <span>
+            <IconButton
+              onClick={() => onNavigate("next")}
+              disabled={!canNavigateForward}
+              aria-label="다음 문제"
+            >
+              <ChevronRight sx={{ fontSize: "1.8rem" }} />
+            </IconButton>
+          </span>
+        </Tooltip>
       </Box>
 
       <Box
