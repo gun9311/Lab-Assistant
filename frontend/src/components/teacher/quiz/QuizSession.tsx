@@ -12,6 +12,10 @@ import {
   DialogContentText,
   DialogTitle,
   IconButton,
+  Popover,
+  Stack,
+  Slider,
+  Divider,
 } from "@mui/material";
 import { useNavigate, useLocation } from "react-router-dom";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
@@ -19,6 +23,10 @@ import FullscreenIcon from "@mui/icons-material/Fullscreen";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
 import VpnKeyIcon from "@mui/icons-material/VpnKey";
+import VolumeUpIcon from "@mui/icons-material/VolumeUp";
+import VolumeOffIcon from "@mui/icons-material/VolumeOff";
+import MusicNoteIcon from "@mui/icons-material/MusicNote";
+import GraphicEqIcon from "@mui/icons-material/GraphicEq";
 import { getToken } from "../../../utils/auth";
 import StudentListComponent from "./components/StudentList";
 import QuestionComponent from "./components/Question";
@@ -26,27 +34,21 @@ import ResultComponent from "./components/ResultComponent";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 // import backgroundImage from '../../../assets/quiz_show_background.png';
 import "./QuizSession.css";
-const backgroundImages = [
-  // require('../../../assets/quiz-theme/quiz_theme1.webp'),
-  // require('../../../assets/quiz-theme/quiz_theme2.webp'),
-  // require('../../../assets/quiz-theme/quiz_theme3.webp'),
-  // require('../../../assets/quiz-theme/quiz_theme4.webp'),
-  // require('../../../assets/quiz-theme/quiz_theme5.webp'),
-  // require('../../../assets/quiz-theme/quiz_theme6.webp'),
-  require("../../../assets/quiz-theme/quiz_theme1.png"),
-  require("../../../assets/quiz-theme/quiz_theme2.png"),
-  require("../../../assets/quiz-theme/quiz_theme3.png"),
-  require("../../../assets/quiz-theme/quiz_theme4.png"),
-  require("../../../assets/quiz-theme/quiz_theme5.png"),
-  require("../../../assets/quiz-theme/quiz_theme6.png"),
-  // require('../../../assets/quiz-theme/quiz_theme7.webp'),
-  // require('../../../assets/quiz-theme/quiz_theme8.webp'),
-  // require('../../../assets/quiz-theme/quiz_theme9.webp'),
-  // require('../../../assets/quiz-theme/quiz_theme10.webp'),
-  // require('../../../assets/quiz-theme/quiz_theme11.webp'),
-  // require('../../../assets/quiz-theme/quiz_theme12.webp'),
-  // require('../../../assets/quiz-theme/quiz_theme13.webp'),
-];
+import {
+  playRandomBgm,
+  stopBgm,
+  fadeOutBgm,
+  playSe,
+  toggleMute,
+  setBgmVolume,
+  setSeVolume,
+  getInitialVolumes,
+  startTickingLoop,
+  stopTickingLoop,
+  duckBgm,
+  unduckBgm,
+  playWinnerSequence,
+} from "../../../utils/soundManager";
 
 type Student = {
   id: string;
@@ -57,6 +59,8 @@ type Student = {
   isCorrect?: boolean;
   rank?: number; // 순위 정보 추가
   prevRank?: number;
+  score?: number; // 점수 정보 추가
+  prevScore?: number; // 이전 점수 추가
 };
 
 type Question = {
@@ -159,9 +163,7 @@ const QuizSessionPage = ({
     useState<DetailedResultsPayload | null>(null);
   const [isViewingResults, setIsViewingResults] = useState(false);
   const [quizStarted, setQuizStarted] = useState(false);
-  const [backgroundImage, setBackgroundImage] = useState<string>(
-    backgroundImages[0]
-  ); // 초기값 설정
+  const [backgroundImage, setBackgroundImage] = useState<string>("");
   const [endTime, setEndTime] = useState<number | null>(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState<number>(0); // 현재 문제 번호 상태 추가
   const [totalQuestions, setTotalQuestions] = useState<number>(0); // 총 문제 수 상태 추가
@@ -178,12 +180,28 @@ const QuizSessionPage = ({
   const [openConfirmDialog, setOpenConfirmDialog] = useState(false);
   const [confirmMessage, setConfirmMessage] = useState("");
 
+  const [timeLeft, setTimeLeft] = useState<number>(0);
+
+  // === Sound 상태 =====
+  const currentBgmRef = React.useRef<"waiting" | "playing" | "winner" | null>(
+    null
+  );
+  const prevStudentCnt = React.useRef(0);
+
+  // 사운드 컨트롤 UI 상태
+  const [soundControlAnchor, setSoundControlAnchor] =
+    useState<null | HTMLElement>(null);
+  const [isMuted, setIsMuted] = useState(getInitialVolumes().mute);
+  const [bgmVolume, setLocalBgmVolume] = useState(getInitialVolumes().bgm);
+  const [seVolume, setLocalSeVolume] = useState(getInitialVolumes().se);
+
   useEffect(() => {
     setIsQuizMode(true);
 
-    const randomImage =
-      backgroundImages[Math.floor(Math.random() * backgroundImages.length)];
-    setBackgroundImage(randomImage);
+    const imageCount = 15; // 테마 이미지 개수
+    const randomIndex = Math.floor(Math.random() * imageCount) + 1;
+    const randomImageUrl = `/assets/quiz-theme/quiz_theme${randomIndex}.png`;
+    setBackgroundImage(randomImageUrl);
 
     const userToken = getToken();
     const wsUrl = process.env.REACT_APP_WEBSOCKET_URL;
@@ -285,6 +303,8 @@ const QuizSessionPage = ({
                   isCorrect: studentFeedback.isCorrect,
                   prevRank: student.rank,
                   rank: studentFeedback.rank,
+                  prevScore: student.score, // 이전 점수 저장
+                  score: studentFeedback.score, // 점수 업데이트
                 };
               }
               return student;
@@ -339,6 +359,8 @@ const QuizSessionPage = ({
 
     return () => {
       socket.close();
+      stopBgm(); // 🔹연결 종료 시 BGM 정지
+      stopTickingLoop(); // 🔹 Ticking 효과음도 확실히 정지
       setIsQuizMode(false);
       if (document.fullscreenElement) {
         document.exitFullscreen().catch((err) => {
@@ -350,13 +372,35 @@ const QuizSessionPage = ({
     };
   }, [pin, setIsQuizMode, navigate]); // Added navigate to dependency array
 
-  // useEffect(() => {
-  //   const allReady =
-  //     students.length > 0 && students.every((student) => student.isReady);
-  //   setAllStudentsReady(allReady);
-  // }, [students]);
+  useEffect(() => {
+    if (endTime && socketRef.current) {
+      const timer = setInterval(() => {
+        const now = Date.now();
+        const newTimeLeft = Math.max(0, Math.floor((endTime - now) / 1000));
+        setTimeLeft(newTimeLeft);
+
+        if (newTimeLeft <= 0) {
+          clearInterval(timer);
+          // 시간 종료 시 서버에 메시지 전송
+          if (
+            socketRef.current &&
+            socketRef.current.readyState === WebSocket.OPEN
+          ) {
+            socketRef.current.send(JSON.stringify({ type: "timeUp" }));
+            console.log("Time's up! Sent timeUp message to server.");
+          }
+        }
+      }, 1000);
+
+      return () => clearInterval(timer);
+    }
+  }, [endTime]);
+
+  const allStudentsReady =
+    students.length > 0 && students.every((s) => s.isReady);
 
   const handleStartQuiz = () => {
+    fadeOutBgm(); // 로비 BGM 즉시 페이드-아웃
     setQuizStarted(true);
     if (socketRef.current) {
       socketRef.current.send(JSON.stringify({ type: "startQuiz" }));
@@ -383,6 +427,7 @@ const QuizSessionPage = ({
   const handleEndQuiz = () => {
     if (isProcessingEndQuiz) return; // Prevent if already processing
     setIsProcessingEndQuiz(true);
+    stopBgm(); // 핸들러 호출 시 즉시 BGM 종료
     if (socketRef.current) {
       socketRef.current.send(JSON.stringify({ type: "endQuiz" }));
       setIsSessionActive(false);
@@ -395,6 +440,7 @@ const QuizSessionPage = ({
   const handleViewResults = () => {
     if (isProcessingViewResults) return;
     setIsProcessingViewResults(true);
+    stopBgm(); // 결과 화면에서는 모든 사운드 정지
     if (socketRef.current) {
       socketRef.current.send(JSON.stringify({ type: "viewDetailedResults" }));
     }
@@ -427,6 +473,116 @@ const QuizSessionPage = ({
   const toggleShowOptions = () => {
     setShowOptions((prev) => !prev);
   };
+
+  // --- Sound Control Handlers ---
+  const handleSoundControlOpen = (event: React.MouseEvent<HTMLElement>) => {
+    setSoundControlAnchor(event.currentTarget);
+  };
+  const handleSoundControlClose = () => {
+    setSoundControlAnchor(null);
+  };
+  const handleToggleMute = () => {
+    setIsMuted(toggleMute());
+  };
+  const handleBgmVolumeChange = (event: Event, newValue: number | number[]) => {
+    const newVol = newValue as number;
+    setLocalBgmVolume(newVol);
+    setBgmVolume(newVol);
+  };
+  const handleSeVolumeChange = (event: Event, newValue: number | number[]) => {
+    const newVol = newValue as number;
+    setLocalSeVolume(newVol);
+    setSeVolume(newVol);
+  };
+  const isSoundControlOpen = Boolean(soundControlAnchor);
+  // ---
+
+  /* ---------- 대기실 BGM ---------- */
+  useEffect(() => {
+    if (!quizStarted && currentBgmRef.current !== "waiting") {
+      playRandomBgm("waiting", true);
+      currentBgmRef.current = "waiting";
+    }
+  }, [quizStarted]);
+
+  /* ---------- 문제 BGM ---------- */
+  useEffect(() => {
+    if (
+      isSessionActive &&
+      currentQuestion &&
+      currentBgmRef.current !== "playing"
+    ) {
+      playRandomBgm("playing", true);
+      currentBgmRef.current = "playing";
+    }
+  }, [isSessionActive, currentQuestion]);
+
+  /* ---------- 학생 참여 SE (대기실에서만) ---------- */
+  useEffect(() => {
+    if (!isSessionActive && students.length > prevStudentCnt.current) {
+      playSe("participating");
+    }
+    prevStudentCnt.current = students.length;
+  }, [students.length, isSessionActive]);
+
+  /* ---------- 문제 전환 SE ---------- */
+  useEffect(() => {
+    if (isQuizStarting || isPreparingNextQuestion) {
+      playSe("next");
+    }
+  }, [isQuizStarting, isPreparingNextQuestion]);
+
+  /* ---------- 정답 공개 SE ---------- */
+  useEffect(() => {
+    if (allSubmitted) {
+      playSe("answer");
+    }
+  }, [allSubmitted]);
+
+  /* ---------- 정답/순위 공개 시 BGM 줄이기 ---------- */
+  useEffect(() => {
+    // 마지막 문제가 아닐 때만 BGM 볼륨을 줄임
+    if (allSubmitted && !isLastQuestion) {
+      duckBgm();
+    }
+  }, [allSubmitted, isLastQuestion]);
+
+  /* ---------- 다음 문제 준비 시 BGM 원복 ---------- */
+  useEffect(() => {
+    if (isPreparingNextQuestion) {
+      unduckBgm();
+    }
+  }, [isPreparingNextQuestion]);
+
+  /* ---------- 시간 임박 SE ---------- */
+  useEffect(() => {
+    // 퀴즈가 진행중이고, 모두가 제출하지 않았으며, 피드백 화면이 아닐 때만
+    const isQuestionActive =
+      isSessionActive && currentQuestion && !allSubmitted && !isShowingFeedback;
+    // 남은 시간이 5초 이하일 때
+    const isTickTime = timeLeft > 0 && timeLeft <= 5;
+
+    if (isQuestionActive && isTickTime) {
+      startTickingLoop(); // Ticking 루프 시작
+    } else {
+      stopTickingLoop(); // 그 외 모든 상황에서 Ticking 루프 정지
+    }
+  }, [
+    timeLeft,
+    isSessionActive,
+    currentQuestion,
+    allSubmitted,
+    isShowingFeedback,
+  ]);
+
+  /* ---------- 결과 상세 보기 시 모든 사운드 정지 ---------- */
+  useEffect(() => {
+    if (isViewingResults) {
+      stopBgm();
+    }
+  }, [isViewingResults]);
+
+  const showFinalRankings = isShowingFeedback && isLastQuestion;
 
   return (
     <Box
@@ -503,22 +659,140 @@ const QuizSessionPage = ({
           )}
       </Box>
 
-      <IconButton
-        onClick={handleFullscreenToggle}
+      <Box
         sx={{
           position: "absolute",
           top: "2vw",
           right: "3vw",
           zIndex: 1000,
-          color: "white",
-          backgroundColor: "rgba(0, 0, 0, 0.5)",
-          "&:hover": {
-            backgroundColor: "rgba(0, 0, 0, 0.7)",
-          },
+          display: "flex",
+          alignItems: "center",
+          gap: 1,
         }}
       >
-        <FullscreenIcon />
-      </IconButton>
+        <IconButton
+          onClick={handleFullscreenToggle}
+          sx={{
+            color: "white",
+            backgroundColor: "rgba(0, 0, 0, 0.5)",
+            "&:hover": {
+              backgroundColor: "rgba(0, 0, 0, 0.7)",
+            },
+          }}
+        >
+          <FullscreenIcon />
+        </IconButton>
+
+        {/* --- Sound Control UI --- */}
+        <IconButton
+          onClick={handleSoundControlOpen}
+          sx={{
+            color: "white",
+            backgroundColor: "rgba(0, 0, 0, 0.5)",
+            "&:hover": { backgroundColor: "rgba(0, 0, 0, 0.7)" },
+          }}
+        >
+          {isMuted ? <VolumeOffIcon /> : <VolumeUpIcon />}
+        </IconButton>
+        <Popover
+          open={isSoundControlOpen}
+          anchorEl={soundControlAnchor}
+          onClose={handleSoundControlClose}
+          anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+          transformOrigin={{ vertical: "top", horizontal: "right" }}
+          PaperProps={{
+            sx: {
+              borderRadius: "12px",
+              backdropFilter: "blur(10px)",
+              backgroundColor: "rgba(255, 255, 255, 0.85)",
+              boxShadow: "0px 8px 24px rgba(0,0,0,0.12)",
+            },
+          }}
+        >
+          <Box sx={{ p: 2.5, width: 260 }}>
+            <Typography
+              variant="subtitle1"
+              sx={{ fontWeight: "bold", mb: 1, textAlign: "center" }}
+            >
+              사운드 설정
+            </Typography>
+            <Divider sx={{ my: 1.5 }} />
+
+            <Typography
+              id="bgm-volume-slider"
+              gutterBottom
+              sx={{ fontWeight: "medium", color: "text.secondary" }}
+            >
+              배경음악
+            </Typography>
+            <Stack
+              spacing={2}
+              direction="row"
+              alignItems="center"
+              sx={{ mb: 2 }}
+            >
+              <MusicNoteIcon color={isMuted ? "disabled" : "action"} />
+              <Slider
+                aria-labelledby="bgm-volume-slider"
+                value={bgmVolume}
+                onChange={handleBgmVolumeChange}
+                min={0}
+                max={1}
+                step={0.05}
+                disabled={isMuted}
+              />
+              <Typography
+                sx={{
+                  minWidth: 40,
+                  textAlign: "right",
+                  color: isMuted ? "text.disabled" : "text.primary",
+                  fontWeight: "medium",
+                }}
+              >
+                {Math.round(bgmVolume * 100)}%
+              </Typography>
+            </Stack>
+
+            <Typography
+              id="se-volume-slider"
+              gutterBottom
+              sx={{ fontWeight: "medium", color: "text.secondary" }}
+            >
+              효과음
+            </Typography>
+            <Stack spacing={2} direction="row" alignItems="center">
+              <GraphicEqIcon color={isMuted ? "disabled" : "action"} />
+              <Slider
+                aria-labelledby="se-volume-slider"
+                value={seVolume}
+                onChange={handleSeVolumeChange}
+                min={0}
+                max={1}
+                step={0.05}
+                disabled={isMuted}
+              />
+              <Typography
+                sx={{
+                  minWidth: 40,
+                  textAlign: "right",
+                  color: isMuted ? "text.disabled" : "text.primary",
+                  fontWeight: "medium",
+                }}
+              >
+                {Math.round(seVolume * 100)}%
+              </Typography>
+            </Stack>
+            <Button
+              variant="outlined"
+              onClick={handleToggleMute}
+              fullWidth
+              sx={{ mt: 3 }}
+            >
+              {isMuted ? "소리 켜기" : "전체 음소거"}
+            </Button>
+          </Box>
+        </Popover>
+      </Box>
 
       {isViewingResults && detailedQuizResults ? (
         <Box

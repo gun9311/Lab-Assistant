@@ -33,41 +33,28 @@ async function saveChatSummary(userId, subject, chatHistoryToSave) {
     }
 
     const newSummaryEntry = { summary: summaryText, createdAt: new Date() };
-    let chatSummaryDoc = await ChatSummary.findOne({ student: userId });
 
-    if (chatSummaryDoc) {
-      logger.info(
-        `[ChatSummarySvc] Found existing ChatSummary for student ${userId}. Updating subjects.`
-      );
-      let subjectData = chatSummaryDoc.subjects.find(
-        (sub) => sub.subject === subject
-      );
+    // 1. 먼저 해당 subject가 존재하는지 확인하고, 존재하면 summaries 배열에 push
+    const updateResult = await ChatSummary.findOneAndUpdate(
+      { student: userId, "subjects.subject": subject }, // 학생 ID와 과목 이름이 모두 일치하는 문서를 찾는다
+      { $push: { "subjects.$.summaries": newSummaryEntry } }, // 찾은 과목의 summaries 배열에 새 요약을 추가한다
+      { new: true } // 업데이트된 문서를 반환하도록 설정
+    );
 
-      if (subjectData) {
-        logger.debug(
-          `[ChatSummarySvc] Subject '${subject}' found for student ${userId}. Adding new summary.`
-        );
-        subjectData.summaries.unshift(newSummaryEntry); // 최신 요약을 맨 앞에 추가
-      } else {
-        logger.debug(
-          `[ChatSummarySvc] Subject '${subject}' not found for student ${userId}. Adding new subject entry.`
-        );
-        chatSummaryDoc.subjects.push({
-          subject: subject,
-          summaries: [newSummaryEntry],
-        });
-      }
-    } else {
-      logger.info(
-        `[ChatSummarySvc] No existing ChatSummary for student ${userId}. Creating new one with subject '${subject}'.`
+    // 2. 만약 위에서 업데이트가 안됐다면 (해당 과목이 없다는 뜻)
+    if (!updateResult) {
+      // 3. 학생 문서는 찾되, subjects 배열에 새로운 과목 객체를 통째로 push
+      await ChatSummary.findOneAndUpdate(
+        { student: userId },
+        {
+          $push: {
+            subjects: { subject: subject, summaries: [newSummaryEntry] },
+          },
+        },
+        { upsert: true, new: true } // upsert: true -> 학생 문서 자체가 없으면 새로 생성해준다
       );
-      chatSummaryDoc = new ChatSummary({
-        student: userId,
-        subjects: [{ subject: subject, summaries: [newSummaryEntry] }],
-      });
     }
 
-    await chatSummaryDoc.save();
     logger.info(
       `[ChatSummarySvc] Chat summary saved successfully for student ${userId}, subject '${subject}'.`
     );

@@ -23,7 +23,7 @@ import {
 import { DotLottieReact } from "@lottiefiles/dotlottie-react";
 import Chatbot from "../../components/student/Chatbot";
 import SubjectSelector from "../../components/student/SubjectSelector";
-import { useChatbotContext } from "../../context/ChatbotContext";
+import { useChatbotContext } from "../../contexts/ChatbotContext";
 import { getChatUsage, ChatUsageData } from "../../utils/api";
 
 const mainSubjects = ["국어", "도덕", "수학", "과학", "사회"];

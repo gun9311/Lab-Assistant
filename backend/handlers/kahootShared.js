@@ -53,6 +53,21 @@ const handlePubSubMessage = async (message, channel) => {
         });
       }
     } else if (channel.endsWith(":broadcast_teacher")) {
+      // --- 5초 전 알림 타이머 정리 (모든 학생 제출 시) ---
+      if (
+        kahootClients[pin] &&
+        rawMessageData.type === "allStudentsSubmitted"
+      ) {
+        if (kahootClients[pin].timeLeftTimeoutId) {
+          clearTimeout(kahootClients[pin].timeLeftTimeoutId);
+          kahootClients[pin].timeLeftTimeoutId = null;
+          logger.info(
+            `[PubSub] Cleared 'timeLeft' timeout for PIN: ${pin} due to all students submitting.`
+          );
+        }
+      }
+      // ---
+
       if (
         kahootClients[pin].teacher &&
         kahootClients[pin].teacher.readyState === WebSocket.OPEN
@@ -353,6 +368,182 @@ async function getActiveStudentCount(pin) {
   }
 }
 
+async function handleAllSubmissionsProcessing(
+  pin,
+  session, // 이 session 인자는 _checkAndFinalizeCurrentQuestionIfNeeded 에서 전달된 상태일 수 있음
+  currentQuestion,
+  allParticipants
+) {
+  const latestSessionState = await redisJsonGet(getSessionKey(pin));
+
+  if (!latestSessionState) {
+    logger.error(
+      `[HASP] Critical: Session state not found in Redis for PIN: ${pin} at the beginning of handleAllSubmissionsProcessing. Aborting.`
+    );
+    return;
+  }
+
+  if (!latestSessionState.isQuestionActive) {
+    logger.warn(
+      `[HASP] Question for PIN: ${pin} (ID: ${currentQuestion?._id}) is no longer active. Likely already processed by another call. Aborting duplicate call to handleAllSubmissionsProcessing.`
+    );
+    return;
+  }
+
+  // 즉시 isQuestionActive를 false로 설정하고 Redis에 반영
+  latestSessionState.isQuestionActive = false;
+  try {
+    await redisJsonSet(getSessionKey(pin), latestSessionState, { EX: 3600 });
+    logger.info(
+      `[HASP] Successfully set isQuestionActive=false in Redis for PIN: ${pin}, Question ID: ${currentQuestion?._id}. Proceeding with feedback and other processing.`
+    );
+  } catch (error) {
+    logger.error(
+      `[HASP] Failed to update session state (isQuestionActive=false) in Redis for PIN: ${pin}. Aborting processing to prevent inconsistencies. Error:`,
+      error
+    );
+    // isQuestionActive를 false로 설정하는데 실패하면, 다른 호출이 시도할 수 있도록 여기서 중단
+    return;
+  }
+
+  logger.info(
+    `[HASP] Processing all submissions for PIN: ${pin}, Question ID: ${
+      currentQuestion?._id
+    }. Participants: ${
+      allParticipants.length
+    }. Session state (after update): ${JSON.stringify(latestSessionState)}`
+  );
+
+  // 학생별 피드백 페이로드 목록 생성
+  const feedbackListForPublishing = [];
+  const participantUpdatePromises = allParticipants.map(async (p) => {
+    const response = p.responses.find(
+      (r) => r.question.toString() === currentQuestion._id.toString()
+    );
+
+    let teamForScore = null;
+    if (latestSessionState.isTeamMode && latestSessionState.teams) {
+      const team = latestSessionState.teams.find((t) =>
+        t.members.includes(p.student)
+      );
+      if (team) {
+        teamForScore = team.teamScore;
+      }
+    }
+
+    feedbackListForPublishing.push({
+      studentId: p.student,
+      feedbackPayload: {
+        type: "feedback",
+        correct: response ? response.isCorrect : false,
+        score: p.score,
+        teamScore: latestSessionState.isTeamMode ? teamForScore : null,
+      },
+    });
+
+    p.hasSubmitted = false;
+    return redisJsonSet(getParticipantKey(pin, p.student), p, { EX: 3600 });
+  });
+
+  await Promise.all(participantUpdatePromises); // 참여자 상태 업데이트 완료 대기
+
+  // 생성된 피드백 목록을 Pub/Sub으로 발행
+  if (feedbackListForPublishing.length > 0) {
+    await publishIndividualFeedbackList(pin, feedbackListForPublishing);
+  }
+
+  // 교사에게는 모든 학생이 제출했다는 정보와 요약된 랭킹 등을 보냄 (이 로직은 유지)
+  await broadcastToTeacher(pin, {
+    type: "allStudentsSubmitted",
+    feedback: allParticipants
+      .sort((a, b) => b.score - a.score)
+      .map((p, index) => {
+        const currentQuestionResponse = p.responses.find(
+          (r) => r.question.toString() === currentQuestion._id.toString()
+        );
+        return {
+          studentId: p.student,
+          name: p.name,
+          score: p.score,
+          isCorrect: currentQuestionResponse
+            ? currentQuestionResponse.isCorrect
+            : false,
+          rank: index + 1,
+        };
+      }),
+  });
+
+  // Process waiting list (이제 'connected_waiting' 상태의 학생들을 활성화)
+  const studentIdsSetKey = getSessionStudentIdsSetKey(pin);
+  let studentsToActivate = [];
+
+  try {
+    const allStudentIdsInSession = await redisClient.sMembers(studentIdsSetKey);
+
+    if (allStudentIdsInSession.length === 0) {
+      logger.info(
+        `No student IDs found in Set for waiting list processing, PIN: ${pin}.`
+      );
+    } else {
+      const participantKeys = allStudentIdsInSession.map((sid) =>
+        getParticipantKey(pin, sid)
+      );
+      const participantDataArray = await redisJsonMGet(participantKeys); // MGET 사용
+
+      if (participantDataArray) {
+        participantDataArray.forEach((participantData, index) => {
+          if (participantData) {
+            if (participantData.status === "connected_waiting") {
+              studentsToActivate.push(participantData);
+            }
+          } else {
+            // participantData가 null인 경우 (키가 없거나 파싱 실패)
+            logger.warn(
+              `Participant data for studentId ${allStudentIdsInSession[index]} was null or invalid during waiting list processing (MGET), PIN: ${pin}.`
+            );
+          }
+        });
+      } else {
+        logger.error(
+          `Failed to get participant data array via MGET for waiting list processing, PIN: ${pin}.`
+        );
+      }
+    }
+  } catch (error) {
+    logger.error(
+      `Error fetching student IDs from Set or MGET participant data for waiting list processing, PIN: ${pin}. Error:`,
+      error
+    );
+  }
+
+  logger.info(
+    `Found ${studentsToActivate.length} students to activate from waiting list for PIN: ${pin}.`
+  );
+
+  for (const participantToActivate of studentsToActivate) {
+    participantToActivate.status = "connected_participating"; // '참여 중' 상태로 변경
+    participantToActivate.hasSubmitted = false; // 다음 문제부터 참여하므로 초기화
+    await redisJsonSet(
+      getParticipantKey(pin, participantToActivate.student),
+      participantToActivate,
+      { EX: 3600 }
+    );
+
+    // 이미 Student.findById는 최초 참여 시(_handleCharacterSelected)에 수행되었으므로,
+    // participantToActivate 객체에 name과 character 정보가 있어야 함.
+    await broadcastToTeacher(pin, {
+      type: "studentJoined", // 또는 "studentActivated"
+      studentId: participantToActivate.student,
+      name: participantToActivate.name, // Ensure name is available
+      character: participantToActivate.character, // Ensure character is available
+      isReady: true, // 이제 참여 준비 완료
+    });
+    logger.info(
+      `Activated student ${participantToActivate.student} in session ${pin}. Now participating.`
+    );
+  }
+}
+
 // 특정 핀(pin)으로 세션에 연결된 교사에게 메시지 발행
 const broadcastToTeacher = async (pin, message) => {
   const channel = getRedisChannelBroadcastToTeacher(pin);
@@ -384,53 +575,68 @@ const broadcastToStudents = async (pin, message) => {
 };
 
 // 특정 핀(pin)으로 세션에 연결된 활성 학생들에게 메시지 발행
-const broadcastToActiveStudents = async (pin, message) => {
+const broadcastToActiveStudents = async (
+  pin,
+  message,
+  targetStudentIds = null // Optional: 특정 학생 ID 배열
+) => {
   const channel = getRedisChannelBroadcastToActiveStudents(pin);
   try {
-    const studentIdsInSessionKey = getSessionStudentIdsSetKey(pin);
-    const allStudentIdsInSession = await redisClient.sMembers(
-      studentIdsInSessionKey
-    );
+    let studentIdsToSendTo = targetStudentIds;
 
-    if (!allStudentIdsInSession || allStudentIdsInSession.length === 0) {
-      logger.info(
-        `No students found in set ${studentIdsInSessionKey} for pin ${pin}. Not publishing to active students.`
+    // targetStudentIds가 제공되지 않은 경우에만, 모든 활성 학생을 조회합니다.
+    if (!studentIdsToSendTo) {
+      const studentIdsInSessionKey = getSessionStudentIdsSetKey(pin);
+      const allStudentIdsInSession = await redisClient.sMembers(
+        studentIdsInSessionKey
       );
-      return;
+
+      if (!allStudentIdsInSession || allStudentIdsInSession.length === 0) {
+        logger.info(
+          `No students found in set ${studentIdsInSessionKey} for pin ${pin}. Not publishing to active students.`
+        );
+        return;
+      }
+
+      const participantKeys = allStudentIdsInSession.map((studentId) =>
+        getParticipantKey(pin, studentId)
+      );
+      const participantDataArray = await redisJsonMGet(participantKeys);
+      const activeStudentIds = [];
+      if (participantDataArray) {
+        allStudentIdsInSession.forEach((studentId, index) => {
+          const participantData = participantDataArray[index];
+          if (
+            participantData &&
+            participantData.status === "connected_participating"
+          ) {
+            activeStudentIds.push(studentId);
+          }
+        });
+      }
+      studentIdsToSendTo = activeStudentIds;
     }
 
-    const participantKeys = allStudentIdsInSession.map((studentId) =>
-      getParticipantKey(pin, studentId)
-    );
-    const participantDataArray = await redisJsonMGet(participantKeys);
-    const activeStudentIds = [];
-    allStudentIdsInSession.forEach((studentId, index) => {
-      const participantData = participantDataArray[index];
-      if (
-        participantData &&
-        participantData.status === "connected_participating"
-      ) {
-        activeStudentIds.push(studentId);
-      }
-    });
-
-    if (activeStudentIds.length === 0) {
+    if (!studentIdsToSendTo || studentIdsToSendTo.length === 0) {
+      const reason = targetStudentIds
+        ? "provided target list was empty"
+        : "no students with status 'connected_participating' found";
       logger.info(
-        `No students with status 'connected_participating' found for pin ${pin}. Not publishing.`
+        `Not publishing to active students for pin ${pin}. Reason: ${reason}.`
       );
       return;
     }
 
     const payload = {
       originalMessage: message,
-      activeStudentIds: activeStudentIds,
+      activeStudentIds: studentIdsToSendTo,
     };
 
     await redisClient.publish(channel, JSON.stringify(payload));
     logger.info(
       `Message published to active students channel ${channel} for ${
-        activeStudentIds.length
-      } active students: ${JSON.stringify(payload)}`
+        studentIdsToSendTo.length
+      } students: ${JSON.stringify(payload)}`
     );
   } catch (error) {
     logger.error(
@@ -529,4 +735,5 @@ module.exports = {
   subscribeToPinChannels, // 새로 추가된 함수
   unsubscribeFromPinChannels, // 새로 추가된 함수
   getActiveStudentCount,
+  handleAllSubmissionsProcessing,
 };

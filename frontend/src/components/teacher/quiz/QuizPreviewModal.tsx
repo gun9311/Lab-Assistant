@@ -13,16 +13,6 @@ import ArrowForwardIosIcon from "@mui/icons-material/ArrowForwardIos";
 import { Question } from "./types"; // 퀴즈 문제 타입
 import QuestionComponent from "./components/Question"; // Question 컴포넌트 재사용
 
-// QuizSession.tsx에서 배경 이미지 가져오는 로직과 유사하게 구성
-const backgroundImages = [
-  require("../../../assets/quiz-theme/quiz_theme1.png"),
-  require("../../../assets/quiz-theme/quiz_theme2.png"),
-  require("../../../assets/quiz-theme/quiz_theme3.png"),
-  require("../../../assets/quiz-theme/quiz_theme4.png"),
-  require("../../../assets/quiz-theme/quiz_theme5.png"),
-  require("../../../assets/quiz-theme/quiz_theme6.png"),
-];
-
 interface QuizPreviewModalProps {
   open: boolean;
   onClose: () => void;
@@ -43,9 +33,10 @@ const QuizPreviewModal: React.FC<QuizPreviewModalProps> = ({
 
   useEffect(() => {
     if (open) {
-      const randomImage =
-        backgroundImages[Math.floor(Math.random() * backgroundImages.length)];
-      setBackgroundImage(randomImage);
+      const imageCount = 15; // 테마 이미지 개수
+      const randomIndex = Math.floor(Math.random() * imageCount) + 1;
+      const randomImageUrl = `/assets/quiz-theme/quiz_theme${randomIndex}.png`;
+      setBackgroundImage(randomImageUrl);
       setCurrentQuestionIndex(0); // 모달 열릴 때 첫 문제로
     }
   }, [open]);

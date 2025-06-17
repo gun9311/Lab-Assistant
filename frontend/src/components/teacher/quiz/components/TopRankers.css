@@ -9,3 +9,145 @@
     box-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
   }
 }
+
+/* === 추가: 1위 실루엣 시선 집중 및 공개 효과 === */
+.first-place-pulsing {
+  animation: pulse-glow 2s infinite ease-in-out;
+}
+
+/* 'revealing' 상태에 대한 제어는 JS에서 직접 하므로 이 클래스는 제거합니다. */
+
+@keyframes pulse-glow {
+  0% {
+    filter: brightness(0) drop-shadow(0 0 5px rgba(255, 255, 255, 0.4));
+  }
+  50% {
+    filter: brightness(0) drop-shadow(0 0 20px rgba(255, 255, 255, 0.8));
+  }
+  100% {
+    filter: brightness(0) drop-shadow(0 0 5px rgba(255, 255, 255, 0.4));
+  }
+}
+
+/* 기존의 단순한 공개 애니메이션을 아래의 더 극적인 애니메이션으로 대체합니다. */
+@keyframes dramatic-reveal {
+  /* 0% ~ 60%: 공개 전 긴장감 조성을 위한 미세한 흔들림 */
+  0% {
+    filter: brightness(0) drop-shadow(0 0 20px rgba(255, 255, 255, 0.8));
+    transform: scale(1) rotate(0deg);
+  }
+  20% {
+    transform: scale(1.02) rotate(-1deg);
+  }
+  40% {
+    transform: scale(1.02) rotate(1deg);
+  }
+  60% {
+    transform: scale(1.02) rotate(0deg);
+  }
+  /* 80%: 밝은 섬광 효과 */
+  80% {
+    filter: brightness(3) drop-shadow(0 0 30px white);
+    transform: scale(1.1);
+  }
+  /* 100%: 완전한 모습 공개 */
+  100% {
+    filter: unset;
+    transform: scale(1);
+  }
+}
+
+/* === 추가된 애니메이션 === */
+
+/* 1위 캐릭터를 위한 바운스 애니메이션 */
+@keyframes winner-bounce {
+  0%,
+  20%,
+  50%,
+  80%,
+  100% {
+    transform: translateY(0);
+  }
+  40% {
+    transform: translateY(-20px);
+  }
+  60% {
+    transform: translateY(-10px);
+  }
+}
+
+/* 스포트라이트 효과 */
+@keyframes spotlight-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* 순위 텍스트 애니메이션 */
+@keyframes rank-text-reveal {
+  0% {
+    transform: translate(-50%, -50%) scale(0.5);
+    opacity: 0;
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.2);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+  }
+}
+
+/* 1위 텍스트를 위한 미세한 떨림 효과 */
+@keyframes rank-text-shake {
+  0%,
+  100% {
+    transform: translate(-50%, -50%) rotate(0deg);
+  }
+  25% {
+    transform: translate(-50%, -50%) rotate(-1.5deg);
+  }
+  75% {
+    transform: translate(-50%, -50%) rotate(1.5deg);
+  }
+}
+
+/* === 추가: 메달 뒤집기 애니메이션 === */
+@keyframes medal-flip-and-fade {
+  from {
+    transform: translate(-50%, -100%) rotateY(0deg) scale(1.2);
+    opacity: 1;
+  }
+  to {
+    transform: translate(-50%, -100%) rotateY(360deg) scale(0);
+    opacity: 0;
+  }
+}
+
+.medal-flipping {
+  /* transform-origin을 부모가 아닌 자신에게 적용 */
+  transform-origin: 50% 100%;
+  animation: medal-flip-and-fade 0.8s forwards ease-in-out;
+}
+
+/* 스포트라이트 효과 - 제거됨 */
+
+/* 순위 텍스트 애니메이션 */
+@keyframes rank-text-reveal {
+  0% {
+    transform: translate(-50%, -50%) scale(0.5);
+    opacity: 0;
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.2);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+  }
+}

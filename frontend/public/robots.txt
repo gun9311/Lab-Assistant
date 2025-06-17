@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Sitemap: https://nudgeflow.co.kr/sitemap.xml
+
+# 민감한 경로 차단
+Disallow: /admin
+Disallow: /api/
+Disallow: /auth/

@@ -14,6 +14,9 @@ import QuizQuestionComponent from "./components/QuizQuestion";
 import QuizFeedbackComponent from "./components/QuizFeedback";
 import WaitingScreenComponent from "./components/WaitingScreen";
 import classroom from "../../../../src/assets/calssroom.png";
+import { keyframes } from "@mui/system";
+// import { useAuth } from "../../../context/AuthContext";
+// import FeedbackComponent from "./components/FeedbackComponent";
 
 // 타입 정의 추가
 declare const require: {
@@ -50,19 +53,33 @@ interface QuizQuestion {
   timeLimit: number;
 }
 
+const zoomInAndFadeOut = keyframes`
+  0% { transform: scale(0.5) translateX(-50%); opacity: 0; }
+  20% { transform: scale(1.1) translateX(-50%); opacity: 1; }
+  40% { transform: scale(1) translateX(-50%); opacity: 1; }
+  80% { transform: scale(1) translateX(-50%); opacity: 1; }
+  100% { transform: scale(1) translateX(-50%); opacity: 0; }
+`;
+
+interface Feedback {
+  correct: boolean;
+  score: number;
+  teamScore: number;
+  totalQuestions: number;
+}
+
 const StudentQuizSessionPage: React.FC = () => {
   const location = useLocation(); // useLocation을 통해 state로 전달된 데이터 받기
   const navigate = useNavigate();
   const { pin, sessionId } = location.state; // state에서 전달된 pin과 sessionId 받기
   const userToken = getToken(); // 사용자 토큰 가져오기
+  // const { user } = useAuth();
 
   const [webSocket, setWebSocket] = useState<WebSocket | null>(null);
   const [currentQuestion, setCurrentQuestion] = useState<QuizQuestion | null>(
     null
   );
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
-  const [timeLeft, setTimeLeft] = useState<number | null>(null);
-  const [startTime, setStartTime] = useState<number | null>(null); // 문제 시작 시간 저장
   const [isQuizStarting, setIsQuizStarting] = useState<boolean>(false); // 퀴즈 시작 준비 화면 상태 추가
   const [isPreparingNextQuestion, setIsPreparingNextQuestion] =
     useState<boolean>(false); // 다음 문제 준비 화면 상태 추가
@@ -76,7 +93,6 @@ const StudentQuizSessionPage: React.FC = () => {
   const [isAnswerSubmitted, setIsAnswerSubmitted] = useState<boolean>(false); // 정답 제출 상태 관리
   const [waitingForFeedback, setWaitingForFeedback] = useState<boolean>(false); // 피드백 대기 상태
   const [isFeedbackReceived, setIsFeedbackReceived] = useState<boolean>(false); // 피드백 상태 추가
-  const [endTime, setEndTime] = useState<number | null>(null);
   const [selectedCharacter, setSelectedCharacter] = useState<
     number | string | null
   >(null); // 캐릭터 선택 상태
@@ -91,6 +107,12 @@ const StudentQuizSessionPage: React.FC = () => {
   const [isProcessingCharacterSelection, setIsProcessingCharacterSelection] =
     useState<boolean>(false); // 로딩 상태 추가
   const isCharacterFinalizedByServer = useRef(false); // 새로운 ref 추가
+  const [isQuestionVisible, setIsQuestionVisible] = useState(false);
+  const [timeLeftNotification, setTimeLeftNotification] = useState<
+    string | null
+  >(null);
+
+  // const isQuestionVisible = !!(currentQuestion && !isFeedbackReceived);
 
   useEffect(() => {
     selectedCharacterRef.current = selectedCharacter;
@@ -272,12 +294,12 @@ const StudentQuizSessionPage: React.FC = () => {
         setIsQuizStarting(false);
         setIsPreparingNextQuestion(false);
         setCurrentQuestion(parsedData);
-        setEndTime(parsedData.endTime);
         setSelectedAnswer(null);
-        setStartTime(Date.now());
         setIsAnswerSubmitted(false);
         setWaitingForFeedback(false);
         setIsFeedbackReceived(false);
+        setIsQuestionVisible(true);
+        setTimeLeftNotification(null); // 새 질문 시작 시 알림 초기화
       } else if (parsedData.type === "feedback") {
         const feedback = parsedData.correct ? "정답입니다!" : "오답입니다.";
         setScore(parsedData.score);
@@ -288,6 +310,7 @@ const StudentQuizSessionPage: React.FC = () => {
         }
         setWaitingForFeedback(false);
         setIsFeedbackReceived(true);
+        setTimeLeftNotification(null); // 피드백 표시 시 알림 초기화
       } else if (parsedData.error === "Character already taken") {
         alert("이미 선택된 캐릭터입니다. 다른 캐릭터를 선택하세요.");
         setSelectedCharacter(null);
@@ -302,6 +325,12 @@ const StudentQuizSessionPage: React.FC = () => {
         alert(`오류: ${parsedData.error}`);
         setIsCharacterConfirmed(false);
         setIsWaitingForQuizStart(false);
+      } else if (parsedData.type === "timeLeft") {
+        setTimeLeftNotification("마감 임박!");
+        // 3초 후에 자동으로 알림을 숨깁니다.
+        setTimeout(() => {
+          setTimeLeftNotification(null);
+        }, 3000);
       }
     };
 
@@ -341,54 +370,6 @@ const StudentQuizSessionPage: React.FC = () => {
     });
   };
 
-  useEffect(() => {
-    if (!endTime || isAnswerSubmitted) return; // 답변이 제출되면 타이머 중지
-
-    const interval = setInterval(() => {
-      const now = Date.now();
-      const timeLeft = Math.max(0, Math.floor((endTime - now) / 1000));
-      setTimeLeft(timeLeft);
-
-      if (timeLeft <= 0) {
-        clearInterval(interval);
-      }
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [endTime, isAnswerSubmitted]); // isAnswerSubmitted 추가
-
-  useEffect(() => {
-    if (
-      timeLeft === 0 &&
-      webSocket &&
-      currentQuestion &&
-      startTime &&
-      !isAnswerSubmitted
-    ) {
-      const responseTime = Date.now() - startTime;
-      const selectedOptionIndex = selectedAnswer ? selectedAnswer : -1;
-
-      webSocket.send(
-        JSON.stringify({
-          type: "submitAnswer",
-          answerIndex: selectedOptionIndex,
-          questionId: currentQuestion.questionId,
-          responseTime: responseTime,
-        })
-      );
-      setIsAnswerSubmitted(true);
-      setWaitingForFeedback(true);
-      setTimeLeft(null);
-    }
-  }, [
-    timeLeft,
-    selectedAnswer,
-    currentQuestion,
-    startTime,
-    webSocket,
-    isAnswerSubmitted,
-  ]);
-
   const handleCharacterSelect = (index: number) => {
     setSelectedCharacter(index);
   };
@@ -421,22 +402,22 @@ const StudentQuizSessionPage: React.FC = () => {
     // console.log(index);
     setSelectedAnswer(index);
 
-    if (webSocket && currentQuestion && startTime) {
-      const responseTime = Date.now() - startTime;
+    if (webSocket && currentQuestion) {
+      // const responseTime = Date.now() - startTime; // 더 이상 responseTime을 클라이언트에서 계산하지 않음
 
       webSocket.send(
         JSON.stringify({
           type: "submitAnswer",
           answerIndex: index,
           questionId: currentQuestion.questionId,
-          responseTime: responseTime,
+          // responseTime: responseTime,
         })
       );
       setWaitingForFeedback(true);
       setIsAnswerSubmitted(true);
-      if (timeLeft === 0) {
-        setTimeLeft(null);
-      }
+      // if (timeLeft === 0) {
+      //   setTimeLeft(null);
+      // }
     }
   };
 
@@ -462,6 +443,9 @@ const StudentQuizSessionPage: React.FC = () => {
           padding: 2,
           borderRadius: "16px",
           backgroundColor: "rgba(255, 255, 255, 0.5)",
+          transition: "all 0.4s ease-in-out",
+          width: { xs: "95vw", sm: isQuestionVisible ? "70vw" : "auto" },
+          maxWidth: isQuestionVisible ? "800px" : "500px",
         }}
       >
         {!isCharacterConfirmed ? (
@@ -552,14 +536,14 @@ const StudentQuizSessionPage: React.FC = () => {
         ) : (
           <>
             <WaitingScreenComponent
-              // isReady={isReady} // isReady는 더 이상 직접 관리하지 않거나, isCharacterConfirmed로 대체 가능
-              isReady={isCharacterConfirmed} // isCharacterConfirmed를 준비 상태로 간주
+              isReady={isCharacterConfirmed}
               isQuizStarting={isQuizStarting}
               isWaitingForQuizStart={isWaitingForQuizStart}
               isPreparingNextQuestion={isPreparingNextQuestion}
               isLastQuestion={isLastQuestion}
               selectedCharacter={selectedCharacter}
               characterImages={characterImages}
+              isQuestionVisible={isQuestionVisible}
             />
 
             {currentQuestion && !isFeedbackReceived && (
@@ -567,7 +551,6 @@ const StudentQuizSessionPage: React.FC = () => {
                 currentQuestion={currentQuestion}
                 selectedAnswer={selectedAnswer}
                 handleAnswerSelect={handleAnswerSelect}
-                timeLeft={timeLeft}
                 isAnswerSubmitted={isAnswerSubmitted}
               />
             )}
@@ -582,9 +565,34 @@ const StudentQuizSessionPage: React.FC = () => {
 
             {waitingForFeedback && (
               <Box sx={{ textAlign: "center", mt: 4 }}>
-                <CircularProgress />
                 <Typography variant="body1">
                   다른 플레이어를 기다리는 중입니다...
+                </Typography>
+              </Box>
+            )}
+
+            {timeLeftNotification && (
+              <Box
+                sx={{
+                  position: "fixed",
+                  top: "30%",
+                  left: "50%",
+                  transform: "translateX(-50%)",
+                  zIndex: 1500,
+                  padding: "16px 24px",
+                  backgroundColor: "rgba(231, 76, 60, 0.85)", // 붉은색 배경
+                  color: "white",
+                  borderRadius: "16px",
+                  boxShadow: "0 8px 16px rgba(0,0,0,0.3)",
+                  animation: `${zoomInAndFadeOut} 3s forwards`,
+                  textAlign: "center",
+                }}
+              >
+                <Typography
+                  variant="h4"
+                  sx={{ fontWeight: "bold", textShadow: "2px 2px 4px #000000" }}
+                >
+                  {timeLeftNotification}
                 </Typography>
               </Box>
             )}

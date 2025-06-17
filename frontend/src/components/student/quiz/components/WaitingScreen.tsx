@@ -11,6 +11,7 @@ interface WaitingScreenComponentProps {
   isLastQuestion: boolean;
   selectedCharacter: number | string | null;
   characterImages: string[];
+  isQuestionVisible: boolean;
 }
 
 const WaitingScreenComponent: React.FC<WaitingScreenComponentProps> = ({
@@ -21,6 +22,7 @@ const WaitingScreenComponent: React.FC<WaitingScreenComponentProps> = ({
   isLastQuestion,
   selectedCharacter,
   characterImages,
+  isQuestionVisible,
 }) => {
   const [dots, setDots] = useState("");
 
@@ -37,14 +39,35 @@ const WaitingScreenComponent: React.FC<WaitingScreenComponentProps> = ({
     return () => clearInterval(interval);
   }, []);
 
+  // 문제가 표시될 때(즉, 대기/준비 상태가 아닐 때)는 캐릭터 크기를 줄임
+  const characterSize = isQuestionVisible ? 60 : 100;
+  const containerPadding = isQuestionVisible ? { pt: 1, pb: 0 } : { p: 3 };
+
   return (
-    <Box textAlign="center" sx={{ padding: 3 }}>
+    <Box
+      textAlign="center"
+      sx={{ ...containerPadding, transition: "all 0.3s ease-in-out" }}
+    >
       {selectedCharacter !== null && (
-        <Box sx={{ mb: 2 }}>
+        <Box
+          sx={{
+            mb: 1,
+            height: isQuestionVisible ? 60 : 100,
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            transition: "height 0.3s ease-in-out",
+          }}
+        >
           <img
             src={characterImages[Number(selectedCharacter)]}
             alt={`선택된 캐릭터`}
-            style={{ width: 100, height: 100, objectFit: "contain" }}
+            style={{
+              width: characterSize,
+              height: characterSize,
+              objectFit: "contain",
+              transition: "width 0.3s ease-in-out, height 0.3s ease-in-out",
+            }}
           />
         </Box>
       )}

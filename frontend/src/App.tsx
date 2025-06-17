@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Route, Routes, Navigate } from "react-router-dom";
+import { Route, Routes, Navigate, useLocation } from "react-router-dom";
 import {
   CssBaseline,
   ThemeProvider,
@@ -31,11 +31,11 @@ import GoogleCallback from "./pages/login/GoogleCallback";
 import StudentLoginPage from "./pages/login/StudentLoginPage";
 import theme from "./theme";
 import Layout from "./components/Layout";
-import { ChatbotProvider } from "./context/ChatbotContext";
+import { ChatbotProvider } from "./contexts/ChatbotContext";
 import {
   NotificationProvider,
   useNotificationContext,
-} from "./context/NotificationContext";
+} from "./contexts/NotificationContext";
 import { requestPermissionAndGetToken, onMessageListener } from "./firebase"; // 수정된 함수 import
 import ManageQuizzesPage from "./components/teacher/quiz/ManageQuizzes"; // 주석 처리
 import CreateQuizPage from "./components/teacher/quiz/CreateQuiz"; // 주석 처리
@@ -48,6 +48,8 @@ import ResetStudentPasswordPage from "./pages/login/ResetStudentPasswordPage";
 import axios from "axios";
 import ComingSoon from "./components/common/ComingSoon"; // ComingSoon 임포트 추가
 import ServiceUnavailable from "./components/ServiceUnavailable"; // 새로 만든 컴포넌트 import
+import NotFoundPage from "./pages/NotFoundPage"; // 404 페이지 임포트
+import ServerErrorPage from "./pages/ServerErrorPage"; // 500 에러 페이지 임포트
 import api from "./utils/api"; // 인증된 API 요청용 인스턴스 (또는 apiNoAuth 사용)
 
 // NotificationPayload 타입 정의
@@ -169,9 +171,19 @@ const AppContent: React.FC = () => {
   );
   const { addNotification } = useNotificationContext();
   const role = getRole();
+  const location = useLocation();
 
   // isQuizMode 상태를 추가
   const [isQuizMode, setIsQuizMode] = useState<boolean>(false);
+
+  useEffect(() => {
+    // 퀴즈 세션 관련 경로에서는 네비게이션 바를 숨김 (isQuizMode=true)
+    const quizPaths = ["/start-quiz-session", "/quiz-session"];
+    const inQuizPath = quizPaths.some((path) =>
+      location.pathname.startsWith(path)
+    );
+    setIsQuizMode(inQuizPath);
+  }, [location.pathname]);
 
   useEffect(() => {
     onMessageListener()
@@ -291,25 +303,25 @@ const AppContent: React.FC = () => {
           />
           <Route
             path="/my-quizzes"
-            // element={<MyQuizzesPage setIsQuizMode={setIsQuizMode} />} // 기존 컴포넌트 주석 처리
-            element={
-              <PrivateRoute
-                roles={["student"]}
-                element={
-                  <StudentRouteGuard>
-                    <ComingSoon />
-                  </StudentRouteGuard>
-                }
-              />
-            }
+            element={<MyQuizzesPage setIsQuizMode={setIsQuizMode} />} // 기존 컴포넌트 주석 처리
+            // element={
+            //   <PrivateRoute
+            //     roles={["student"]}
+            //     element={
+            //       <StudentRouteGuard>
+            //         <ComingSoon />
+            //       </StudentRouteGuard>
+            //     }
+            //   />
+            // }
           />
           <Route
             path="/manage-quizzes"
             element={
               <PrivateRoute
                 roles={["teacher"]}
-                // element={<ManageQuizzesPage />} // 기존 컴포넌트 주석 처리
-                element={<ComingSoon />} // ComingSoon 컴포넌트로 대체
+                element={<ManageQuizzesPage />} // 기존 컴포넌트 주석 처리
+                // element={<ComingSoon />} // ComingSoon 컴포넌트로 대체
               />
             }
           />
@@ -341,7 +353,11 @@ const AppContent: React.FC = () => {
               />
             }
           />
+          {/* 일치하는 경로가 없을 경우 404 페이지 표시 */}
+          <Route path="*" element={<NotFoundPage />} />
         </Route>
+        {/* 서버 오류 페이지 라우트 */}
+        <Route path="/server-error" element={<ServerErrorPage />} />
         {/* 모든 다른 경로를 /로 리다이렉트 */}
         <Route path="*" element={<RedirectToHome />} />
       </Routes>
@@ -438,6 +454,8 @@ const App: React.FC = () => {
           <Route path="/auth/google/callback" element={<GoogleCallback />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
+          {/* 서버 오류 페이지 라우트 (비로그인 시)*/}
+          <Route path="/server-error" element={<ServerErrorPage />} />
           {/* 모든 다른 경로를 /로 리다이렉트 */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

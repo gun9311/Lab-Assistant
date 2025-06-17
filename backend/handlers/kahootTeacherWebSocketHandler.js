@@ -6,12 +6,15 @@ const logger = require("../utils/logger");
 const WebSocket = require("ws");
 const {
   kahootClients,
+  broadcastToTeacher,
   broadcastToStudents,
   broadcastToActiveStudents,
   setupKeepAlive,
   subscribeToPinChannels,
   unsubscribeFromPinChannels,
   getActiveStudentCount,
+  publishIndividualFeedbackList,
+  // handleAllSubmissionsProcessing,
 } = require("./kahootShared");
 const {
   getSessionKey,
@@ -21,12 +24,260 @@ const {
   getSessionTakenCharactersSetKey,
   getRedisChannelForceCloseStudents,
   getTeacherViewingResultsFlagKey,
+  getRedisChannelBroadcastToActiveStudents,
 } = require("../utils/redisKeys");
 const {
   redisJsonGet,
   redisJsonSet,
   redisJsonMGet,
 } = require("../utils/redisUtils");
+
+// 새로운 헬퍼 함수: 7초 전 알림 타이머 설정
+async function _set7SecondWarningTimer(pin, endTime) {
+  if (!kahootClients[pin]) {
+    logger.warn(
+      `[Timer] Attempted to set 7-second warning for PIN ${pin}, but kahootClients[${pin}] does not exist.`
+    );
+    return;
+  }
+
+  // Clear any existing timer first
+  if (kahootClients[pin].timeLeftTimeoutId) {
+    clearTimeout(kahootClients[pin].timeLeftTimeoutId);
+  }
+
+  const sevenSecondsWarningTime = endTime - 7000;
+  const delay = sevenSecondsWarningTime - Date.now();
+
+  if (delay > 0) {
+    kahootClients[pin].timeLeftTimeoutId = setTimeout(async () => {
+      try {
+        const studentIdsSetKey = getSessionStudentIdsSetKey(pin);
+        const allStudentIdsInSession = await redisClient.sMembers(
+          studentIdsSetKey
+        );
+        const unsubmittedStudentIds = [];
+
+        if (allStudentIdsInSession && allStudentIdsInSession.length > 0) {
+          const participantKeys = allStudentIdsInSession.map((sid) =>
+            getParticipantKey(pin, sid)
+          );
+          const participants = await redisJsonMGet(participantKeys);
+
+          if (participants) {
+            participants.forEach((p) => {
+              if (
+                p &&
+                p.status === "connected_participating" &&
+                !p.hasSubmitted
+              ) {
+                unsubmittedStudentIds.push(p.student);
+              }
+            });
+          }
+        }
+
+        if (unsubmittedStudentIds.length > 0) {
+          await broadcastToActiveStudents(
+            pin,
+            { type: "timeLeft", seconds: 7 },
+            unsubmittedStudentIds
+          );
+          logger.info(
+            `[Timer] Triggered '7 seconds left' notification for ${unsubmittedStudentIds.length} unsubmitted students for PIN: ${pin}`
+          );
+        }
+      } catch (error) {
+        logger.error(
+          `[Timer] Error inside 7-second warning timeout for PIN ${pin}:`,
+          error
+        );
+      }
+    }, delay);
+
+    logger.info(
+      `[Timer] Set '7 seconds left' notification for PIN: ${pin} to trigger in ${delay}ms.`
+    );
+  }
+}
+
+async function handleAllSubmissionsProcessing(
+  pin,
+  session, // 이 session 인자는 _checkAndFinalizeCurrentQuestionIfNeeded 에서 전달된 상태일 수 있음
+  currentQuestion,
+  allParticipants
+) {
+  // 타이머 해제 로직이 여기 있었다면 제거합니다.
+
+  const latestSessionState = await redisJsonGet(getSessionKey(pin));
+
+  if (!latestSessionState) {
+    logger.error(
+      `[HASP] Critical: Session state not found in Redis for PIN: ${pin} at the beginning of handleAllSubmissionsProcessing. Aborting.`
+    );
+    return;
+  }
+
+  if (!latestSessionState.isQuestionActive) {
+    logger.warn(
+      `[HASP] Question for PIN: ${pin} (ID: ${currentQuestion?._id}) is no longer active. Likely already processed by another call. Aborting duplicate call to handleAllSubmissionsProcessing.`
+    );
+    return;
+  }
+
+  // 즉시 isQuestionActive를 false로 설정하고 Redis에 반영
+  latestSessionState.isQuestionActive = false;
+  try {
+    await redisJsonSet(getSessionKey(pin), latestSessionState, { EX: 3600 });
+    logger.info(
+      `[HASP] Successfully set isQuestionActive=false in Redis for PIN: ${pin}, Question ID: ${currentQuestion?._id}. Proceeding with feedback and other processing.`
+    );
+  } catch (error) {
+    logger.error(
+      `[HASP] Failed to update session state (isQuestionActive=false) in Redis for PIN: ${pin}. Aborting processing to prevent inconsistencies. Error:`,
+      error
+    );
+    // isQuestionActive를 false로 설정하는데 실패하면, 다른 호출이 시도할 수 있도록 여기서 중단
+    return;
+  }
+
+  logger.info(
+    `[HASP] Processing all submissions for PIN: ${pin}, Question ID: ${
+      currentQuestion?._id
+    }. Participants: ${
+      allParticipants.length
+    }. Session state (after update): ${JSON.stringify(latestSessionState)}`
+  );
+
+  // 학생별 피드백 페이로드 목록 생성
+  const feedbackListForPublishing = [];
+  const participantUpdatePromises = allParticipants.map(async (p) => {
+    const response = p.responses.find(
+      (r) => r.question.toString() === currentQuestion._id.toString()
+    );
+
+    let teamForScore = null;
+    if (latestSessionState.isTeamMode && latestSessionState.teams) {
+      const team = latestSessionState.teams.find((t) =>
+        t.members.includes(p.student)
+      );
+      if (team) {
+        teamForScore = team.teamScore;
+      }
+    }
+
+    feedbackListForPublishing.push({
+      studentId: p.student,
+      feedbackPayload: {
+        type: "feedback",
+        correct: response ? response.isCorrect : false,
+        score: p.score,
+        teamScore: latestSessionState.isTeamMode ? teamForScore : null,
+      },
+    });
+
+    p.hasSubmitted = false;
+    return redisJsonSet(getParticipantKey(pin, p.student), p, { EX: 3600 });
+  });
+
+  await Promise.all(participantUpdatePromises); // 참여자 상태 업데이트 완료 대기
+
+  // 생성된 피드백 목록을 Pub/Sub으로 발행
+  if (feedbackListForPublishing.length > 0) {
+    await publishIndividualFeedbackList(pin, feedbackListForPublishing);
+  }
+
+  // 교사에게는 모든 학생이 제출했다는 정보와 요약된 랭킹 등을 보냄 (이 로직은 유지)
+  await broadcastToTeacher(pin, {
+    type: "allStudentsSubmitted",
+    feedback: allParticipants
+      .sort((a, b) => b.score - a.score)
+      .map((p, index) => {
+        const currentQuestionResponse = p.responses.find(
+          (r) => r.question.toString() === currentQuestion._id.toString()
+        );
+        return {
+          studentId: p.student,
+          name: p.name,
+          score: p.score,
+          isCorrect: currentQuestionResponse
+            ? currentQuestionResponse.isCorrect
+            : false,
+          rank: index + 1,
+        };
+      }),
+  });
+
+  // Process waiting list (이제 'connected_waiting' 상태의 학생들을 활성화)
+  const studentIdsSetKey = getSessionStudentIdsSetKey(pin);
+  let studentsToActivate = [];
+
+  try {
+    const allStudentIdsInSession = await redisClient.sMembers(studentIdsSetKey);
+
+    if (allStudentIdsInSession.length === 0) {
+      logger.info(
+        `No student IDs found in Set for waiting list processing, PIN: ${pin}.`
+      );
+    } else {
+      const participantKeys = allStudentIdsInSession.map((sid) =>
+        getParticipantKey(pin, sid)
+      );
+      const participantDataArray = await redisJsonMGet(participantKeys); // MGET 사용
+
+      if (participantDataArray) {
+        participantDataArray.forEach((participantData, index) => {
+          if (participantData) {
+            if (participantData.status === "connected_waiting") {
+              studentsToActivate.push(participantData);
+            }
+          } else {
+            // participantData가 null인 경우 (키가 없거나 파싱 실패)
+            logger.warn(
+              `Participant data for studentId ${allStudentIdsInSession[index]} was null or invalid during waiting list processing (MGET), PIN: ${pin}.`
+            );
+          }
+        });
+      } else {
+        logger.error(
+          `Failed to get participant data array via MGET for waiting list processing, PIN: ${pin}.`
+        );
+      }
+    }
+  } catch (error) {
+    logger.error(
+      `Error fetching student IDs from Set or MGET participant data for waiting list processing, PIN: ${pin}. Error:`,
+      error
+    );
+  }
+
+  logger.info(
+    `Found ${studentsToActivate.length} students to activate from waiting list for PIN: ${pin}.`
+  );
+
+  for (const participantToActivate of studentsToActivate) {
+    participantToActivate.status = "connected_participating"; // '참여 중' 상태로 변경
+    participantToActivate.hasSubmitted = false; // 다음 문제부터 참여하므로 초기화
+    await redisJsonSet(
+      getParticipantKey(pin, participantToActivate.student),
+      participantToActivate,
+      { EX: 3600 }
+    );
+
+    // 이미 Student.findById는 최초 참여 시(_handleCharacterSelected)에 수행되었으므로,
+    // participantToActivate 객체에 name과 character 정보가 있어야 함.
+    await broadcastToTeacher(pin, {
+      type: "studentJoined", // 또는 "studentActivated"
+      studentId: participantToActivate.student,
+      name: participantToActivate.name, // Ensure name is available
+      character: participantToActivate.character, // Ensure character is available
+      isReady: true, // 이제 참여 준비 완료
+    });
+    logger.info(
+      `Activated student ${participantToActivate.student} in session ${pin}. Now participating.`
+    );
+  }
+}
 
 // 내부 헬퍼 함수: 세션 리소스 정리
 // 이 함수는 퀴즈 세션 종료 시 관련된 Redis 데이터 삭제, 학생 연결 종료 등의 정리 작업을 수행합니다.
@@ -39,6 +290,16 @@ async function _cleanupSessionResources(pin, ws, options = {}) {
   } = options;
 
   logger.info(`Starting cleanup for session PIN: ${pin}`);
+
+  // --- 5초 전 알림 타이머 정리 (안전장치) ---
+  if (kahootClients[pin] && kahootClients[pin].timeLeftTimeoutId) {
+    clearTimeout(kahootClients[pin].timeLeftTimeoutId);
+    kahootClients[pin].timeLeftTimeoutId = null;
+    logger.info(
+      `Cleared 'timeLeft' timeout for PIN: ${pin} during session resource cleanup.`
+    );
+  }
+  // ---
 
   // 1. 학생들에게 알림 및 연결 종료 (옵션)
   if (notifyStudents) {
@@ -278,6 +539,92 @@ async function _saveQuizResults(
   }
 }
 
+// 새로운 헬퍼 함수: 시간 종료로 인한 문제 마감 처리
+async function _handleTimeUp(pin) {
+  logger.info(`Handling timeUp for session PIN: ${pin}`);
+
+  // --- 5초 전 알림 타이머 정리 ---
+  if (kahootClients[pin] && kahootClients[pin].timeLeftTimeoutId) {
+    clearTimeout(kahootClients[pin].timeLeftTimeoutId);
+    kahootClients[pin].timeLeftTimeoutId = null;
+    logger.info(
+      `[TimeUp] Cleared 'timeLeft' timeout for PIN: ${pin} because time is up.`
+    );
+  }
+  // ---
+
+  const lockKey = `lock:teacher:timeup:${pin}`;
+  let lockAcquired = false;
+
+  try {
+    lockAcquired = await redisClient.set(lockKey, "locked", "EX", 5, "NX");
+    if (!lockAcquired) {
+      logger.warn(
+        `[TimeUp] Could not acquire lock for PIN ${pin}. TimeUp already being processed.`
+      );
+      return;
+    }
+
+    const sessionState = await redisJsonGet(getSessionKey(pin));
+    // 이 시점에서 마감 신호를 보낸 교사가 유효한지 확인할 수도 있습니다.
+    // 예를 들어, ws 객체를 전달받아 준비 상태인지 확인합니다.
+
+    if (!sessionState || !sessionState.isQuestionActive) {
+      logger.warn(
+        `[TimeUp] Received timeUp for PIN ${pin}, but question is no longer active. Ignoring.`
+      );
+      return;
+    }
+
+    const questions = await redisJsonGet(getSessionQuestionsKey(pin));
+    if (!questions) {
+      logger.error(`[TimeUp] Questions not found for PIN: ${pin}`);
+      return;
+    }
+    const currentQuestion = questions.find(
+      (q) => q._id.toString() === sessionState.currentQuestionId.toString()
+    );
+    if (!currentQuestion) {
+      logger.error(`[TimeUp] Current question not found for PIN: ${pin}`);
+      return;
+    }
+
+    const studentIdsSetKey = getSessionStudentIdsSetKey(pin);
+    const studentIds = await redisClient.sMembers(studentIdsSetKey);
+    let allValidPData = [];
+
+    if (studentIds && studentIds.length > 0) {
+      const participantKeys = studentIds.map((sid) =>
+        getParticipantKey(pin, sid)
+      );
+      const pDataArray = await redisJsonMGet(participantKeys);
+      if (pDataArray) {
+        allValidPData = pDataArray.filter((p) => p);
+      }
+    }
+
+    const activeParticipants = allValidPData.filter(
+      (p) => p && p.status === "connected_participating"
+    );
+
+    // 공용 마감 처리 함수 호출
+    await handleAllSubmissionsProcessing(
+      pin,
+      sessionState,
+      currentQuestion,
+      activeParticipants
+    );
+
+    logger.info(`[TimeUp] Successfully processed timeUp for PIN: ${pin}`);
+  } catch (error) {
+    logger.error(`Error in _handleTimeUp for PIN ${pin}:`, error);
+  } finally {
+    if (lockAcquired) {
+      await redisClient.del(lockKey);
+    }
+  }
+}
+
 // Helper function for 'startQuiz' message
 async function _handleStartQuiz(pin, ws, currentSessionState, questionContent) {
   logger.info(`Handling startQuiz for session PIN: ${pin}`);
@@ -366,6 +713,21 @@ async function _handleStartQuiz(pin, ws, currentSessionState, questionContent) {
       const endTime = currentTime + timeLimit + bufferTime;
       const activeStudentCount = await getActiveStudentCount(pin);
 
+      // --- 7초 전 알림 타이머 설정 ---
+      await _set7SecondWarningTimer(pin, endTime);
+      // ---
+
+      // 질문 시작 시간을 Redis에 기록
+      const sessionStateForTimestamp = await redisJsonGet(getSessionKey(pin));
+      if (sessionStateForTimestamp) {
+        sessionStateForTimestamp.questionStartTime = Date.now();
+        await redisJsonSet(
+          getSessionKey(pin),
+          sessionStateForTimestamp,
+          { EX: 3600 } // TTL 1시간으로 재설정
+        );
+      }
+
       ws.send(
         JSON.stringify({
           type: "quizStarted",
@@ -386,7 +748,7 @@ async function _handleStartQuiz(pin, ws, currentSessionState, questionContent) {
         type: "newQuestionOptions",
         questionId: firstQuestion._id,
         options: questionOptions,
-        endTime: endTime,
+        timeLimit: firstQuestion.timeLimit,
       });
       logger.info(`Quiz started for session PIN: ${pin}, first question sent.`);
     }, 3000);
@@ -440,7 +802,7 @@ async function _handleNextQuestion(
       return;
     }
 
-    // 락 획득 후 최신 세션 상태를 다시 읽어오는 것을 고려할 수 있습니다.
+    // 락 획득 후 최신 세션 상태를 다시 읽어오는 것을 고려합니다.
     // currentSessionState = await redisJsonGet(getSessionKey(pin));
     // if (!currentSessionState) { /* ... 오류 처리 ... */ return; }
     // const currentQuestionIndex = currentSessionState.currentQuestionIndex; // 업데이트된 인덱스 사용
@@ -577,6 +939,22 @@ async function _handleNextQuestion(
         const bufferTime = 2000;
         const endTime = currentTime + timeLimit + bufferTime;
         const activeStudentCount = await getActiveStudentCount(pin);
+
+        // --- 7초 전 알림 타이머 설정 ---
+        await _set7SecondWarningTimer(pin, endTime);
+        // ---
+
+        // 질문 시작 시간을 Redis에 기록
+        const sessionStateForTimestamp = await redisJsonGet(getSessionKey(pin));
+        if (sessionStateForTimestamp) {
+          sessionStateForTimestamp.questionStartTime = Date.now();
+          await redisJsonSet(
+            getSessionKey(pin),
+            sessionStateForTimestamp,
+            { EX: 3600 } // TTL 1시간으로 재설정
+          );
+        }
+
         ws.send(
           JSON.stringify({
             type: "newQuestion",
@@ -597,9 +975,9 @@ async function _handleNextQuestion(
         await broadcastToActiveStudents(pin, {
           type: "newQuestionOptions",
           questionId: nextQuestion._id,
-          endTime: endTime,
           options: questionOptions,
           isLastQuestion: isLastQuestion,
+          timeLimit: nextQuestion.timeLimit,
         });
         logger.info(
           `Sent 'newQuestion' and 'newQuestionOptions' for question index ${newQuestionIndex}, session PIN: ${pin}`
@@ -631,6 +1009,16 @@ async function _handleNextQuestion(
 // Helper function for 'endQuiz' message
 async function _handleEndQuiz(pin, ws, currentSessionState, questionContent) {
   logger.info(`Handling endQuiz for session PIN: ${pin}`);
+
+  // --- 5초 전 알림 타이머 정리 ---
+  if (kahootClients[pin] && kahootClients[pin].timeLeftTimeoutId) {
+    clearTimeout(kahootClients[pin].timeLeftTimeoutId);
+    kahootClients[pin].timeLeftTimeoutId = null;
+    logger.info(
+      `[EndQuiz] Cleared 'timeLeft' timeout for PIN: ${pin} because quiz is ending.`
+    );
+  }
+  // ---
 
   const lockKey = `lock:teacher:endquiz:${pin}`;
   let lockAcquired = false;
@@ -1067,6 +1455,7 @@ exports.handleTeacherWebSocketConnection = async (ws, teacherId, pin) => {
       teacher: null,
       students: {},
       subscribedChannels: new Set(), // Set 초기화
+      timeLeftTimeoutId: null, // 타이머 ID를 저장할 속성 추가
     };
   }
   // 교사 웹소켓은 하나만 존재한다고 가정, students 객체는 학생 핸들러에서 관리
@@ -1254,6 +1643,9 @@ exports.handleTeacherWebSocketConnection = async (ws, teacherId, pin) => {
           currentSessionState,
           questionContent
         );
+        break;
+      case "timeUp":
+        await _handleTimeUp(pin);
         break;
       case "endQuiz":
         await _handleEndQuiz(pin, ws, currentSessionState, questionContent);

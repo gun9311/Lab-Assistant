@@ -1,6 +1,7 @@
 {
   "short_name": "넛지EDU",
   "name": "넛지EDU",
+  "description": "넛지(NUDGE EDU)는 학생과 교사를 위한 스마트 교육 플랫폼입니다.",
   "icons": [
     {
       "src": "nudge_logo_192.png",
@@ -13,9 +14,11 @@
       "type": "image/png"
     }
   ],
-  "start_url": ".",
+  "start_url": "/",
   "display": "standalone",
   "theme_color": "#000000",
   "background_color": "#ffffff",
+  "lang": "ko",
+  "scope": "/",
   "gcm_sender_id": "103953800507"
 }

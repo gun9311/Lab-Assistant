@@ -34,6 +34,13 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
+
+    // 서버 오류 (5xx) 처리
+    if (error.response && error.response.status >= 500) {
+      window.location.href = "/server-error";
+      return Promise.reject(error);
+    }
+
     if (error.response.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
       const refreshToken = getRefreshToken();
