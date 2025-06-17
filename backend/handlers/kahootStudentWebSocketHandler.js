@@ -11,6 +11,7 @@ const {
   subscribeToPinChannels,
   unsubscribeFromPinChannels,
   getActiveStudentCount,
+  // handleAllSubmissionsProcessing,
 } = require("./kahootShared");
 const {
   getSessionKey,
@@ -552,7 +553,7 @@ async function _handleSubmitAnswer(
   logger.info(
     `Handling submitAnswer for student ${studentId} in session ${pin}`
   );
-  const { questionId, answerIndex, responseTime } = parsedMessage;
+  const { questionId, answerIndex } = parsedMessage;
 
   // --- BEGIN MODIFICATION: Add Lock ---
   const lockKey = `lock:submit:${pin}:${studentId}:${questionId}`;
@@ -576,6 +577,10 @@ async function _handleSubmitAnswer(
       return;
     }
     // --- END MODIFICATION: Add Lock ---
+
+    // 서버에서 응답 시간 계산
+    const questionStartTime = currentSession.questionStartTime || Date.now(); // 시작 시간이 없으면 현재 시간으로 대체
+    const responseTime = Date.now() - questionStartTime;
 
     const participantKey = getParticipantKey(pin, studentId);
     const participant = await redisJsonGet(participantKey);
@@ -625,7 +630,7 @@ async function _handleSubmitAnswer(
       question: currentQuestionFromSnapshot._id,
       answer: answerIndex !== -1 ? answerIndex : null,
       isCorrect: isCorrect,
-      responseTime: responseTime,
+      responseTime: responseTime, // 서버에서 계산한 응답 시간 사용
     });
 
     const maxScore = 1000;
