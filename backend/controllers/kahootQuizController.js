@@ -21,11 +21,15 @@ const uploadMultiple = multer({
     s3: s3,
     bucket: process.env.S3_BUCKET_NAME,
     key: function (req, file, cb) {
-      cb(null, Date.now().toString() + "-" + file.originalname); // 파일명을 타임스탬프와 함께 설정
+      cb(null, Date.now().toString() + "-" + file.originalname);
     },
   }),
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB per file
+    files: 50, // 최대 파일 개수
+    fieldSize: 2 * 1024 * 1024, // 2MB per field
+  },
   fileFilter: function (req, file, cb) {
-    // 동적 필드명을 처리할 수 있도록 필드 검증을 확장
     const fieldName = file.fieldname;
     if (
       /^questionImages_\d+$/.test(fieldName) ||
@@ -37,7 +41,7 @@ const uploadMultiple = multer({
       cb(new multer.MulterError("LIMIT_UNEXPECTED_FILE", fieldName));
     }
   },
-}).any(); // .any()를 사용하여 모든 필드를 받아들임
+}).any();
 
 // 새로운 헬퍼 함수 정의
 /**
