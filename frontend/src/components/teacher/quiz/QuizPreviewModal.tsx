@@ -56,11 +56,18 @@ const QuizPreviewModal: React.FC<QuizPreviewModalProps> = ({
             ? parseInt(question.correctAnswer, 10)
             : question.correctAnswer;
 
+        // 문제 이미지 URL 처리 - File 객체가 있으면 임시 URL 생성, 없으면 기존 imageUrl 사용
+        const questionImageUrl = question.image
+          ? URL.createObjectURL(question.image)
+          : question.imageUrl || "";
+
         // imageUrl, image, options 내부의 imageUrl, image 필드 확인 및 기본값 처리
         const processedOptions = question.options.map((opt) => ({
           text: opt.text || "",
-          imageUrl: opt.imageUrl || "",
-          // image: opt.image || null, // File 객체는 미리보기에서 직접 다루기 어려움
+          // 선택지 이미지 URL 처리 - File 객체가 있으면 임시 URL 생성, 없으면 기존 imageUrl 사용
+          imageUrl: opt.image
+            ? URL.createObjectURL(opt.image)
+            : opt.imageUrl || "",
         }));
 
         setCurrentQuestionForDisplay({
@@ -69,8 +76,7 @@ const QuizPreviewModal: React.FC<QuizPreviewModalProps> = ({
           options: processedOptions,
           correctAnswer: correctAnswerAsNumber, // 숫자형으로 전달
           timeLimit: question.timeLimit || 30, // 기본 시간 제한
-          imageUrl: question.imageUrl || "",
-          // image: question.image || null, // File 객체
+          imageUrl: questionImageUrl,
         });
       } else {
         setCurrentQuestionForDisplay(null);
@@ -79,6 +85,27 @@ const QuizPreviewModal: React.FC<QuizPreviewModalProps> = ({
       setCurrentQuestionForDisplay(null); // 문제가 없으면 null 처리
     }
   }, [open, questions, currentQuestionIndex]);
+
+  // 컴포넌트 언마운트 시 생성된 Object URL들을 정리
+  useEffect(() => {
+    return () => {
+      if (currentQuestionForDisplay) {
+        // 문제 이미지 URL 정리
+        if (
+          currentQuestionForDisplay.imageUrl &&
+          currentQuestionForDisplay.imageUrl.startsWith("blob:")
+        ) {
+          URL.revokeObjectURL(currentQuestionForDisplay.imageUrl);
+        }
+        // 선택지 이미지 URL들 정리
+        currentQuestionForDisplay.options?.forEach((opt: any) => {
+          if (opt.imageUrl && opt.imageUrl.startsWith("blob:")) {
+            URL.revokeObjectURL(opt.imageUrl);
+          }
+        });
+      }
+    };
+  }, [currentQuestionForDisplay]);
 
   const handleNextQuestion = useCallback(() => {
     if (currentQuestionIndex < questions.length - 1) {

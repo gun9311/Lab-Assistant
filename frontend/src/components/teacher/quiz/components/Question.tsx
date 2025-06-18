@@ -96,10 +96,12 @@ const QuestionComponent: React.FC<QuestionComponentProps> = ({
           alt="문제 이미지"
           style={{
             maxWidth: "100%",
-            maxHeight: "40vh", // 이미지 최대 높이 조정 가능
-            marginBottom: "2vh",
+            maxHeight: shouldShowOptions ? "35vh" : "45vh",
+            marginTop: shouldShowOptions ? "1vh" : "8vh",
+            // marginBottom: shouldShowOptions ? "1vh" : "3vh",
             borderRadius: "8px",
             objectFit: "contain",
+            transition: "all 0.5s ease-in-out",
           }}
         />
       )}
@@ -113,7 +115,7 @@ const QuestionComponent: React.FC<QuestionComponentProps> = ({
           gap: "1vw",
           marginBottom: "2vh",
           flexGrow: 1, // 남은 공간을 채우도록 설정
-          maxHeight: shouldShowOptions ? "35vh" : "60vh", // 조건부 최대 높이
+          maxHeight: shouldShowOptions ? "35vh" : "45vh",
           overflow: "hidden", // 스크롤바 제거
           transition: "max-height 0.5s ease-in-out",
         }}

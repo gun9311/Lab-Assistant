@@ -7,6 +7,7 @@ import {
   Visibility as VisibilityIcon,
   PlayArrow,
   Edit,
+  ArrowBack,
 } from "@mui/icons-material";
 
 export const FIXED_ACTION_BAR_HEIGHT = "72px";
@@ -21,6 +22,7 @@ export interface ActionBarProps {
   onSave?: () => void;
   onStart?: () => void;
   onEdit?: () => void;
+  onCancel?: () => void;
   variant?: "fixed" | "dialog";
 }
 
@@ -34,6 +36,7 @@ const ActionBar: React.FC<ActionBarProps> = ({
   onSave,
   onStart,
   onEdit,
+  onCancel,
   variant = "fixed",
 }) => {
   const baseSx = {
@@ -66,7 +69,23 @@ const ActionBar: React.FC<ActionBarProps> = ({
   return (
     <Paper elevation={0} sx={{ ...baseSx, ...variantSx }}>
       <Box sx={{ flex: 1, display: "flex", justifyContent: "flex-start" }}>
-        {/* Left aligned buttons can be placed here in the future */}
+        {!isReadOnly && onCancel && (
+          <Button
+            variant="outlined"
+            color="inherit"
+            startIcon={<ArrowBack />}
+            onClick={onCancel}
+            sx={{
+              borderRadius: "8px",
+              fontWeight: "medium",
+              borderColor: "#b0b0b0",
+              color: "#666",
+              "&:hover": { backgroundColor: "#f0f0f0" },
+            }}
+          >
+            목록으로
+          </Button>
+        )}
       </Box>
 
       <Box sx={{ display: "flex", gap: 1, justifyContent: "center" }}>

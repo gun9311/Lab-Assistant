@@ -1,15 +1,27 @@
 // EditQuizPage.tsx
 import React, { useEffect, useState, useRef } from "react";
-import { Box, Typography, Divider, CircularProgress } from "@mui/material";
+import {
+  Box,
+  Typography,
+  Divider,
+  CircularProgress,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
+  Button,
+} from "@mui/material";
+import { useNavigate, useParams } from "react-router-dom";
 import QuizContainer, {
   QuizContainerRef,
   ActionBarState,
 } from "./QuizContainer";
 import ActionBar, { FIXED_ACTION_BAR_HEIGHT } from "./ActionBar";
-import { useParams } from "react-router-dom";
 import { getQuizById } from "../../../utils/quizApi"; // 이미 구현된 API
 
 const EditQuizPage: React.FC = () => {
+  const navigate = useNavigate();
   const { quizId } = useParams<{ quizId: string }>();
   const [initialData, setInitialData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -19,6 +31,9 @@ const EditQuizPage: React.FC = () => {
     totalQuestions: 1,
     isReviewSlide: false,
   });
+
+  // 취소 확인 다이얼로그 상태 추가
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
 
   useEffect(() => {
     const fetchQuizData = async () => {
@@ -44,6 +59,15 @@ const EditQuizPage: React.FC = () => {
   };
   const handleNavigate = (direction: "prev" | "next") => {
     quizContainerRef.current?.navigate(direction);
+  };
+
+  // 취소 핸들러 추가
+  const handleCancel = () => {
+    setShowCancelDialog(true);
+  };
+
+  const handleConfirmCancel = () => {
+    navigate("/manage-quizzes");
   };
 
   const canNavigateForward =
@@ -116,7 +140,29 @@ const EditQuizPage: React.FC = () => {
         onNavigate={handleNavigate}
         onPreview={handlePreview}
         onSave={handleSave}
+        onCancel={handleCancel}
       />
+
+      {/* 취소 확인 다이얼로그 추가 */}
+      <Dialog
+        open={showCancelDialog}
+        onClose={() => setShowCancelDialog(false)}
+      >
+        <DialogTitle>퀴즈 수정 취소</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            퀴즈 수정을 취소하고 목록으로 돌아가시겠습니까?
+            <br />
+            저장하지 않은 변경사항은 사라집니다.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowCancelDialog(false)}>계속 수정</Button>
+          <Button onClick={handleConfirmCancel} color="error">
+            취소하고 나가기
+          </Button>
+        </DialogActions>
+      </Dialog>
     </>
   );
 };
