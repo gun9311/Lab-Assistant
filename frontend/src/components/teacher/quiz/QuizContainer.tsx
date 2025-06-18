@@ -323,6 +323,11 @@ const QuizContainer = forwardRef<QuizContainerRef, QuizContainerProps>(
         return false;
       }
 
+      if (!unit || unit.trim() === "") {
+        setError("단원을 선택해주세요.");
+        return false;
+      }
+
       for (let i = 0; i < questions.length; i++) {
         const q = questions[i];
         if (!q.questionText.trim() && !isReadOnly) {

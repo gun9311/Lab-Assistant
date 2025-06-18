@@ -92,7 +92,9 @@ const validateQuizData = (body, files) => {
   if (!semester || typeof semester !== "string" || semester.trim() === "") {
     return { isValid: false, message: "학기를 선택해주세요." };
   }
-  // unit은 선택적이므로 검사에서 제외하거나 필요시 추가
+  if (!unit || typeof unit !== "string" || unit.trim() === "") {
+    return { isValid: false, message: "단원을 선택해주세요." };
+  }
 
   if (!questions || typeof questions !== "string") {
     return { isValid: false, message: "문제 목록이 올바르지 않습니다." };
@@ -436,6 +438,7 @@ exports.getQuizzes = async (req, res) => {
       semesterFilter,
       subjectFilter,
       unitFilter,
+      titleFilter,
       sortBy = "latest",
       createdBy,
     } = req.query;
@@ -446,7 +449,12 @@ exports.getQuizzes = async (req, res) => {
     if (semesterFilter) filter.semester = semesterFilter;
     if (subjectFilter) filter.subject = subjectFilter;
     if (unitFilter) filter.unit = unitFilter;
-    if (createdBy) filter.createdBy = createdBy; // 생성자 필터 추가 (내 퀴즈함 기능용)
+    if (createdBy) filter.createdBy = createdBy;
+
+    // 제목 검색 추가 (대소문자 구분 없이, 부분 일치)
+    if (titleFilter && titleFilter.trim() !== "") {
+      filter.title = { $regex: titleFilter.trim(), $options: "i" };
+    }
 
     // 정렬 조건 설정
     let sortOption = {};
