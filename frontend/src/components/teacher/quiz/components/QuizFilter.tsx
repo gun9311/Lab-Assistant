@@ -7,11 +7,16 @@ import {
   MenuItem,
   Grid,
   Tooltip,
+  TextField,
+  InputAdornment,
+  IconButton,
 } from "@mui/material";
 import SchoolIcon from "@mui/icons-material/School";
 import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
 import SubjectIcon from "@mui/icons-material/Subject";
 import ListIcon from "@mui/icons-material/List";
+import SearchIcon from "@mui/icons-material/Search";
+import ClearIcon from "@mui/icons-material/Clear";
 import { getSubjects } from "../../../../utils/api";
 
 interface QuizFilterProps {
@@ -23,6 +28,8 @@ interface QuizFilterProps {
   setSubjectFilter: (value: string | null) => void;
   unitFilter: string | null;
   setUnitFilter: (value: string | null) => void;
+  titleFilter: string | null;
+  setTitleFilter: (value: string | null) => void;
   units: string[];
   sortBy: string;
   setSortBy: (value: string) => void;
@@ -37,11 +44,31 @@ const QuizFilter: React.FC<QuizFilterProps> = ({
   setSubjectFilter,
   unitFilter,
   setUnitFilter,
+  titleFilter,
+  setTitleFilter,
   units,
   sortBy,
   setSortBy,
 }) => {
   const [subjects, setSubjects] = useState<string[]>([]);
+  const [searchInput, setSearchInput] = useState(titleFilter || "");
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setTitleFilter(searchInput.trim() || null);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchInput, setTitleFilter]);
+
+  useEffect(() => {
+    setSearchInput(titleFilter || "");
+  }, [titleFilter]);
+
+  const handleClearSearch = () => {
+    setSearchInput("");
+    setTitleFilter(null);
+  };
 
   useEffect(() => {
     const fetchSubjects = async () => {
@@ -78,8 +105,36 @@ const QuizFilter: React.FC<QuizFilterProps> = ({
       }}
     >
       <Grid container spacing={2} alignItems="center">
-        {/* 학년 필터 */}
-        <Grid item xs={12} sm={6} md={2.25}>
+        <Grid item xs={12} sm={6} md={3}>
+          <TextField
+            fullWidth
+            label="제목 검색"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            placeholder="퀴즈 제목을 입력하세요"
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon sx={{ color: "#9E9E9E" }} />
+                </InputAdornment>
+              ),
+              endAdornment: searchInput && (
+                <InputAdornment position="end">
+                  <IconButton size="small" onClick={handleClearSearch}>
+                    <ClearIcon />
+                  </IconButton>
+                </InputAdornment>
+              ),
+            }}
+            sx={{
+              "& .MuiOutlinedInput-root": {
+                borderRadius: "8px",
+              },
+            }}
+          />
+        </Grid>
+
+        <Grid item xs={12} sm={6} md={2}>
           <FormControl fullWidth>
             <InputLabel>학년</InputLabel>
             <Tooltip title="학년 필터">
@@ -109,8 +164,7 @@ const QuizFilter: React.FC<QuizFilterProps> = ({
           </FormControl>
         </Grid>
 
-        {/* 학기 필터 */}
-        <Grid item xs={12} sm={6} md={2.25}>
+        <Grid item xs={12} sm={6} md={2}>
           <FormControl fullWidth>
             <InputLabel>학기</InputLabel>
             <Tooltip title="학기 필터">
@@ -136,8 +190,7 @@ const QuizFilter: React.FC<QuizFilterProps> = ({
           </FormControl>
         </Grid>
 
-        {/* 과목 필터 */}
-        <Grid item xs={12} sm={6} md={2.25}>
+        <Grid item xs={12} sm={6} md={2}>
           <FormControl fullWidth>
             <InputLabel>과목</InputLabel>
             <Tooltip title="과목 필터">
@@ -164,8 +217,7 @@ const QuizFilter: React.FC<QuizFilterProps> = ({
           </FormControl>
         </Grid>
 
-        {/* 단원 필터 */}
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={12} sm={6} md={2.5}>
           <FormControl fullWidth>
             <InputLabel>단원(영역)</InputLabel>
             <Tooltip title="단원 필터">
@@ -185,13 +237,13 @@ const QuizFilter: React.FC<QuizFilterProps> = ({
                     {unit}
                   </MenuItem>
                 ))}
+                <MenuItem value="기타">기타</MenuItem>
               </Select>
             </Tooltip>
           </FormControl>
         </Grid>
 
-        {/* 정렬 기준 필터 */}
-        <Grid item xs={12} sm={6} md={2}>
+        <Grid item xs={12} sm={6} md={1.5}>
           <FormControl fullWidth>
             <InputLabel>정렬 기준</InputLabel>
             <Tooltip title="정렬 기준 선택">

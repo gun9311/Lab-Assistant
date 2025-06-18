@@ -73,6 +73,10 @@ const OverviewPanel: React.FC<OverviewPanelProps> = ({
   const displaySemesterError = validationAttempted && isSemesterEmpty;
   const displaySubjectError = validationAttempted && isSubjectEmpty;
 
+  // 단원 필드 유효성 검사 추가
+  const isUnitEmpty = !isReadOnly && (!unit || unit.trim() === "");
+  const displayUnitError = validationAttempted && isUnitEmpty;
+
   return (
     <Box
       sx={{
@@ -394,6 +398,9 @@ const OverviewPanel: React.FC<OverviewPanelProps> = ({
                 value={unit}
                 onChange={(e) => setUnit(e.target.value)}
                 fullWidth
+                error={displayUnitError}
+                helperText={displayUnitError ? "단원을 선택해주세요." : ""}
+                disabled={!grade || !semester || !subject || units.length === 0}
                 sx={{
                   "& .MuiInputBase-root": {
                     borderRadius: "8px",
@@ -407,6 +414,7 @@ const OverviewPanel: React.FC<OverviewPanelProps> = ({
                     {unit}
                   </MenuItem>
                 ))}
+                <MenuItem value="기타">기타</MenuItem>
               </TextField>
             )}
           </Grid>

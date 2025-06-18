@@ -81,6 +81,8 @@ const ManageQuizzesPage: React.FC = () => {
   const isMd = useMediaQuery(theme.breakpoints.only("md"));
   const isSm = useMediaQuery(theme.breakpoints.only("sm"));
 
+  const [titleFilter, setTitleFilter] = useState<string | null>(null);
+
   useEffect(() => {
     if (isXl) {
       setLimit(10);
@@ -127,6 +129,7 @@ const ManageQuizzesPage: React.FC = () => {
           semesterFilter,
           subjectFilter,
           unitFilter,
+          titleFilter,
           sortBy,
           createdBy: isMyQuizzes && userId ? userId : undefined,
         });
@@ -146,13 +149,14 @@ const ManageQuizzesPage: React.FC = () => {
     semesterFilter,
     subjectFilter,
     unitFilter,
+    titleFilter,
     sortBy,
     isMyQuizzes,
   ]);
 
   useEffect(() => {
     setPage(1);
-  }, [gradeFilter, semesterFilter, subjectFilter, unitFilter]);
+  }, [gradeFilter, semesterFilter, subjectFilter, unitFilter, titleFilter]);
 
   useEffect(() => {
     if (gradeFilter && semesterFilter && subjectFilter) {
@@ -431,6 +435,8 @@ const ManageQuizzesPage: React.FC = () => {
             setSubjectFilter={setSubjectFilter}
             unitFilter={unitFilter}
             setUnitFilter={setUnitFilter}
+            titleFilter={titleFilter}
+            setTitleFilter={setTitleFilter}
             units={units}
             sortBy={sortBy}
             setSortBy={setSortBy}
