@@ -13,6 +13,7 @@ import {
   Tab,
 } from "@mui/material";
 import { Image, Delete, Link } from "@mui/icons-material";
+import imageCompression from "browser-image-compression";
 
 type ImageUploadDialogProps = {
   open: boolean;
@@ -34,6 +35,8 @@ const ImageUploadDialog: React.FC<ImageUploadDialogProps> = ({
   const [tempImageUrl, setTempImageUrl] = useState(imageUrl);
   const [tempImageFile, setTempImageFile] = useState<File | null>(imageFile);
   const [tabValue, setTabValue] = useState(0);
+
+  const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
   useEffect(() => {
     if (open) {
@@ -62,9 +65,44 @@ const ImageUploadDialog: React.FC<ImageUploadDialogProps> = ({
     setTempImageFile(null);
   };
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+
+      // 파일 크기 체크
+      if (file.size > MAX_FILE_SIZE) {
+        alert(
+          `파일 크기가 너무 큽니다. ${
+            MAX_FILE_SIZE / (1024 * 1024)
+          }MB 이하의 파일을 선택해주세요.`
+        );
+        return;
+      }
+
+      setTempImageFile(file);
+    }
+  };
+
+  const compressImage = async (file: File): Promise<File> => {
+    const options = {
+      maxSizeMB: 1, // 최대 1MB로 압축
+      maxWidthOrHeight: 1920, // 최대 너비/높이
+      useWebWorker: true,
+    };
+
+    try {
+      return await imageCompression(file, options);
+    } catch (error) {
+      console.error("이미지 압축 실패:", error);
+      return file; // 압축 실패 시 원본 반환
+    }
+  };
+
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle sx={{ textAlign: "center", fontWeight: "bold" }}>이미지 첨부</DialogTitle>
+      <DialogTitle sx={{ textAlign: "center", fontWeight: "bold" }}>
+        이미지 첨부
+      </DialogTitle>
 
       {/* Tabs for File Upload and URL */}
       <Tabs value={tabValue} onChange={handleTabChange} centered>
@@ -101,9 +139,8 @@ const ImageUploadDialog: React.FC<ImageUploadDialogProps> = ({
               <input
                 type="file"
                 hidden
-                onChange={(e) => {
-                  if (e.target.files) setTempImageFile(e.target.files[0]);
-                }}
+                accept="image/*"
+                onChange={handleFileChange}
               />
             </Button>
 
