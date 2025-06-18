@@ -19,6 +19,8 @@ import {
   Tooltip as MuiTooltip, // Material-UI의 Tooltip과 이름 충돌 방지
   ListItemButton, // Tooltip for additional info
   LinearProgress, // LinearProgress 추가
+  IconButton,
+  Dialog, // 추가
 } from "@mui/material";
 import {
   DetailedResultsPayload,
@@ -35,6 +37,8 @@ import DangerousOutlinedIcon from "@mui/icons-material/DangerousOutlined"; // �
 import EmojiEventsIcon from "@mui/icons-material/EmojiEvents"; // 1등 아이콘
 import TrendingUpIcon from "@mui/icons-material/TrendingUp"; // 쉬운 문제
 import StarIcon from "@mui/icons-material/Star"; // Podium 강조용
+import ZoomIn from "@mui/icons-material/ZoomIn"; // 추가
+import CloseIcon from "@mui/icons-material/Close"; // 추가
 
 // Recharts import
 import {
@@ -48,6 +52,9 @@ import {
   Cell, // 개별 막대 색상 지정을 위해 Cell import
   LabelList, // 막대 내부에 값 표시
 } from "recharts";
+
+// QuestionComponent import 추가
+import QuestionComponent from "./Question";
 
 // --- BEGIN: 캐릭터 이미지 로딩 (WaitingPlayers.tsx 참고) ---
 declare const require: {
@@ -148,6 +155,12 @@ const ResultComponent: React.FC<ResultComponentProps> = ({
   const [selectedQuestion, setSelectedQuestion] =
     useState<QuestionDetail | null>(null);
 
+  // 문제 크게보기 모달 상태 추가
+  const [questionPreviewModal, setQuestionPreviewModal] = useState<{
+    open: boolean;
+    question: QuestionDetail | null;
+  }>({ open: false, question: null });
+
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setCurrentTab(newValue);
     setSelectedQuestion(null);
@@ -208,6 +221,32 @@ const ResultComponent: React.FC<ResultComponentProps> = ({
           : "rgba(33, 150, 243, 0.8)",
       imageUrl: opt.imageUrl,
     }));
+  };
+
+  const handleQuestionPreview = (question: QuestionDetail) => {
+    setQuestionPreviewModal({ open: true, question });
+  };
+
+  const handleCloseQuestionPreview = () => {
+    setQuestionPreviewModal({ open: false, question: null });
+  };
+
+  // QuestionComponent 형식으로 변환하는 함수
+  const convertToQuestionFormat = (question: QuestionDetail) => {
+    return {
+      _id: question.questionId,
+      questionText: question.questionText,
+      options: question.options.map((opt) => ({
+        text: opt.text,
+        imageUrl: opt.imageUrl,
+      })),
+      correctAnswer:
+        typeof question.correctAnswer === "string"
+          ? parseInt(question.correctAnswer, 10)
+          : question.correctAnswer,
+      timeLimit: 30, // 기본값
+      imageUrl: question.imageUrl,
+    };
   };
 
   return (
@@ -666,7 +705,34 @@ const ResultComponent: React.FC<ResultComponentProps> = ({
                           >
                             문제 {index + 1}
                           </Typography>
-                          <DifficultyChip rate={q.correctAnswerRate} />
+                          <Box
+                            sx={{
+                              display: "flex",
+                              gap: 1,
+                              alignItems: "center",
+                            }}
+                          >
+                            <DifficultyChip rate={q.correctAnswerRate} />
+                            {/* 크게보기 버튼 추가 */}
+                            <MuiTooltip title="문제 크게보기" arrow>
+                              <IconButton
+                                size="small"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleQuestionPreview(q);
+                                }}
+                                sx={{
+                                  color: "primary.main",
+                                  "&:hover": {
+                                    backgroundColor: "primary.light",
+                                    color: "white",
+                                  },
+                                }}
+                              >
+                                <ZoomIn fontSize="small" />
+                              </IconButton>
+                            </MuiTooltip>
+                          </Box>
                         </Box>
                         <Typography
                           variant="body1"
@@ -715,9 +781,29 @@ const ResultComponent: React.FC<ResultComponentProps> = ({
                           ) + 1}
                           . {selectedQuestion.questionText}
                         </Typography>
-                        <DifficultyChip
-                          rate={selectedQuestion.correctAnswerRate}
-                        />
+                        <Box
+                          sx={{ display: "flex", gap: 1, alignItems: "center" }}
+                        >
+                          <DifficultyChip
+                            rate={selectedQuestion.correctAnswerRate}
+                          />
+                          <MuiTooltip title="문제 크게보기" arrow>
+                            <IconButton
+                              onClick={() =>
+                                handleQuestionPreview(selectedQuestion)
+                              }
+                              sx={{
+                                color: "primary.main",
+                                "&:hover": {
+                                  backgroundColor: "primary.light",
+                                  color: "white",
+                                },
+                              }}
+                            >
+                              <ZoomIn />
+                            </IconButton>
+                          </MuiTooltip>
+                        </Box>
                       </Box>
 
                       {selectedQuestion.imageUrl && (
@@ -1002,6 +1088,73 @@ const ResultComponent: React.FC<ResultComponentProps> = ({
           </Button>
         </Box>
       </Paper>
+
+      {/* 문제 크게보기 모달 추가 */}
+      <Dialog
+        fullScreen
+        open={questionPreviewModal.open}
+        onClose={handleCloseQuestionPreview}
+        PaperProps={{
+          sx: {
+            backgroundImage: `url(/assets/quiz-theme/quiz_theme${
+              Math.floor(Math.random() * 15) + 1
+            }.png)`,
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "space-between",
+          },
+        }}
+      >
+        {/* 상단 바 */}
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            padding: { xs: "0.5rem 1rem", sm: "1rem 2rem" },
+            backgroundColor: "rgba(0, 0, 0, 0.6)",
+            color: "#fff",
+          }}
+        >
+          <Typography
+            variant="h5"
+            sx={{
+              fontWeight: "bold",
+              fontSize: { xs: "1.2rem", sm: "1.5rem" },
+            }}
+          >
+            문제 크게보기
+          </Typography>
+          <IconButton
+            onClick={handleCloseQuestionPreview}
+            sx={{ color: "#fff" }}
+          >
+            <CloseIcon />
+          </IconButton>
+        </Box>
+
+        {/* 문제 내용 */}
+        <Box
+          sx={{
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "center",
+            alignItems: "center",
+            flexGrow: 1,
+            padding: "0",
+          }}
+        >
+          {selectedQuestion && (
+            <QuestionComponent
+              currentQuestion={convertToQuestionFormat(selectedQuestion)}
+              allSubmitted={true}
+              isPreview={true}
+            />
+          )}
+        </Box>
+      </Dialog>
     </Box>
   );
 };

@@ -959,9 +959,12 @@ const StudentListComponent: React.FC<StudentListComponentProps> = ({
             sx={{
               position: "fixed", // 고정 위치
               bottom: "5vh",
-              left: "50%", // 중앙 정렬
-              transform: "translateX(-50%)", // 중앙 정렬
+              left: 0, // 변경: 50% → 0
+              right: 0, // 추가: 전체 너비 확보
+              display: "flex", // 추가: flex 레이아웃
+              justifyContent: "center", // 추가: 중앙 정렬
               zIndex: 1200, // 다른 요소들 위에 오도록 z-index 설정
+              pointerEvents: "none", // 추가: 부모는 클릭 차단
             }}
           >
             <Button
@@ -980,6 +983,7 @@ const StudentListComponent: React.FC<StudentListComponentProps> = ({
                 background: "linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)", // 파란색 테마
                 boxShadow: "0 4px 8px 2px rgba(33, 150, 243, .3)",
                 transition: "transform 0.3s ease-in-out",
+                pointerEvents: "auto", // 추가: 버튼은 클릭 가능
                 "&:hover": {
                   background:
                     "linear-gradient(45deg, #21CBF3 30%, #2196F3 90%)",

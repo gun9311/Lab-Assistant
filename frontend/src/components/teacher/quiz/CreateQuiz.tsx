@@ -1,5 +1,16 @@
 import React, { useRef, useState } from "react";
-import { Box, Typography, Divider } from "@mui/material";
+import {
+  Box,
+  Typography,
+  Divider,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
+  Button,
+} from "@mui/material";
+import { useNavigate } from "react-router-dom";
 import QuizContainer, {
   QuizContainerRef,
   ActionBarState,
@@ -7,12 +18,15 @@ import QuizContainer, {
 import ActionBar, { FIXED_ACTION_BAR_HEIGHT } from "./ActionBar";
 
 const CreateQuizPage: React.FC = () => {
+  const navigate = useNavigate();
   const quizContainerRef = useRef<QuizContainerRef>(null);
   const [actionBarState, setActionBarState] = useState<ActionBarState>({
     currentSlideIndex: 1,
     totalQuestions: 1,
     isReviewSlide: false,
   });
+
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
 
   const handleSave = () => {
     quizContainerRef.current?.save();
@@ -22,6 +36,17 @@ const CreateQuizPage: React.FC = () => {
   };
   const handleNavigate = (direction: "prev" | "next") => {
     quizContainerRef.current?.navigate(direction);
+  };
+
+  const handleCancel = () => {
+    setShowCancelDialog(true);
+  };
+
+  const handleConfirmCancel = (shouldClearTempData: boolean) => {
+    if (shouldClearTempData) {
+      localStorage.removeItem("tempQuizData");
+    }
+    navigate("/manage-quizzes");
   };
 
   const canNavigateForward =
@@ -91,7 +116,31 @@ const CreateQuizPage: React.FC = () => {
         onNavigate={handleNavigate}
         onPreview={handlePreview}
         onSave={handleSave}
+        onCancel={handleCancel}
       />
+
+      <Dialog
+        open={showCancelDialog}
+        onClose={() => setShowCancelDialog(false)}
+      >
+        <DialogTitle>퀴즈 생성 취소</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            퀴즈 생성을 취소하시겠습니까?
+            <br />
+            임시 저장된 내용을 삭제하시겠습니까?
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowCancelDialog(false)}>계속 작성</Button>
+          <Button onClick={() => handleConfirmCancel(false)} color="primary">
+            저장하고 나가기
+          </Button>
+          <Button onClick={() => handleConfirmCancel(true)} color="error">
+            삭제하고 나가기
+          </Button>
+        </DialogActions>
+      </Dialog>
     </>
   );
 };
