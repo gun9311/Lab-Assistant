@@ -132,7 +132,7 @@ const AnnouncementModal: React.FC<AnnouncementModalProps> = ({
                       variant="body2"
                       color="text.secondary"
                     >
-                      - 3개 단원 조합 시: 30 × 30 × 30 = 2,700개
+                      - 3개 단원 조합 시: 30 × 30 × 30 = 27,000개
                     </Typography>
                     <Typography
                       component="span"
@@ -165,7 +165,7 @@ const AnnouncementModal: React.FC<AnnouncementModalProps> = ({
                       color="text.secondary"
                     >
                       계정 관리 화면에서 학생 정보 일괄(반, 식별코드) 또는 개별
-                      수정(번호, 이름) 및 비밀번호 초기화, 계정 삭제가
+                      수정(번호, 이름) 및 비밀번호 초기화, 학생 계정 삭제가
                       가능합니다.
                     </Typography>
                     <Typography
