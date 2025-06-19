@@ -10,6 +10,10 @@ const {
   updateStudentByTeacher, // 교사에 의한 학생 정보 수정
   resetStudentPasswordByTeacher, // 교사에 의한 학생 비번 초기화
   deleteStudentByTeacher, // 교사에 의한 학생 삭제
+  // --- 새 일괄 처리 함수 임포트 ---
+  bulkDeleteStudents,
+  bulkResetStudentPasswords,
+  bulkUpdateStudentInfo,
 } = require("../controllers/userController");
 const auth = require("../middleware/auth");
 
@@ -42,6 +46,29 @@ router.delete(
   "/teacher/student/:studentId",
   auth("teacher"),
   deleteStudentByTeacher
+);
+// --- 추가 끝 ---
+
+// --- 학생 계정 일괄 관리 API 추가 ---
+// POST /api/users/teacher/students/bulk-delete
+router.post(
+  "/teacher/students/bulk-delete",
+  auth("teacher"),
+  bulkDeleteStudents
+);
+
+// POST /api/users/teacher/students/bulk-reset-password
+router.post(
+  "/teacher/students/bulk-reset-password",
+  auth("teacher"),
+  bulkResetStudentPasswords
+);
+
+// POST /api/users/teacher/students/bulk-update-info
+router.post(
+  "/teacher/students/bulk-update-info",
+  auth("teacher"),
+  bulkUpdateStudentInfo
 );
 // --- 추가 끝 ---
 

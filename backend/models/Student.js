@@ -16,6 +16,12 @@ const studentSchema = new mongoose.Schema({
   lastChatDay: { type: String, default: null }, // 예: "YYYY-MM-DD"
   monthlyChatCount: { type: Number, default: 0 },
   lastChatMonth: { type: String, default: null }, // 예: "YYYY-MM"
+  createdByTeacher: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Teacher",
+    required: false, // 과거 데이터와의 호환성을 위해 false로 설정
+    index: true, // 나중에 교사별 학생 조회를 위해 인덱스 추가
+  },
 });
 
 studentSchema.pre("save", async function (next) {

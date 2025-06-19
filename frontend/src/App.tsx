@@ -51,6 +51,11 @@ import ServiceUnavailable from "./components/ServiceUnavailable"; // 새로 만�
 import NotFoundPage from "./pages/NotFoundPage"; // 404 페이지 임포트
 import ServerErrorPage from "./pages/ServerErrorPage"; // 500 에러 페이지 임포트
 import api from "./utils/api"; // 인증된 API 요청용 인스턴스 (또는 apiNoAuth 사용)
+import QnAListPage from "./components/teacher/qna/QnAListPage";
+import CreateQuestionPage from "./components/teacher/qna/CreateQuestionPage";
+import QuestionDetailPage from "./components/teacher/qna/QuestionDetailPage";
+import AdminQnAPage from "./components/admin/qna/AdminQnAPage";
+import EditQuestionPage from "./components/teacher/qna/EditQuestionPage";
 
 // NotificationPayload 타입 정의
 type NotificationPayload = {
@@ -351,6 +356,47 @@ const AppContent: React.FC = () => {
                 roles={["teacher"]}
                 element={<ResetStudentPasswordPage />}
               />
+            }
+          />
+          {/* QnA 관련 라우트 (교사 전용) */}
+          <Route
+            path="/qna"
+            element={
+              <PrivateRoute roles={["teacher"]} element={<QnAListPage />} />
+            }
+          />
+          <Route
+            path="/qna/create"
+            element={
+              <PrivateRoute
+                roles={["teacher"]}
+                element={<CreateQuestionPage />}
+              />
+            }
+          />
+          <Route
+            path="/qna/:id"
+            element={
+              <PrivateRoute
+                roles={["teacher"]}
+                element={<QuestionDetailPage />}
+              />
+            }
+          />
+          <Route
+            path="/qna/edit/:id"
+            element={
+              <PrivateRoute
+                roles={["teacher"]}
+                element={<EditQuestionPage />}
+              />
+            }
+          />
+          {/* 관리자 QnA 관리 라우트 */}
+          <Route
+            path="/admin/qna"
+            element={
+              <PrivateRoute roles={["admin"]} element={<AdminQnAPage />} />
             }
           />
           {/* 일치하는 경로가 없을 경우 404 페이지 표시 */}

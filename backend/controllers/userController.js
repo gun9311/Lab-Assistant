@@ -639,7 +639,208 @@ const deleteStudentByTeacher = async (req, res) => {
   }
 };
 
-// --- 추가 끝 ---
+// --- 일괄 처리 함수들 ---
+
+const bulkDeleteStudents = async (req, res) => {
+  const { studentIds } = req.body;
+  const { _id: teacherId } = req.user;
+
+  if (!Array.isArray(studentIds) || studentIds.length === 0) {
+    return res.status(400).send({ error: "삭제할 학생 ID 목록이 필요합니다." });
+  }
+
+  try {
+    // Note: 권한 확인 로직 추가 가능 (예: 이 교사가 생성한 학생들인지)
+    const result = await Student.deleteMany({ _id: { $in: studentIds } });
+
+    if (result.deletedCount === 0) {
+      logger.warn(
+        `Bulk delete by teacher ${teacherId} attempted, but no students found for IDs:`,
+        studentIds
+      );
+      return res.status(404).send({ error: "삭제할 학생을 찾을 수 없습니다." });
+    }
+
+    logger.info(
+      `Teacher ${teacherId} bulk deleted ${result.deletedCount} students.`
+    );
+    res.send({
+      message: `총 ${result.deletedCount}명의 학생 계정이 삭제되었습니다.`,
+    });
+  } catch (error) {
+    logger.error(
+      `Error during bulk student deletion by teacher ${teacherId}:`,
+      {
+        error: error.message,
+        stack: error.stack,
+      }
+    );
+    res
+      .status(500)
+      .send({ error: "학생 계정 일괄 삭제 중 오류가 발생했습니다." });
+  }
+};
+
+const bulkResetStudentPasswords = async (req, res) => {
+  const { studentIds } = req.body;
+  const { _id: teacherId } = req.user;
+  const defaultPassword = "123";
+
+  if (!Array.isArray(studentIds) || studentIds.length === 0) {
+    return res
+      .status(400)
+      .send({ error: "비밀번호를 초기화할 학생 ID 목록이 필요합니다." });
+  }
+
+  try {
+    // updateMany는 pre-save 훅을 트리거하지 않으므로 직접 해싱
+    const hashedPassword = await bcrypt.hash(defaultPassword, 10);
+
+    const result = await Student.updateMany(
+      { _id: { $in: studentIds } },
+      { $set: { password: hashedPassword } }
+    );
+
+    if (result.matchedCount === 0) {
+      logger.warn(
+        `Bulk password reset by teacher ${teacherId} attempted, but no students found for IDs:`,
+        studentIds
+      );
+      return res
+        .status(404)
+        .send({ error: "비밀번호를 초기화할 학생을 찾을 수 없습니다." });
+    }
+
+    logger.info(
+      `Teacher ${teacherId} bulk reset passwords for ${result.modifiedCount} students.`
+    );
+    res.send({
+      message: `총 ${result.modifiedCount}명의 학생 비밀번호가 초기화되었습니다.`,
+    });
+  } catch (error) {
+    logger.error(
+      `Error during bulk student password reset by teacher ${teacherId}:`,
+      {
+        error: error.message,
+        stack: error.stack,
+      }
+    );
+    res
+      .status(500)
+      .send({ error: "비밀번호 일괄 초기화 중 오류가 발생했습니다." });
+  }
+};
+
+const bulkUpdateStudentInfo = async (req, res) => {
+  const {
+    currentIdentifier,
+    currentGrade,
+    currentClassNum,
+    newIdentifier,
+    newClassNum,
+  } = req.body;
+  const { _id: teacherId } = req.user;
+
+  if ((!newIdentifier && !newClassNum) || (newIdentifier && newClassNum)) {
+    return res
+      .status(400)
+      .send({ error: "식별코드 또는 반 정보 중 하나만 변경할 수 있습니다." });
+  }
+
+  try {
+    const teacher = await Teacher.findById(teacherId).select("school").lean();
+    if (!teacher || !teacher.school) {
+      return res
+        .status(403)
+        .send({ error: "교사 정보를 찾을 수 없거나 학교 정보가 없습니다." });
+    }
+    const schoolName = teacher.school;
+    const schoolPrefix = getSchoolPrefix(schoolName);
+    const expectedLoginIdPrefix = `${currentIdentifier}${schoolPrefix}${currentGrade}${currentClassNum}`;
+
+    const studentsToUpdate = await Student.find({
+      school: schoolName,
+      grade: currentGrade,
+      class: currentClassNum,
+      loginId: { $regex: `^${expectedLoginIdPrefix}` },
+    });
+
+    if (studentsToUpdate.length === 0) {
+      return res
+        .status(404)
+        .send({ error: "일괄 변경 대상 학생을 찾을 수 없습니다." });
+    }
+
+    const finalIdentifier = newIdentifier || currentIdentifier;
+    const finalClassNum = newClassNum || currentClassNum;
+
+    // Generate new login IDs and check for duplicates within the batch
+    const newLoginIds = new Set();
+    const bulkOps = studentsToUpdate.map((student) => {
+      const paddedStudentId = student.studentId.padStart(2, "0");
+      const newLoginId = `${finalIdentifier}${schoolPrefix}${currentGrade}${finalClassNum}${paddedStudentId}`;
+      newLoginIds.add(newLoginId);
+
+      const updateData = { loginId: newLoginId };
+      if (newClassNum) {
+        updateData.class = newClassNum;
+      }
+
+      return {
+        updateOne: {
+          filter: { _id: student._id },
+          update: { $set: updateData },
+        },
+      };
+    });
+
+    if (newLoginIds.size !== studentsToUpdate.length) {
+      logger.warn(
+        `Bulk update by teacher ${teacherId} failed due to internal loginId collision.`
+      );
+      return res
+        .status(400)
+        .send({
+          error: "변경 후 학생 아이디가 중복됩니다. 일괄 변경을 취소합니다.",
+        });
+    }
+
+    // Check for duplicates in the database (outside the current batch)
+    const existingStudentsCount = await Student.countDocuments({
+      loginId: { $in: Array.from(newLoginIds) },
+      _id: { $nin: studentsToUpdate.map((s) => s._id) },
+    });
+
+    if (existingStudentsCount > 0) {
+      logger.warn(
+        `Bulk update by teacher ${teacherId} failed due to existing loginId collision.`
+      );
+      return res.status(400).send({
+        error:
+          "변경하려는 정보가 다른 학생의 아이디와 충돌합니다. 일괄 변경을 취소합니다.",
+      });
+    }
+
+    // Perform bulk write operation
+    await Student.bulkWrite(bulkOps);
+
+    logger.info(
+      `Successfully updated info for ${studentsToUpdate.length} students by teacher ${teacherId}.`
+    );
+    res.send({
+      message: `총 ${studentsToUpdate.length}명 학생의 정보가 성공적으로 변경되었습니다.`,
+    });
+  } catch (error) {
+    logger.error(
+      `Error during bulk student info update by teacher ${teacherId}:`,
+      {
+        error: error.message,
+        stack: error.stack,
+      }
+    );
+    res.status(500).send({ error: "정보 일괄 변경 중 오류가 발생했습니다." });
+  }
+};
 
 module.exports = {
   getStudents,
@@ -652,4 +853,8 @@ module.exports = {
   updateStudentByTeacher,
   resetStudentPasswordByTeacher,
   deleteStudentByTeacher,
+  // --- 새 일괄 처리 함수 export ---
+  bulkDeleteStudents,
+  bulkResetStudentPasswords,
+  bulkUpdateStudentInfo,
 };

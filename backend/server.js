@@ -20,6 +20,7 @@ const adminRoutes = require("./routes/adminRoutes");
 const subjectRoutes = require("./routes/subjectRoutes");
 const reportRoutes = require("./routes/reportRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
+const qnaRoutes = require("./routes/qnaRoutes"); // QnA 라우트 추가
 // const ChatSummary = require("./models/ChatSummary"); // 현재 사용되지 않음
 // const cron = require("node-cron"); // 현재 사용되지 않음
 const { redisClient } = require("./utils/redisClient"); // redisClient만 가져오도록 수정 (subscriberClient는 kahootShared에서 사용)
@@ -106,6 +107,7 @@ app.use("/api/report", reportRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/kahoot-quiz", kahootQuizRoutes);
 app.use("/api/time", timeRoutes);
+app.use("/api/qna", qnaRoutes); // QnA 라우트 등록
 
 const serverPort = process.env.PORT || config.serverConfig.DEFAULT_PORT;
 
