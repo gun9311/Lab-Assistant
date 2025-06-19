@@ -107,7 +107,7 @@ const AnnouncementModal: React.FC<AnnouncementModalProps> = ({
               </ListItemIcon>
               <ListItemText
                 primaryTypographyProps={{ fontWeight: "bold", mb: 0.5 }}
-                primary="평어 내용, 겹칠 걱정 없이 사용하세요"
+                primary="평어 내용, 겹칠 걱정 없이 사용하세요."
                 secondary={
                   <>
                     <Typography
@@ -132,7 +132,7 @@ const AnnouncementModal: React.FC<AnnouncementModalProps> = ({
                       variant="body2"
                       color="text.secondary"
                     >
-                      - 3개 단원 조합 시: 30 × 30 × 30 = 27,00개
+                      - 3개 단원 조합 시: 30 × 30 × 30 = 2,700개
                     </Typography>
                     <Typography
                       component="span"
