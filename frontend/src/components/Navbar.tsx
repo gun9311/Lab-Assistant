@@ -33,6 +33,7 @@ import {
   CheckCircle,
   Done,
   NotificationsActive,
+  HelpOutline,
 } from "@mui/icons-material";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useChatbotContext } from "../contexts/ChatbotContext";
@@ -377,8 +378,36 @@ const Navbar: React.FC<{ role: string; isQuizMode: boolean }> = ({
                   )}
                 </Box>
               </Box>
-              {/* 오른쪽: 알림 및 프로필 */}
+              {/* 오른쪽: QnA, 알림 및 프로필 */}
               <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                {/* 교사용 QnA 버튼 */}
+                {role === "teacher" && (
+                  <IconButton
+                    onClick={() => navigate("/qna")}
+                    aria-label="문의하기"
+                    sx={{
+                      transition: "all 0.2s ease",
+                      "&:hover": { transform: "scale(1.1)" },
+                    }}
+                  >
+                    <HelpOutline sx={{ fontSize: 28 }} />
+                  </IconButton>
+                )}
+
+                {/* 관리자용 QnA 관리 버튼 */}
+                {role === "admin" && (
+                  <IconButton
+                    onClick={() => navigate("/admin/qna")}
+                    aria-label="QnA 관리"
+                    sx={{
+                      transition: "all 0.2s ease",
+                      "&:hover": { transform: "scale(1.1)" },
+                    }}
+                  >
+                    <HelpOutline sx={{ fontSize: 28 }} />
+                  </IconButton>
+                )}
+
                 <IconButton
                   onClick={handleNotificationClick}
                   aria-label="알림"
@@ -591,6 +620,9 @@ const Navbar: React.FC<{ role: string; isQuizMode: boolean }> = ({
             handleClose();
           }}
         >
+          <ListItemIcon>
+            <Person sx={{ fontSize: 18 }} />
+          </ListItemIcon>
           내 프로필
         </MenuItem>
         <MenuItem
@@ -599,10 +631,10 @@ const Navbar: React.FC<{ role: string; isQuizMode: boolean }> = ({
             handleClose();
           }}
         >
-          로그아웃
           <ListItemIcon>
             <Logout sx={{ fontSize: 18 }} />
           </ListItemIcon>
+          로그아웃
         </MenuItem>
       </Menu>
 

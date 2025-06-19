@@ -53,6 +53,9 @@ const QuizFilter: React.FC<QuizFilterProps> = ({
   const [subjects, setSubjects] = useState<string[]>([]);
   const [searchInput, setSearchInput] = useState(titleFilter || "");
 
+  // 검색이 활성화되어 있는지 확인
+  const isSearchActive = !!searchInput.trim();
+
   useEffect(() => {
     const timer = setTimeout(() => {
       setTitleFilter(searchInput.trim() || null);
@@ -65,9 +68,68 @@ const QuizFilter: React.FC<QuizFilterProps> = ({
     setSearchInput(titleFilter || "");
   }, [titleFilter]);
 
+  // 검색 시작할 때 필터들 자동 초기화
+  useEffect(() => {
+    if (isSearchActive) {
+      // 검색이 활성화되면 모든 필터를 초기화
+      if (gradeFilter || semesterFilter || subjectFilter || unitFilter) {
+        setGradeFilter(null);
+        setSemesterFilter(null);
+        setSubjectFilter(null);
+        setUnitFilter(null);
+      }
+    }
+  }, [
+    isSearchActive,
+    gradeFilter,
+    semesterFilter,
+    subjectFilter,
+    unitFilter,
+    setGradeFilter,
+    setSemesterFilter,
+    setSubjectFilter,
+    setUnitFilter,
+  ]);
+
   const handleClearSearch = () => {
     setSearchInput("");
     setTitleFilter(null);
+  };
+
+  // 필터 변경 시 검색 초기화
+  const handleGradeChange = (value: number | null) => {
+    setGradeFilter(value);
+    setUnitFilter(null);
+    if (value) {
+      setSearchInput("");
+      setTitleFilter(null);
+    }
+  };
+
+  const handleSemesterChange = (value: string | null) => {
+    setSemesterFilter(value);
+    setUnitFilter(null);
+    if (value) {
+      setSearchInput("");
+      setTitleFilter(null);
+    }
+  };
+
+  const handleSubjectChange = (value: string | null) => {
+    setSubjectFilter(value);
+    setUnitFilter(null);
+    if (value) {
+      setSearchInput("");
+      setTitleFilter(null);
+    }
+  };
+
+  const handleUnitChange = (value: string | null) => {
+    setUnitFilter(value);
+    if (value) {
+      setSearchInput("");
+      setTitleFilter(null);
+    }
   };
 
   useEffect(() => {
@@ -105,7 +167,7 @@ const QuizFilter: React.FC<QuizFilterProps> = ({
       }}
     >
       <Grid container spacing={2} alignItems="center">
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={12} sm={6} md={2.5}>
           <TextField
             fullWidth
             label="제목 검색"
@@ -134,21 +196,31 @@ const QuizFilter: React.FC<QuizFilterProps> = ({
           />
         </Grid>
 
-        <Grid item xs={12} sm={6} md={2}>
+        <Grid item xs={12} sm={6} md={1.8}>
           <FormControl fullWidth>
-            <InputLabel>학년</InputLabel>
-            <Tooltip title="학년 필터">
+            <InputLabel sx={{ color: isSearchActive ? "#BDBDBD" : "inherit" }}>
+              학년
+            </InputLabel>
+            <Tooltip title={isSearchActive ? "검색 사용 중" : "학년 필터"}>
               <Select
                 value={gradeFilter ?? ""}
                 onChange={(e) => {
-                  setGradeFilter(
+                  handleGradeChange(
                     e.target.value ? Number(e.target.value) : null
                   );
-                  setUnitFilter(null);
                 }}
+                disabled={isSearchActive}
                 startAdornment={
-                  <SchoolIcon sx={{ marginRight: "8px", color: "#FFC107" }} />
+                  <SchoolIcon
+                    sx={{
+                      marginRight: "8px",
+                      color: isSearchActive ? "#E0E0E0" : "#FFC107",
+                    }}
+                  />
                 }
+                sx={{
+                  backgroundColor: isSearchActive ? "#f5f5f5" : "inherit",
+                }}
               >
                 <MenuItem value="">
                   <em>전체</em>
@@ -164,21 +236,29 @@ const QuizFilter: React.FC<QuizFilterProps> = ({
           </FormControl>
         </Grid>
 
-        <Grid item xs={12} sm={6} md={2}>
+        <Grid item xs={12} sm={6} md={1.8}>
           <FormControl fullWidth>
-            <InputLabel>학기</InputLabel>
-            <Tooltip title="학기 필터">
+            <InputLabel sx={{ color: isSearchActive ? "#BDBDBD" : "inherit" }}>
+              학기
+            </InputLabel>
+            <Tooltip title={isSearchActive ? "검색 사용 중" : "학기 필터"}>
               <Select
                 value={semesterFilter ?? ""}
                 onChange={(e) => {
-                  setSemesterFilter(e.target.value || null);
-                  setUnitFilter(null);
+                  handleSemesterChange(e.target.value || null);
                 }}
+                disabled={isSearchActive}
                 startAdornment={
                   <CalendarTodayIcon
-                    sx={{ marginRight: "8px", color: "#FF9800" }}
+                    sx={{
+                      marginRight: "8px",
+                      color: isSearchActive ? "#E0E0E0" : "#FF9800",
+                    }}
                   />
                 }
+                sx={{
+                  backgroundColor: isSearchActive ? "#f5f5f5" : "inherit",
+                }}
               >
                 <MenuItem value="">
                   <em>전체</em>
@@ -190,19 +270,29 @@ const QuizFilter: React.FC<QuizFilterProps> = ({
           </FormControl>
         </Grid>
 
-        <Grid item xs={12} sm={6} md={2}>
+        <Grid item xs={12} sm={6} md={1.8}>
           <FormControl fullWidth>
-            <InputLabel>과목</InputLabel>
-            <Tooltip title="과목 필터">
+            <InputLabel sx={{ color: isSearchActive ? "#BDBDBD" : "inherit" }}>
+              과목
+            </InputLabel>
+            <Tooltip title={isSearchActive ? "검색 사용 중" : "과목 필터"}>
               <Select
                 value={subjectFilter ?? ""}
                 onChange={(e) => {
-                  setSubjectFilter(e.target.value || null);
-                  setUnitFilter(null);
+                  handleSubjectChange(e.target.value || null);
                 }}
+                disabled={isSearchActive}
                 startAdornment={
-                  <SubjectIcon sx={{ marginRight: "8px", color: "#8BC34A" }} />
+                  <SubjectIcon
+                    sx={{
+                      marginRight: "8px",
+                      color: isSearchActive ? "#E0E0E0" : "#8BC34A",
+                    }}
+                  />
                 }
+                sx={{
+                  backgroundColor: isSearchActive ? "#f5f5f5" : "inherit",
+                }}
               >
                 <MenuItem value="">
                   <em>전체</em>
@@ -219,15 +309,25 @@ const QuizFilter: React.FC<QuizFilterProps> = ({
 
         <Grid item xs={12} sm={6} md={2.5}>
           <FormControl fullWidth>
-            <InputLabel>단원(영역)</InputLabel>
-            <Tooltip title="단원 필터">
+            <InputLabel sx={{ color: isSearchActive ? "#BDBDBD" : "inherit" }}>
+              단원(영역)
+            </InputLabel>
+            <Tooltip title={isSearchActive ? "검색 사용 중" : "단원 필터"}>
               <Select
                 value={unitFilter ?? ""}
-                onChange={(e) => setUnitFilter(e.target.value || null)}
-                disabled={!units.length}
+                onChange={(e) => handleUnitChange(e.target.value || null)}
+                disabled={!units.length || isSearchActive}
                 startAdornment={
-                  <ListIcon sx={{ marginRight: "8px", color: "#03A9F4" }} />
+                  <ListIcon
+                    sx={{
+                      marginRight: "8px",
+                      color: isSearchActive ? "#E0E0E0" : "#03A9F4",
+                    }}
+                  />
                 }
+                sx={{
+                  backgroundColor: isSearchActive ? "#f5f5f5" : "inherit",
+                }}
               >
                 <MenuItem value="">
                   <em>전체</em>
@@ -243,7 +343,7 @@ const QuizFilter: React.FC<QuizFilterProps> = ({
           </FormControl>
         </Grid>
 
-        <Grid item xs={12} sm={6} md={1.5}>
+        <Grid item xs={12} sm={6} md={1.6}>
           <FormControl fullWidth>
             <InputLabel>정렬 기준</InputLabel>
             <Tooltip title="정렬 기준 선택">

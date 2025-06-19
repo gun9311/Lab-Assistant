@@ -486,6 +486,7 @@ const registerStudentByTeacher = async (req, res) => {
           grade: studentData.grade,
           class: studentData.studentClass,
           school: studentData.school,
+          createdByTeacher: teacherId, // 생성한 교사 ID 추가
         };
       })
     );
