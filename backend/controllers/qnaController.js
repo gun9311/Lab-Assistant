@@ -494,8 +494,13 @@ const sendAnswerNotification = async (question, answer) => {
       for (const token of tokens) {
         try {
           await sendNotification(token, {
-            title: "QnA 답변 알림",
+            title: "Q&A 답변 알림",
             body: `"${question.title}" 질문에 대한 답변이 등록되었습니다.`,
+            data: {
+              notificationId: notification._id.toString(),
+              type: "qna_answer",
+              questionId: question._id.toString(),
+            },
           });
         } catch (error) {
           logger.warn("Failed to send FCM notification:", {

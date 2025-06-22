@@ -63,7 +63,7 @@ const AnnouncementModal: React.FC<AnnouncementModalProps> = ({
             gutterBottom
             sx={{ fontWeight: "bold" }}
           >
-            NUDGE 주요 업데이트 안내
+            NUDGE 공지사항
           </Typography>
           <Divider sx={{ my: 2 }} />
           <List sx={{ width: "100%", bgcolor: "background.paper" }}>

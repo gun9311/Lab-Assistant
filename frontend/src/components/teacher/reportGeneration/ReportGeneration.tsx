@@ -32,6 +32,8 @@ import {
   AccordionDetails,
   Grid,
   useTheme,
+  Tooltip,
+  IconButton,
 } from "@mui/material";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import FilterListIcon from "@mui/icons-material/FilterList";
@@ -42,16 +44,23 @@ import Filter1Icon from "@mui/icons-material/Filter1";
 import Filter2Icon from "@mui/icons-material/Filter2";
 import Filter3Icon from "@mui/icons-material/Filter3";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import LibraryBooksIcon from "@mui/icons-material/LibraryBooks";
 import MenuBookIcon from "@mui/icons-material/MenuBook";
 import EditNoteIcon from "@mui/icons-material/EditNote";
 import ManageSearchIcon from "@mui/icons-material/ManageSearch";
 import { Avatar } from "@mui/material";
+import { Link as RouterLink } from "react-router-dom";
 import SemesterSelect from "./SemesterSelect";
 import SubjectSelect from "./SubjectSelect";
 import StudentSelect from "./StudentSelect";
 import UnitSelect from "./UnitSelect";
-import api, { getSubjects, updateReportComment } from "../../../utils/api";
+import api, {
+  getSubjects,
+  updateReportComment,
+  getUnitRatings,
+} from "../../../utils/api";
 import ReportComponent from "./ReportComponent";
+import UnitRatingsPreviewModal from "./UnitRatingsPreviewModal";
 
 // 새로운 하위 컴포넌트 임포트
 import StepTargetForm from "./StepTargetForm";
@@ -85,6 +94,18 @@ type FetchedUnitsType = {
 // 타입 정의 추가: 과목별, 학기별 선택된 단원
 type SelectedUnitsType = {
   [subject: string]: UnitsBySemester;
+};
+
+type Rating = {
+  level: "상" | "중" | "하";
+  comments: string[];
+};
+
+type PreviewData = {
+  subjectName: string;
+  semester: string;
+  unitName: string;
+  ratings: Rating[];
 };
 
 const generationSteps_new = [
@@ -162,6 +183,9 @@ const ReportGeneration: React.FC<ReportGenerationProps> = ({
   const [activeStep, setActiveStep] = useState(0);
   const [isGenerating, setIsGenerating] = useState(false);
   const [availableSubjects, setAvailableSubjects] = useState<string[]>([]);
+  const [isRatingsModalOpen, setRatingsModalOpen] = useState(false);
+  const [ratingsPreviewData, setRatingsPreviewData] =
+    useState<PreviewData | null>(null);
 
   const steps = tabValue === 0 ? generationSteps_new : querySteps_new;
 
@@ -514,6 +538,34 @@ const ReportGeneration: React.FC<ReportGenerationProps> = ({
     resetSelectionsForNewTab();
   };
 
+  const handlePreviewRatings = async (
+    subject: string,
+    semester: string,
+    unitName: string
+  ) => {
+    if (!grade) {
+      setSnackbarMessage("학년 정보가 없어 평어를 조회할 수 없습니다.");
+      setSnackbarSeverity("error");
+      setSnackbarOpen(true);
+      return;
+    }
+    try {
+      const response = await getUnitRatings(grade, semester, subject, unitName);
+      setRatingsPreviewData({
+        subjectName: subject,
+        semester: semester,
+        unitName: unitName,
+        ratings: response.data,
+      });
+      setRatingsModalOpen(true);
+    } catch (error) {
+      console.error("Failed to fetch unit ratings:", error);
+      setSnackbarMessage("평어 미리보기를 불러오는 데 실패했습니다.");
+      setSnackbarSeverity("error");
+      setSnackbarOpen(true);
+    }
+  };
+
   const getStepContent = (step: number) => {
     if (tabValue === 0) {
       switch (step) {
@@ -589,6 +641,7 @@ const ReportGeneration: React.FC<ReportGenerationProps> = ({
                   },
                 }));
               }}
+              handleUnitPreview={handlePreviewRatings}
               grade={grade}
               isGeneratingUnits={
                 isGenerating &&
@@ -684,9 +737,19 @@ const ReportGeneration: React.FC<ReportGenerationProps> = ({
   return (
     <Fade in={true} timeout={500}>
       <Box sx={{ padding: { xs: "0", sm: "0 16px" }, mt: 2 }}>
+        <UnitRatingsPreviewModal
+          open={isRatingsModalOpen}
+          onClose={() => setRatingsModalOpen(false)}
+          previewData={ratingsPreviewData}
+        />
         <Paper
           elevation={2}
-          sx={{ borderRadius: 2, overflow: "hidden", mb: 3 }}
+          sx={{
+            borderRadius: 2,
+            overflow: "hidden",
+            mb: 3,
+            position: "relative",
+          }}
         >
           <Tabs
             value={tabValue}
@@ -739,6 +802,21 @@ const ReportGeneration: React.FC<ReportGenerationProps> = ({
               }}
             />
           </Tabs>
+          <Tooltip title="평어 라이브러리">
+            <IconButton
+              component={RouterLink}
+              to="/library"
+              sx={{
+                position: "absolute",
+                top: "50%",
+                right: 16,
+                transform: "translateY(-50%)",
+                color: "action.active",
+              }}
+            >
+              <LibraryBooksIcon />
+            </IconButton>
+          </Tooltip>
         </Paper>
 
         <Paper

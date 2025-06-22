@@ -10,14 +10,17 @@ import {
   Box,
   Chip,
   Tooltip,
+  IconButton,
 } from "@mui/material";
 import { SelectChangeEvent } from "@mui/material/Select";
+import VisibilityIcon from "@mui/icons-material/Visibility";
 
 type UnitSelectProps = {
   subject: string;
   units: string[];
   selectedUnits: string[];
   handleUnitChange: (event: SelectChangeEvent<string[]>) => void;
+  onPreview: (unitName: string) => void;
   sx?: object;
 };
 
@@ -26,6 +29,7 @@ const UnitSelect: React.FC<UnitSelectProps> = ({
   units,
   selectedUnits,
   handleUnitChange,
+  onPreview,
   sx,
 }) => {
   return (
@@ -82,6 +86,9 @@ const UnitSelect: React.FC<UnitSelectProps> = ({
                 key={unit}
                 value={unit}
                 sx={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
                   borderRadius: 1,
                   mx: 1,
                   my: 0.5,
@@ -91,15 +98,32 @@ const UnitSelect: React.FC<UnitSelectProps> = ({
                   },
                 }}
               >
-                <Checkbox checked={selectedUnits.includes(unit)} size="small" />
-                <ListItemText
-                  primary={unit}
-                  primaryTypographyProps={{
-                    variant: "body2",
-                    noWrap: true,
-                    title: unit,
-                  }}
-                />
+                <Box sx={{ display: "flex", alignItems: "center" }}>
+                  <Checkbox
+                    checked={selectedUnits.includes(unit)}
+                    size="small"
+                  />
+                  <ListItemText
+                    primary={unit}
+                    primaryTypographyProps={{
+                      variant: "body2",
+                      noWrap: true,
+                      title: unit,
+                    }}
+                  />
+                </Box>
+                <Tooltip title="평어 내용 미리보기">
+                  <IconButton
+                    size="small"
+                    onClick={(e) => {
+                      e.stopPropagation(); // 메뉴가 닫히는 것을 방지
+                      onPreview(unit);
+                    }}
+                    sx={{ ml: 1 }}
+                  >
+                    <VisibilityIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
               </MenuItem>
             ))
           ) : (

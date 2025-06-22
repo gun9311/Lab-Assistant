@@ -55,6 +55,11 @@ type GenerationStepConditionFormProps = {
     semester: string,
     event: SelectChangeEvent<string[]>
   ) => void;
+  handleUnitPreview: (
+    subject: string,
+    semester: string,
+    unitName: string
+  ) => void;
   grade: number | null;
   isGeneratingUnits: boolean; // Renamed from isGenerating for clarity
 };
@@ -73,6 +78,7 @@ const GenerationStepConditionForm: React.FC<
   fetchedUnits,
   selectedUnits,
   handleUnitChange,
+  handleUnitPreview,
   grade,
   isGeneratingUnits,
 }) => {
@@ -258,6 +264,13 @@ const GenerationStepConditionForm: React.FC<
                                     }
                                     handleUnitChange={(e) =>
                                       handleUnitChange(subject, semester, e)
+                                    }
+                                    onPreview={(unitName) =>
+                                      handleUnitPreview(
+                                        subject,
+                                        semester,
+                                        unitName
+                                      )
                                     }
                                   />
                                   <Typography

@@ -98,7 +98,7 @@ const QuestionComponent: React.FC<QuestionComponentProps> = ({
             maxWidth: "100%",
             maxHeight: shouldShowOptions ? "35vh" : "45vh",
             marginTop: shouldShowOptions ? "1vh" : "8vh",
-            // marginBottom: shouldShowOptions ? "1vh" : "3vh",
+            marginBottom: shouldShowOptions ? "1vh" : "3vh",
             borderRadius: "8px",
             objectFit: "contain",
             transition: "all 0.5s ease-in-out",

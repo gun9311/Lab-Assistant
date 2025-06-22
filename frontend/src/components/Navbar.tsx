@@ -37,7 +37,10 @@ import {
 } from "@mui/icons-material";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useChatbotContext } from "../contexts/ChatbotContext";
-import { useNotificationContext } from "../contexts/NotificationContext";
+import {
+  useNotificationContext,
+  Notification,
+} from "../contexts/NotificationContext";
 import { clearAuth, getUserId } from "../utils/auth";
 import logo from "../assets/nudge-navlogo.png";
 import apiNoAuth from "../utils/apiNoAuth";
@@ -73,6 +76,24 @@ const Navbar: React.FC<{ role: string; isQuizMode: boolean }> = ({
   const [notificationAnchorEl, setNotificationAnchorEl] =
     useState<null | HTMLElement>(null);
   const notificationOpen = Boolean(notificationAnchorEl);
+
+  const clearTeacherFilters = () => {
+    sessionStorage.removeItem("teacherHomePageState");
+  };
+
+  const handleNotificationItemClick = (notification: Notification) => {
+    markAsRead(notification._id);
+    handleNotificationClose();
+
+    if (notification.type === "qna_answer" && notification.data?.questionId) {
+      navigate(`/qna/${notification.data.questionId}`);
+    } else if (notification.type === "report_generated") {
+      sessionStorage.setItem("teacherHomePageTab", "reports");
+      navigate("/teacher");
+    } else {
+      navigate("/notifications");
+    }
+  };
 
   // 현재 경로에 따라 선택된 메뉴 설정
   useEffect(() => {
@@ -118,6 +139,7 @@ const Navbar: React.FC<{ role: string; isQuizMode: boolean }> = ({
       return;
     }
 
+    clearTeacherFilters();
     setValue(newValue);
     switch (newValue) {
       case 0:
@@ -244,7 +266,10 @@ const Navbar: React.FC<{ role: string; isQuizMode: boolean }> = ({
                   src={logo}
                   alt="로고"
                   style={{ height: 40, marginRight: 8 }}
-                  onClick={() => navigate("/")}
+                  onClick={() => {
+                    clearTeacherFilters();
+                    navigate("/");
+                  }}
                 />
                 {/* 네비게이션 버튼 */}
                 <Box
@@ -383,7 +408,10 @@ const Navbar: React.FC<{ role: string; isQuizMode: boolean }> = ({
                 {/* 교사용 QnA 버튼 */}
                 {role === "teacher" && (
                   <IconButton
-                    onClick={() => navigate("/qna")}
+                    onClick={() => {
+                      clearTeacherFilters();
+                      navigate("/qna");
+                    }}
                     aria-label="문의하기"
                     sx={{
                       transition: "all 0.2s ease",
@@ -528,10 +556,7 @@ const Navbar: React.FC<{ role: string; isQuizMode: boolean }> = ({
             {notifications.map((notification) => (
               <MenuItem
                 key={notification._id}
-                onClick={() => {
-                  markAsRead(notification._id);
-                  handleNotificationClose();
-                }}
+                onClick={() => handleNotificationItemClick(notification)}
                 sx={{
                   mb: 1,
                   borderRadius: "12px",
@@ -616,6 +641,7 @@ const Navbar: React.FC<{ role: string; isQuizMode: boolean }> = ({
       >
         <MenuItem
           onClick={() => {
+            clearTeacherFilters();
             navigate("/profile");
             handleClose();
           }}

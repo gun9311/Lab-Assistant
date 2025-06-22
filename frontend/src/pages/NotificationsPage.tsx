@@ -14,8 +14,10 @@ import {
 } from "@mui/material";
 import { useNotificationContext } from "../contexts/NotificationContext";
 import { NotificationsActive, Done, CheckCircle } from "@mui/icons-material";
+import { useNavigate } from "react-router-dom";
 
 const NotificationsPage: React.FC = () => {
+  const navigate = useNavigate();
   const {
     notifications,
     markAsRead,
@@ -32,7 +34,27 @@ const NotificationsPage: React.FC = () => {
   }, [fetchNotifications]);
 
   const handleNotificationClick = (id: string) => {
+    const notification = notifications.find((n) => n._id === id);
+
     markAsRead(id);
+
+    if (!notification) return;
+
+    // 알림 종류에 따라 페이지 이동
+    switch (notification.type) {
+      case "qna_answer":
+        if (notification.data && notification.data.questionId) {
+          navigate(`/qna/${notification.data.questionId}`);
+        }
+        break;
+      case "report_generated":
+        sessionStorage.setItem("teacherHomePageTab", "reports");
+        navigate("/teacher");
+        break;
+      default:
+        // 특별한 이동이 없는 경우
+        break;
+    }
   };
 
   const handleMarkAllAsRead = async () => {

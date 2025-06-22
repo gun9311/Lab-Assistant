@@ -56,6 +56,7 @@ import CreateQuestionPage from "./components/teacher/qna/CreateQuestionPage";
 import QuestionDetailPage from "./components/teacher/qna/QuestionDetailPage";
 import AdminQnAPage from "./components/admin/qna/AdminQnAPage";
 import EditQuestionPage from "./components/teacher/qna/EditQuestionPage";
+import CommentLibraryPage from "./pages/library/CommentLibraryPage";
 
 // NotificationPayload 타입 정의
 type NotificationPayload = {
@@ -65,6 +66,8 @@ type NotificationPayload = {
   };
   data?: {
     notificationId?: string;
+    type?: string;
+    [key: string]: any;
   };
 };
 
@@ -197,10 +200,12 @@ const AppContent: React.FC = () => {
         setNotification(payload as NotificationPayload);
 
         addNotification({
-          _id: payload.data.notificationId,
+          _id: payload.data?.notificationId || `fg-${Date.now()}`,
           title: payload.notification.title,
           body: payload.notification.body,
           read: false,
+          type: payload.data?.type,
+          data: payload.data,
         });
       })
       .catch((err) =>
@@ -261,6 +266,15 @@ const AppContent: React.FC = () => {
             }
           />
           <Route
+            path="/library"
+            element={
+              <PrivateRoute
+                roles={["teacher"]}
+                element={<CommentLibraryPage />}
+              />
+            }
+          />
+          <Route
             path="/admin"
             element={
               <PrivateRoute roles={["admin"]} element={<AdminHomePage />} />
@@ -308,25 +322,25 @@ const AppContent: React.FC = () => {
           />
           <Route
             path="/my-quizzes"
-            element={<MyQuizzesPage setIsQuizMode={setIsQuizMode} />} // 기존 컴포넌트 주석 처리
-            // element={
-            //   <PrivateRoute
-            //     roles={["student"]}
-            //     element={
-            //       <StudentRouteGuard>
-            //         <ComingSoon />
-            //       </StudentRouteGuard>
-            //     }
-            //   />
-            // }
+            // element={<MyQuizzesPage setIsQuizMode={setIsQuizMode} />} // 기존 컴포넌트 주석 처리
+            element={
+              <PrivateRoute
+                roles={["student"]}
+                element={
+                  <StudentRouteGuard>
+                    <ComingSoon />
+                  </StudentRouteGuard>
+                }
+              />
+            }
           />
           <Route
             path="/manage-quizzes"
             element={
               <PrivateRoute
                 roles={["teacher"]}
-                element={<ManageQuizzesPage />} // 기존 컴포넌트 주석 처리
-                // element={<ComingSoon />} // ComingSoon 컴포넌트로 대체
+                // element={<ManageQuizzesPage />} // 기존 컴포넌트 주석 처리
+                element={<ComingSoon />} // ComingSoon 컴포넌트로 대체
               />
             }
           />
