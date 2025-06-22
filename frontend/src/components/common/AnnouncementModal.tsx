@@ -82,7 +82,7 @@ const AnnouncementModal: React.FC<AnnouncementModalProps> = ({
                     variant="body2"
                     color="text.secondary"
                   >
-                    '평어 생성/일괄조회'에 '평어 라이브러리' 버튼을 통해 평어
+                    '평어 생성/일괄조회' 탭에서 '평어 라이브러리' 버튼을 통해 평어
                     전문을 참고할 수 있습니다.
                   </Typography>
                 }
