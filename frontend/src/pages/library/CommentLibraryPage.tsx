@@ -25,12 +25,14 @@ import {
   FormControl as MuiFormControl,
   SelectChangeEvent,
   Stack,
+  Snackbar,
 } from "@mui/material";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import SearchIcon from "@mui/icons-material/Search";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import LibraryBooksIcon from "@mui/icons-material/LibraryBooks";
+import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import SubjectSelect from "../../components/teacher/reportGeneration/SubjectSelect";
 import SemesterSelect from "../../components/teacher/reportGeneration/SemesterSelect";
 import { getSubjects, getCommentsForLibrary } from "../../utils/api";
@@ -70,6 +72,8 @@ const CommentLibraryPage: React.FC = () => {
   const [results, setResults] = useState<LibraryResult[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [searched, setSearched] = useState<boolean>(false);
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState("");
 
   useEffect(() => {
     const fetchSubjectsForSelection = async () => {
@@ -131,6 +135,24 @@ const CommentLibraryPage: React.FC = () => {
     setResults([]);
     setAvailableSubjects([]);
     setSearched(false);
+  };
+
+  const handleCopy = (text: string) => {
+    navigator.clipboard.writeText(text).then(
+      () => {
+        setSnackbarMessage("클립보드에 복사되었습니다.");
+        setSnackbarOpen(true);
+      },
+      (err) => {
+        console.error("Could not copy text: ", err);
+        setSnackbarMessage("복사에 실패했습니다.");
+        setSnackbarOpen(true);
+      }
+    );
+  };
+
+  const handleCloseSnackbar = () => {
+    setSnackbarOpen(false);
   };
 
   return (
@@ -365,17 +387,30 @@ const CommentLibraryPage: React.FC = () => {
                                                     p: 1.5,
                                                     backgroundColor: "grey.50",
                                                     borderRadius: 1.5,
+                                                    display: "flex",
+                                                    justifyContent:
+                                                      "space-between",
+                                                    alignItems: "center",
                                                   }}
                                                 >
                                                   <Typography
                                                     variant="body2"
                                                     sx={{
-                                                      userSelect: "none",
                                                       lineHeight: 1.6,
+                                                      flexGrow: 1,
                                                     }}
                                                   >
                                                     {comment}
                                                   </Typography>
+                                                  <IconButton
+                                                    onClick={() =>
+                                                      handleCopy(comment)
+                                                    }
+                                                    size="small"
+                                                    sx={{ ml: 1 }}
+                                                  >
+                                                    <ContentCopyIcon fontSize="small" />
+                                                  </IconButton>
                                                 </Paper>
                                               )
                                             )}
@@ -396,6 +431,13 @@ const CommentLibraryPage: React.FC = () => {
           </Paper>
         </Grid>
       </Grid>
+      <Snackbar
+        open={snackbarOpen}
+        autoHideDuration={2000}
+        onClose={handleCloseSnackbar}
+        message={snackbarMessage}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      />
     </Container>
   );
 };
