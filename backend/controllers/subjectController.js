@@ -118,6 +118,183 @@ const getUnits = async (req, res) => {
   }
 };
 
+const getUnitRatings = async (req, res) => {
+  const { grade, semester, subjectName, unitName } = req.query;
+
+  if (!grade || !semester || !subjectName || !unitName) {
+    return res.status(400).send({
+      error: "모든 파라미터(학년, 학기, 과목명, 단원명)가 필요합니다.",
+    });
+  }
+
+  try {
+    const subject = await Subject.findOne({
+      grade: parseInt(grade),
+      semester,
+      name: subjectName,
+    });
+
+    if (!subject) {
+      return res.status(404).send({ error: "해당 과목을 찾을 수 없습니다." });
+    }
+
+    const unit = subject.units.find((u) => u.name === unitName);
+
+    if (!unit) {
+      return res.status(404).send({ error: "해당 단원을 찾을 수 없습니다." });
+    }
+
+    // 평어가 없는 경우 ratings는 빈 배열일 수 있음. 그대로 반환.
+    res.status(200).send(unit.ratings);
+  } catch (error) {
+    logger.error("Error fetching unit ratings:", error);
+    res
+      .status(500)
+      .send({ error: "단원 평어 정보를 불러오는데 실패했습니다." });
+  }
+};
+
+const getCommentsForLibrary = async (req, res) => {
+  const { grade, semesters, subjects, themes, keyword } = req.query;
+
+  try {
+    const pipeline = [];
+
+    // Stage 1: Initial Match
+    const initialMatch = {};
+    if (grade) initialMatch.grade = parseInt(grade);
+    if (semesters) initialMatch.semester = { $in: semesters.split(",") };
+    if (subjects) initialMatch.name = { $in: subjects.split(",") };
+    if (Object.keys(initialMatch).length > 0) {
+      pipeline.push({ $match: initialMatch });
+    }
+
+    // Unwind all necessary arrays to filter comments
+    pipeline.push({ $unwind: "$units" });
+    pipeline.push({ $unwind: "$units.ratings" });
+
+    // Stage 2: Filter by theme (level)
+    if (themes) {
+      const themeMap = {
+        "심화·응용": "상",
+        "성장·과정": "중",
+        "태도·잠재력": "하",
+      };
+      const dbThemes = themes
+        .split(",")
+        .map((t) => themeMap[t])
+        .filter(Boolean);
+      if (dbThemes.length > 0) {
+        pipeline.push({
+          $match: { "units.ratings.level": { $in: dbThemes } },
+        });
+      }
+    }
+
+    pipeline.push({ $unwind: "$units.ratings.comments" });
+
+    // Stage 3: Filter by keyword (case-insensitive)
+    if (keyword) {
+      pipeline.push({
+        $match: {
+          "units.ratings.comments": { $regex: keyword, $options: "i" },
+        },
+      });
+    }
+
+    // Stage 4: Grouping everything back together
+    pipeline.push({
+      $group: {
+        _id: {
+          subjectName: "$name",
+          semester: "$semester",
+          unitName: "$units.name",
+          level: "$units.ratings.level",
+        },
+        comments: { $push: "$units.ratings.comments" },
+      },
+    });
+
+    pipeline.push({
+      $group: {
+        _id: {
+          subjectName: "$_id.subjectName",
+          semester: "$_id.semester",
+          unitName: "$_id.unitName",
+        },
+        ratings: {
+          $push: {
+            level: "$_id.level",
+            comments: "$comments",
+          },
+        },
+      },
+    });
+
+    pipeline.push({ $sort: { "_id.unitName": 1 } });
+
+    pipeline.push({
+      $group: {
+        _id: {
+          subjectName: "$_id.subjectName",
+          semester: "$_id.semester",
+        },
+        units: {
+          $push: {
+            unitName: "$_id.unitName",
+            ratings: "$ratings",
+          },
+        },
+      },
+    });
+
+    pipeline.push({ $sort: { "_id.semester": 1 } });
+
+    pipeline.push({
+      $group: {
+        _id: "$_id.subjectName",
+        semesters: {
+          $push: {
+            semester: "$_id.semester",
+            units: "$units",
+          },
+        },
+      },
+    });
+
+    // Stage 5: Final projection and sort
+    const predefinedOrder = [
+      "국어",
+      "도덕",
+      "수학",
+      "과학",
+      "사회",
+      "영어",
+      "음악",
+      "미술",
+      "체육",
+      "실과",
+      "통합교과",
+    ];
+    pipeline.push({
+      $project: {
+        _id: 0,
+        subjectName: "$_id",
+        semesters: "$semesters",
+        sortOrder: { $indexOfArray: [predefinedOrder, "$_id"] },
+      },
+    });
+    pipeline.push({ $sort: { sortOrder: 1 } });
+    pipeline.push({ $project: { sortOrder: 0 } });
+
+    const results = await Subject.aggregate(pipeline);
+    res.status(200).send(results);
+  } catch (error) {
+    logger.error("Error fetching comments for library:", error);
+    res.status(500).send({ error: "평어 라이브러리 조회에 실패했습니다." });
+  }
+};
+
 // 여러 개의 유닛 추가
 const addUnits = async (req, res) => {
   const { subject, units } = req.body; // units는 배열로 받음
@@ -179,4 +356,6 @@ module.exports = {
   getUnits,
   addUnits,
   addUnitRating,
+  getUnitRatings,
+  getCommentsForLibrary,
 };

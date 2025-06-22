@@ -25,6 +25,7 @@ import {
   Stack,
   Tabs,
   Tab,
+  IconButton,
 } from "@mui/material";
 import SchoolIcon from "@mui/icons-material/School";
 import GradeIcon from "@mui/icons-material/Grade";
@@ -39,7 +40,9 @@ import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import ComingSoon from "../../components/common/ComingSoon";
 import GetAppIcon from "@mui/icons-material/GetApp";
+import LibraryBooksIcon from "@mui/icons-material/LibraryBooks";
 import AnnouncementModal from "../../components/common/AnnouncementModal";
+import { Link as RouterLink, useLocation } from "react-router-dom";
 
 type Student = {
   _id: number;
@@ -122,6 +125,7 @@ const TeacherHomePage: React.FC = () => {
   const school = getSchoolName();
   const theme = useTheme();
   const currentTabIndex = showReportGeneration ? 1 : 0;
+  const location = useLocation();
 
   const [isChromeBrowser, setIsChromeBrowser] = useState(false);
   const [canCommunicateWithExtension, setCanCommunicateWithExtension] =
@@ -172,6 +176,41 @@ const TeacherHomePage: React.FC = () => {
       setAnnouncementModalOpen(true);
     }
   }, []);
+
+  useEffect(() => {
+    // 페이지 로드 시 세션 스토리지에서 상태 복원
+    const savedStateJSON = sessionStorage.getItem("teacherHomePageState");
+    if (savedStateJSON) {
+      const savedState = JSON.parse(savedStateJSON);
+      setGrade(savedState.grade);
+      setClassNumber(savedState.classNumber);
+      setUniqueIdentifier(savedState.uniqueIdentifier);
+      setShowReportGeneration(savedState.showReportGeneration);
+    }
+
+    // 알림 클릭으로 인한 탭 상태 확인
+    const tabToSelect = sessionStorage.getItem("teacherHomePageTab");
+    if (tabToSelect === "reports") {
+      setShowReportGeneration(true);
+      sessionStorage.removeItem("teacherHomePageTab"); // 다시 트리거되지 않도록 정리
+    }
+  }, [location]);
+
+  useEffect(() => {
+    // 상태 변경 시 세션 스토리지에 저장
+    const stateToSave = {
+      grade,
+      classNumber,
+      uniqueIdentifier,
+      showReportGeneration,
+    };
+    if (grade || classNumber || uniqueIdentifier) {
+      sessionStorage.setItem(
+        "teacherHomePageState",
+        JSON.stringify(stateToSave)
+      );
+    }
+  }, [grade, classNumber, uniqueIdentifier, showReportGeneration]);
 
   useEffect(() => {
     const fetchStudents = async () => {
@@ -367,23 +406,25 @@ const TeacherHomePage: React.FC = () => {
             </Typography>
           </Grid>
           <Grid item>
-            <Button
-              variant="contained"
-              onClick={handleOpenModal}
-              startIcon={<AccountCircleIcon />}
-              sx={{
-                fontWeight: "bold",
-                py: 1,
-                px: 2,
-                backgroundColor: theme.palette.grey[700],
-                color: theme.palette.common.white,
-                "&:hover": {
-                  backgroundColor: theme.palette.grey[800],
-                },
-              }}
-            >
-              학생 계정 관리
-            </Button>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+              <Button
+                variant="contained"
+                onClick={handleOpenModal}
+                startIcon={<AccountCircleIcon />}
+                sx={{
+                  fontWeight: "bold",
+                  py: 1,
+                  px: 2,
+                  backgroundColor: theme.palette.grey[700],
+                  color: theme.palette.common.white,
+                  "&:hover": {
+                    backgroundColor: theme.palette.grey[800],
+                  },
+                }}
+              >
+                학생 계정 관리
+              </Button>
+            </Box>
           </Grid>
         </Grid>
         <UnifiedModal
@@ -467,39 +508,41 @@ const TeacherHomePage: React.FC = () => {
             </Stack>
           </Grid>
           <Grid item xs={12} md="auto">
-            <Tabs
-              value={currentTabIndex}
-              onChange={handleTabChange}
-              aria-label="view tabs"
-              indicatorColor="primary"
-            >
-              <Tab
-                icon={<DashboardIcon />}
-                iconPosition="start"
-                label="대시보드"
-                sx={{
-                  textTransform: "none",
-                  minHeight: "48px",
-                  color: theme.palette.grey[500],
-                  "&.Mui-selected": {
-                    color: theme.palette.primary.main,
-                  },
-                }}
-              />
-              <Tab
-                icon={<AssessmentIcon />}
-                iconPosition="start"
-                label="평어 생성/일괄조회"
-                sx={{
-                  textTransform: "none",
-                  minHeight: "48px",
-                  color: theme.palette.grey[500],
-                  "&.Mui-selected": {
-                    color: theme.palette.primary.main,
-                  },
-                }}
-              />
-            </Tabs>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+              <Tabs
+                value={currentTabIndex}
+                onChange={handleTabChange}
+                aria-label="view tabs"
+                indicatorColor="primary"
+              >
+                <Tab
+                  icon={<DashboardIcon />}
+                  iconPosition="start"
+                  label="대시보드"
+                  sx={{
+                    textTransform: "none",
+                    minHeight: "48px",
+                    color: theme.palette.grey[500],
+                    "&.Mui-selected": {
+                      color: theme.palette.primary.main,
+                    },
+                  }}
+                />
+                <Tab
+                  icon={<AssessmentIcon />}
+                  iconPosition="start"
+                  label="평어 생성/일괄조회"
+                  sx={{
+                    textTransform: "none",
+                    minHeight: "48px",
+                    color: theme.palette.grey[500],
+                    "&.Mui-selected": {
+                      color: theme.palette.primary.main,
+                    },
+                  }}
+                />
+              </Tabs>
+            </Box>
           </Grid>
         </Grid>
         <StudentRegistrationResultModal

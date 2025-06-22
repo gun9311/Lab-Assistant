@@ -12,6 +12,28 @@ export interface ChatUsageData {
   monthlyRemaining: number;
 }
 
+export interface LibraryFilters {
+  grade?: number | null;
+  semesters?: string[];
+  subjects?: string[];
+  themes?: string[];
+  keyword?: string;
+}
+
+export interface LibraryResult {
+  subjectName: string;
+  semesters: {
+    semester: string;
+    units: {
+      unitName: string;
+      ratings: {
+        level: "상" | "중" | "하";
+        comments: string[];
+      }[];
+    }[];
+  }[];
+}
+
 const api = axios.create({
   baseURL: process.env.REACT_APP_API_URL,
   headers: {
@@ -101,6 +123,46 @@ export const updateReportComment = (
   comment: string
 ): Promise<{ data: any }> => // data 타입을 실제 반환 타입에 맞게 수정할 수 있음
   api.put(`/report/comment/${reportId}`, { comment });
+
+export const getUnitRatings = (
+  grade: number,
+  semester: string,
+  subjectName: string,
+  unitName: string
+): Promise<{ data: { level: "상" | "중" | "하"; comments: string[] }[] }> => {
+  return api.get("/subjects/unit-ratings", {
+    params: {
+      grade,
+      semester,
+      subjectName,
+      unitName,
+    },
+  });
+};
+
+export const getCommentsForLibrary = (
+  filters: LibraryFilters
+): Promise<{ data: LibraryResult[] }> => {
+  // URLSearchParams를 사용하여 빈 값은 보내지 않도록 처리
+  const params = new URLSearchParams();
+  if (filters.grade) {
+    params.append("grade", String(filters.grade));
+  }
+  if (filters.semesters && filters.semesters.length > 0) {
+    params.append("semesters", filters.semesters.join(","));
+  }
+  if (filters.subjects && filters.subjects.length > 0) {
+    params.append("subjects", filters.subjects.join(","));
+  }
+  if (filters.themes && filters.themes.length > 0) {
+    params.append("themes", filters.themes.join(","));
+  }
+  if (filters.keyword) {
+    params.append("keyword", filters.keyword);
+  }
+
+  return api.get("/subjects/library", { params });
+};
 
 // --- 추가된 함수 끝 ---
 

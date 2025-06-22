@@ -8,11 +8,13 @@ import React, {
 } from "react";
 import api from "../utils/api";
 
-type Notification = {
+export type Notification = {
   _id: string;
   title: string;
   body: string;
   read: boolean;
+  type?: string;
+  data?: any;
 };
 
 type NotificationContextType = {
@@ -54,6 +56,8 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({
         return "퀴즈 결과";
       case "report_generated":
         return "평어 생성";
+      case "qna_answer":
+        return "Q&A 답변";
       default:
         return "공지사항";
     }
@@ -68,6 +72,8 @@ export const NotificationProvider: React.FC<{ children: ReactNode }> = ({
         title: getNotificationTitle(notif.type),
         body: notif.message,
         read: notif.read,
+        type: notif.type,
+        data: notif.data,
       }));
 
       if (page === 1) {
