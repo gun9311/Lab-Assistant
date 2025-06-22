@@ -170,7 +170,7 @@ const TeacherHomePage: React.FC = () => {
 
   useEffect(() => {
     const noticeDismissed = localStorage.getItem(
-      "announcementDismissed_20240726_qna"
+      "announcementDismissed_20240727_library"
     );
     if (!noticeDismissed) {
       setAnnouncementModalOpen(true);
@@ -242,7 +242,7 @@ const TeacherHomePage: React.FC = () => {
 
   const handleAnnouncementModalClose = (dontShowAgain: boolean) => {
     if (dontShowAgain) {
-      localStorage.setItem("announcementDismissed_20240726_qna", "true");
+      localStorage.setItem("announcementDismissed_20240727_library", "true");
     }
     setAnnouncementModalOpen(false);
   };

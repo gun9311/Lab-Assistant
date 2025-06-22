@@ -16,6 +16,7 @@ import {
 import HelpOutlineIcon from "@mui/icons-material/HelpOutline";
 import LockIcon from "@mui/icons-material/Lock";
 import CalculateIcon from "@mui/icons-material/Calculate";
+import LibraryBooksIcon from "@mui/icons-material/LibraryBooks";
 
 interface AnnouncementModalProps {
   open: boolean;
@@ -69,6 +70,27 @@ const AnnouncementModal: React.FC<AnnouncementModalProps> = ({
           <List sx={{ width: "100%", bgcolor: "background.paper" }}>
             <ListItem alignItems="flex-start">
               <ListItemIcon sx={{ mt: 0.5, minWidth: 40 }}>
+                <LibraryBooksIcon color="primary" />
+              </ListItemIcon>
+              <ListItemText
+                primaryTypographyProps={{ fontWeight: "bold", mb: 0.5 }}
+                primary="평어 라이브러리가 추가되었습니다."
+                secondary={
+                  <Typography
+                    component="span"
+                    display="block"
+                    variant="body2"
+                    color="text.secondary"
+                  >
+                    '평어 생성/일괄조회'에 '평어 라이브러리' 버튼을 통해 평어
+                    전문을 참고할 수 있습니다.
+                  </Typography>
+                }
+              />
+            </ListItem>
+            <Divider variant="inset" component="li" sx={{ my: 1 }} />
+            <ListItem alignItems="flex-start">
+              <ListItemIcon sx={{ mt: 0.5, minWidth: 40 }}>
                 <HelpOutlineIcon color="primary" />
               </ListItemIcon>
               <ListItemText
@@ -83,9 +105,18 @@ const AnnouncementModal: React.FC<AnnouncementModalProps> = ({
                       color="text.secondary"
                       sx={{ mb: 0.5 }}
                     >
-                      특히 특정 학년-학기-과목-단원에 대한 평어 내용이 아쉽거나
-                      개선이 필요한 경우, 주저하지 마시고 문의 게시판에 글을
-                      남겨주세요.
+                      <Box
+                        component="span"
+                        sx={{
+                          backgroundColor: "rgba(255, 243, 79, 0.5)",
+                          px: 0.5,
+                          borderRadius: "4px",
+                        }}
+                      >
+                        특히 특정 학년,학기,과목,단원에 대한 평어 내용이
+                        아쉽거나 개선이 필요한 경우, 주저하지 마시고 문의
+                        게시판에 글을 남겨주세요.
+                      </Box>
                     </Typography>
                     <Typography
                       component="span"
