@@ -21,7 +21,7 @@ module.exports = (req, res, next) => {
             Dimensions: [
               {
                 Name: "Route",
-                Value: req.route?.path || req.path || "unknown",
+                Value: req.route?.path || req.originalUrl || "unknown",
               },
               {
                 Name: "Method",
