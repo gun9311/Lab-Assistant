@@ -226,6 +226,25 @@ async function _handleCharacterSelected(
   const studentIdsSetKey = getSessionStudentIdsSetKey(pin);
   const takenCharactersSetKey = getSessionTakenCharactersSetKey(pin); // 선점된 캐릭터 Set 키
 
+  // 🎭 새로운 검증: 선택한 캐릭터가 이 세션에서 사용 가능한지 확인
+  const characterIndex = parseInt(character.replace("character", "")) - 1; // "character1" -> 0
+  if (
+    !currentSession.availableCharacters ||
+    !Array.isArray(currentSession.availableCharacters) ||
+    !currentSession.availableCharacters.includes(characterIndex)
+  ) {
+    logger.warn(
+      `Student ${studentId} in session ${pin} tried to select unavailable character ${character} (index: ${characterIndex})`
+    );
+    ws.send(
+      JSON.stringify({
+        error: "This character is not available in this session",
+        type: "characterNotAvailable",
+      })
+    );
+    return;
+  }
+
   const studentLockKey = `lock:charselect:${pin}:${studentId}`;
   let studentLockAcquired = false;
 
@@ -921,6 +940,42 @@ exports.handleStudentWebSocketConnection = async (ws, studentId, pin) => {
   } else {
     logger.info(
       `New student ${studentId} connected to session: ${pin}. Awaiting character selection.`
+    );
+  }
+
+  // 🎭 사용 가능한 캐릭터 목록과 이미 선택된 캐릭터들을 함께 전송
+  if (
+    currentSession.availableCharacters &&
+    Array.isArray(currentSession.availableCharacters)
+  ) {
+    const takenCharactersSetKey = getSessionTakenCharactersSetKey(pin);
+    const takenCharacterStrings = await redisClient.sMembers(
+      takenCharactersSetKey
+    );
+    const takenCharactersIndices = takenCharacterStrings
+      .map((charStr) => {
+        const index = parseInt(charStr.replace("character", "")) - 1;
+        return isNaN(index) ? -1 : index;
+      })
+      .filter((index) => index !== -1);
+
+    // 한 번에 보내기
+    ws.send(
+      JSON.stringify({
+        type: "characterData",
+        availableCharacters: currentSession.availableCharacters,
+        takenCharacters: takenCharactersIndices,
+      })
+    );
+
+    logger.info(
+      `Sent character data to student ${studentId} in session ${pin}: available[${currentSession.availableCharacters.join(
+        ", "
+      )}], taken[${takenCharactersIndices.join(", ")}]`
+    );
+  } else {
+    logger.warn(
+      `No availableCharacters found in session ${pin} for student ${studentId}. Check session initialization.`
     );
   }
 

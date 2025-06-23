@@ -69,12 +69,12 @@ const getPositionForRank = (
   if (index < 3) {
     return {
       top: index === 0 ? 4 : index === 1 ? 35 : 36,
-      left: index === 0 ? 49 : index === 1 ? 33.5 : 63.5,
+      left: index === 0 ? 49 : index === 1 ? 34.0 : 63.0,
     };
   } else {
     return {
       top: 79,
-      left: 26.5 + (index - 3) * 6.7,
+      left: 26.5 + (index - 3) * 6.93,
     };
   }
 };

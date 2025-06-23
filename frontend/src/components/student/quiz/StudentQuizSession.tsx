@@ -112,7 +112,11 @@ const StudentQuizSessionPage: React.FC = () => {
     string | null
   >(null);
 
-  // const isQuestionVisible = !!(currentQuestion && !isFeedbackReceived);
+  // 🎭 새로운 상태: 이 세션에서 사용 가능한 캐릭터 인덱스 배열
+  const [availableCharacters, setAvailableCharacters] = useState<number[]>([]);
+  const [availableCharacterImages, setAvailableCharacterImages] = useState<
+    string[]
+  >([]);
 
   useEffect(() => {
     selectedCharacterRef.current = selectedCharacter;
@@ -130,15 +134,7 @@ const StudentQuizSessionPage: React.FC = () => {
 
     socket.onopen = () => {
       console.log("웹소켓 연결 성공");
-      const message = JSON.stringify({ type: "getTakenCharacters" });
-      // console.log("메시지 준비 완료:", message); // 로그 레벨 조정
-
-      try {
-        socket.send(message);
-        // console.log(`메시지 전송: ${message}`); // 로그 레벨 조정
-      } catch (error) {
-        console.error("메시지 전송 중 오류 발생:", error);
-      }
+      // getTakenCharacters는 더 이상 필요 없음 - 서버가 자동으로 availableCharacters를 보내줌
     };
 
     socket.onmessage = async (message) => {
@@ -160,15 +156,55 @@ const StudentQuizSessionPage: React.FC = () => {
       console.log("Received message from server:", parsedData);
       setIsProcessingCharacterSelection(false);
 
-      if (parsedData.type === "takenCharacters") {
+      // 🎭 새로운 메시지 타입: 캐릭터 데이터 (available + taken)
+      if (parsedData.type === "characterData") {
+        console.log("Character data received:", parsedData);
+
+        // availableCharacters 설정
+        setAvailableCharacters(parsedData.availableCharacters);
+
+        // 사용 가능한 캐릭터 이미지만 필터링
+        const filteredImages = parsedData.availableCharacters.map(
+          (index: number) => characterImages[index]
+        );
+        setAvailableCharacterImages(filteredImages);
+
+        // takenCharacters 설정 (타입 명시)
+        const takenSet = new Set<number>(
+          parsedData.takenCharacters as number[]
+        );
+        setTakenCharacters(takenSet);
+
         console.log(
-          "[takenCharacters] Received. Current states before processing:",
-          {
-            isCharacterFinalizedByServer_ref:
-              isCharacterFinalizedByServer.current,
-            selectedCharacterRef_current: selectedCharacterRef.current,
-            parsedData_takenCharacters: parsedData.takenCharacters,
-          }
+          `Session has ${
+            parsedData.availableCharacters.length
+          } available characters: [${parsedData.availableCharacters.join(
+            ", "
+          )}]`
+        );
+        console.log(
+          `Already taken characters: [${parsedData.takenCharacters.join(", ")}]`
+        );
+      } else if (parsedData.type === "availableCharacters") {
+        // 이전 방식 호환성을 위해 유지 (제거 예정)
+        console.log("Available characters received:", parsedData.characters);
+        setAvailableCharacters(parsedData.characters);
+
+        const filteredImages = parsedData.characters.map(
+          (index: number) => characterImages[index]
+        );
+        setAvailableCharacterImages(filteredImages);
+
+        console.log(
+          `Session has ${
+            parsedData.characters.length
+          } available characters: [${parsedData.characters.join(", ")}]`
+        );
+      } else if (parsedData.type === "takenCharacters") {
+        // 이전 방식 호환성을 위해 유지하되, 더 안전하게 처리
+        console.log(
+          "[takenCharacters] Received taken characters:",
+          parsedData.takenCharacters
         );
 
         setTakenCharacters((prev) => {
@@ -178,37 +214,15 @@ const StudentQuizSessionPage: React.FC = () => {
           });
           return updatedSet;
         });
-
-        // 서버로부터 캐릭터 확정 응답을 받은 후에는 takenCharacters 메시지가 selectedCharacter를 바꾸지 않도록 함
-        if (isCharacterFinalizedByServer.current) {
-          console.log(
-            "[takenCharacters] Character is FINALIZED by server. Skipping setSelectedCharacter(null)."
-          );
-        } else {
-          // 아직 서버로부터 최종 확정을 받기 전 (사용자가 UI에서 캐릭터를 고르는 중)
-          if (
-            selectedCharacterRef.current !== null &&
-            parsedData.takenCharacters.includes(selectedCharacterRef.current)
-          ) {
-            console.log(
-              `[takenCharacters] Character NOT FINALIZED. Current selection ${selectedCharacterRef.current} is in takenCharacters. Setting selectedCharacter to null.`
-            );
-            setSelectedCharacter(null);
-          }
-        }
       } else if (parsedData.type === "characterSelected") {
         const characterIndex =
           parseInt(parsedData.character.replace("character", "")) - 1;
+
+        // ✅ availableCharacters 체크 제거 - 서버에서 보낸 것은 신뢰
         setTakenCharacters((prev) => new Set(prev).add(characterIndex));
 
-        // 내가 캐릭터 선택 요청을 보내고 서버의 최종 확정(Acknowledged)을 기다리는 동안,
-        // 나 자신의 선택에 대한 브로드캐스트가 먼저 도착해서 selectedCharacter를 null로 만들지 않도록 한다.
-        // isCharacterFinalizedByServer.current가 true가 된 이후에는 다른 사람의 선택이 내 캐릭터 상태를 바꾸지 않아야 한다.
-        // 이 블록은 이제 단순히 다른 사람이 어떤 캐릭터를 가져갔는지(takenCharacters)만 업데이트하고,
-        // 현재 학생의 selectedCharacter 상태는 건드리지 않는다.
-        // 내 캐릭터 선택이 중복되거나 문제가 있다면, characterAcknowledged 메시지나 에러 메시지를 통해 처리될 것이다.
         console.log(
-          `[characterSelected broadcast] Char ${characterIndex} taken. Current local selection: ${selectedCharacterRef.current}. Finalized by server: ${isCharacterFinalizedByServer.current}`
+          `[characterSelected broadcast] Char ${characterIndex} taken and UI updated.`
         );
       } else if (parsedData.type === "characterAcknowledged") {
         console.log("Character selection acknowledged by server:", parsedData);
@@ -352,7 +366,7 @@ const StudentQuizSessionPage: React.FC = () => {
         socket.close();
       }
     };
-  }, [pin, userToken, navigate]);
+  }, [pin, userToken, navigate]); // availableCharacters 제거!
 
   const arrayBufferToString = (buffer: ArrayBuffer): Promise<string> => {
     return new Promise((resolve) => {
@@ -465,73 +479,73 @@ const StudentQuizSessionPage: React.FC = () => {
                 gap: 2,
               }}
             >
-              {characterImages.map((characterImage: string, index: number) => (
-                <Tooltip
-                  key={index}
-                  title={
-                    takenCharacters.has(index) ? "이미 선택된 캐릭터입니다" : ""
+              {availableCharacterImages.length > 0 ? (
+                availableCharacterImages.map(
+                  (characterImage: string, displayIndex: number) => {
+                    const actualIndex = availableCharacters[displayIndex]; // 실제 캐릭터 인덱스
+                    return (
+                      <Tooltip
+                        key={actualIndex}
+                        title={
+                          takenCharacters.has(actualIndex)
+                            ? "이미 선택된 캐릭터입니다"
+                            : ""
+                        }
+                        arrow
+                      >
+                        <Button
+                          onClick={() => handleCharacterSelect(actualIndex)}
+                          sx={{
+                            width: 80,
+                            height: 80,
+                            p: 0,
+                            filter: takenCharacters.has(actualIndex)
+                              ? "grayscale(100%)"
+                              : "none",
+                            opacity: takenCharacters.has(actualIndex) ? 0.5 : 1,
+                            cursor: takenCharacters.has(actualIndex)
+                              ? "not-allowed"
+                              : "pointer",
+                            border:
+                              selectedCharacter === actualIndex
+                                ? "2px solid #4caf50"
+                                : "none",
+                            transition: "transform 0.2s",
+                            "&:hover": { transform: "scale(1.05)" },
+                          }}
+                          disabled={takenCharacters.has(actualIndex)}
+                        >
+                          <img
+                            src={characterImage}
+                            alt={`캐릭터 ${actualIndex + 1}`}
+                            style={{
+                              width: "100%",
+                              height: "100%",
+                              objectFit: "contain",
+                            }}
+                          />
+                        </Button>
+                      </Tooltip>
+                    );
                   }
-                  arrow
-                >
-                  <Button
-                    onClick={() => handleCharacterSelect(index)}
-                    sx={{
-                      width: 80,
-                      height: 80,
-                      p: 0,
-                      filter: takenCharacters.has(index)
-                        ? "grayscale(100%)"
-                        : "none",
-                      opacity: takenCharacters.has(index) ? 0.5 : 1,
-                      cursor: takenCharacters.has(index)
-                        ? "not-allowed"
-                        : "pointer",
-                      border:
-                        selectedCharacter === index
-                          ? "2px solid #4caf50"
-                          : "none",
-                      transition: "transform 0.2s",
-                      "&:hover": { transform: "scale(1.05)" },
-                    }}
-                    disabled={takenCharacters.has(index)}
-                  >
-                    <img
-                      src={characterImage}
-                      alt={`캐릭터 ${index + 1}`}
-                      style={{
-                        width: "100%",
-                        height: "100%",
-                        objectFit: "contain",
-                      }}
-                    />
-                  </Button>
-                </Tooltip>
-              ))}
-            </Box>
-            <Button
-              variant="contained"
-              color="primary"
-              onClick={confirmCharacterSelection}
-              sx={{
-                mt: 2,
-                fontWeight: "bold",
-                background: "linear-gradient(45deg, #FE6B8B 30%, #FF8E53 90%)",
-                boxShadow: "0 3px 5px 2px rgba(255, 105, 135, .3)",
-                "&:hover": {
-                  background:
-                    "linear-gradient(45deg, #FF8E53 30%, #FE6B8B 90%)",
-                },
-              }}
-              disabled={
-                selectedCharacter === null || isProcessingCharacterSelection
-              }
-            >
-              {isProcessingCharacterSelection ? (
-                <CircularProgress size={24} sx={{ color: "white" }} />
+                )
               ) : (
-                "Ready"
+                <Typography variant="body2" color="text.secondary">
+                  사용 가능한 캐릭터를 불러오는 중...
+                </Typography>
               )}
-            </Button>
+            </Box>
+            {selectedCharacter !== null && (
+              <Button
+                variant="contained"
+                color="primary"
+                onClick={confirmCharacterSelection}
+                disabled={isProcessingCharacterSelection}
+                sx={{ mt: 2 }}
+              >
+                {isProcessingCharacterSelection ? "처리 중..." : "ready!"}
+              </Button>
+            )}
           </Box>
         ) : (
           <>

@@ -43,6 +43,19 @@ const KahootQuizSessionSchema = new Schema({
   // 사용된 질문들의 스냅샷 (가장 중요)
   questionsSnapshot: [QuestionSnapshotSchema],
 
+  // 이 세션에서 사용 가능한 캐릭터 인덱스 배열 (0-50 중 30개 랜덤)
+  availableCharacters: {
+    type: [Number],
+    default: [],
+    validate: {
+      validator: function (v) {
+        return v.length <= 30 && v.every((idx) => idx >= 0 && idx <= 50);
+      },
+      message:
+        "availableCharacters should contain at most 30 indices between 0-50",
+    },
+  },
+
   // (선택적) 세션 시작 시 팀 모드 설정 및 팀 구성 정보
   isTeamMode: { type: Boolean, default: false },
   initialTeams: [

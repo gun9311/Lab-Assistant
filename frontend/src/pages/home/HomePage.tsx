@@ -36,12 +36,12 @@ const HomePage = () => {
       lottieSrc:
         "https://lottie.host/81c669e8-198c-4843-a98b-af3c3fd18636/H8vDucmkpi.lottie",
       description:
-        "교실이 즐거워지는 실시간 퀴즈!\n편리하게 자료를 공유해 보세요.",
+        "교실이 즐거워지는 실시간 퀴즈!\n편리하게 자료를 공유하하세요.",
     },
     {
       lottieSrc:
         "https://lottie.host/35ec8ec8-40ba-49a7-a1d5-8ef2198c1521/hMol44ecSD.lottie",
-      description: "한 번의 클릭으로\n교과별 평어를 작성해 보세요.",
+      description: "평어 작성부터 NEIS 반영까지\n한 번에 해결하세요.",
     },
   ];
   const maxSteps = tutorialSteps.length;

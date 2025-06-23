@@ -694,6 +694,7 @@ exports.startQuizSession = async (req, res) => {
               memberStudentIds: team.memberStudentIds || [],
             }))
           : [],
+      availableCharacters: generateRandomCharacters(),
     });
 
     await newSession.save();
@@ -724,6 +725,7 @@ exports.startQuizSession = async (req, res) => {
       questionsSnapshot: newSession.questionsSnapshot.map((q) =>
         q._id.toString()
       ),
+      availableCharacters: newSession.availableCharacters,
     };
 
     const questionsSnapshotForRedis = newSession.questionsSnapshot.map((q) =>
@@ -778,3 +780,10 @@ exports.joinQuizSession = async (req, res) => {
     res.status(500).send({ error: "퀴즈 세션 참여 실패" });
   }
 };
+
+// availableCharacters 생성 함수 (0-50 중 30개 랜덤 선택)
+function generateRandomCharacters() {
+  const allCharacters = Array.from({ length: 51 }, (_, i) => i); // 0부터 50까지
+  const shuffled = allCharacters.sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, 30); // 첫 30개 선택
+}
