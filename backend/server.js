@@ -30,6 +30,9 @@ const config = require("./config"); // 설정 파일 로드
 const { handleNewWebSocketConnection } = require("./websocketInitialSetup");
 const { initializeKahootPubSub } = require("./handlers/kahootShared"); // Pub/Sub 초기화 함수 import
 
+// 🎯 latency 미들웨어 추가
+const latencyMetric = require("./middleware/latencyMetric");
+
 // MongoDB 연결
 mongoose
   .connect(process.env.MONGODB_URL)
@@ -38,6 +41,9 @@ mongoose
 
 // Express 앱 설정
 const app = express();
+
+// 🎯 latency 미들웨어를 다른 미들웨어보다 먼저 적용
+app.use(latencyMetric);
 
 const { ALLOWED_ORIGINS } = config.serverConfig;
 
