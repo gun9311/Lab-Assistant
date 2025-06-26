@@ -2,12 +2,10 @@ module.exports = {
   chatLimits: {
     DAILY_LIMIT: 15,
     MONTHLY_LIMIT: 150,
-    RECENT_HISTORY_COUNT: 4,
+    RECENT_HISTORY_COUNT: 3,
   },
   serverConfig: {
-    ALLOWED_ORIGINS: ["http://localhost:3000",
-                      "http://192.168.219.182:3000",
-                      "https://nudgeflow.co.kr"],
+    ALLOWED_ORIGINS: ["http://localhost:3000", "https://nudgeflow.co.kr"],
     DEFAULT_PORT: 5000,
   },
   studentServiceHours: {
@@ -24,5 +22,11 @@ module.exports = {
     LEVEL: "warn",
     TIMESTAMP_FORMAT: "YYYY-MM-DD HH:mm:ss",
     DEFAULT_META_SERVICE: "backend-server",
+  },
+  apiRateLimits: {
+    MAX_INPUT_TOKENS_PER_MINUTE: 48500,
+    MAX_OUTPUT_TOKENS_PER_MINUTE: 9700,
+    ESTIMATED_INPUT_TOKENS: 2200, // 예상 입력 토큰
+    ESTIMATED_OUTPUT_TOKENS: 500, // 예상 출력 토큰
   },
 };

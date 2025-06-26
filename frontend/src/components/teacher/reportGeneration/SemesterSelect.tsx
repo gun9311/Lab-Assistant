@@ -12,6 +12,9 @@ import {
   Paper,
   Divider,
   Chip,
+  Radio,
+  RadioGroup,
+  FormControlLabel,
 } from "@mui/material";
 import { SelectChangeEvent } from "@mui/material/Select";
 import CalendarTodayIcon from "@mui/icons-material/CalendarToday";
@@ -24,6 +27,8 @@ type SemesterSelectProps = {
   handleSelectAllSemesters: () => void;
   handleDeselectAllSemesters: () => void;
   sx?: object;
+  isSingleSelect?: boolean;
+  onSingleSemesterChange?: (semester: string) => void;
 };
 
 const semesterItems = ["1학기", "2학기"];
@@ -34,10 +39,18 @@ const SemesterSelect: React.FC<SemesterSelectProps> = ({
   handleSelectAllSemesters,
   handleDeselectAllSemesters,
   sx,
+  isSingleSelect = false,
+  onSingleSemesterChange,
 }) => {
   const allSelected = selectedSemesters.length === semesterItems.length;
 
-  // 선택된 학기를 semesterItems 순서대로 정렬하는 함수
+  const handleRadioChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedSemester = event.target.value;
+    if (onSingleSemesterChange) {
+      onSingleSemesterChange(selectedSemester);
+    }
+  };
+
   const getSortedSelectedSemesters = (selected: string[]) => {
     return [...selected].sort(
       (a, b) => semesterItems.indexOf(a) - semesterItems.indexOf(b)
@@ -61,80 +74,120 @@ const SemesterSelect: React.FC<SemesterSelectProps> = ({
           <CalendarTodayIcon
             sx={{ mr: 1, fontSize: "1.3rem", color: "primary.main" }}
           />
-          학기 선택
+          학기 선택 {isSingleSelect ? "(단일 선택)" : "(다중 가능)"}
         </Typography>
-        <Button
-          onClick={
-            allSelected ? handleDeselectAllSemesters : handleSelectAllSemesters
-          }
-          size="small"
-          variant={allSelected ? "contained" : "outlined"}
-          color="primary"
-          startIcon={
-            allSelected ? <CheckBoxIcon /> : <CheckBoxOutlineBlankIcon />
-          }
-          sx={{ textTransform: "none", borderRadius: 1.5 }}
-        >
-          {allSelected ? "전체 해제" : "전체 선택"}
-        </Button>
+        {!isSingleSelect && (
+          <Button
+            onClick={
+              allSelected
+                ? handleDeselectAllSemesters
+                : handleSelectAllSemesters
+            }
+            size="small"
+            variant={allSelected ? "contained" : "outlined"}
+            color="primary"
+            startIcon={
+              allSelected ? <CheckBoxIcon /> : <CheckBoxOutlineBlankIcon />
+            }
+            sx={{ textTransform: "none", borderRadius: 1.5 }}
+          >
+            {allSelected ? "전체 해제" : "전체 선택"}
+          </Button>
+        )}
       </Box>
       <Divider sx={{ mb: 2.5 }} />
-      <FormControl fullWidth>
-        <InputLabel id="semester-select-label">
-          학기 선택 (다중 가능)
-        </InputLabel>
-        <Select
-          labelId="semester-select-label"
-          multiple
-          value={selectedSemesters}
-          onChange={handleSemesterChange}
-          label="학기 선택 (다중 가능)"
-          renderValue={(selected) => {
-            const sortedSelected = getSortedSelectedSemesters(
-              selected as string[]
-            );
-            return (
-              <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.75 }}>
-                {sortedSelected.length === 0 ? (
-                  <Typography variant="body2" color="text.secondary">
-                    <em>선택 안 함</em>
-                  </Typography>
-                ) : (
-                  sortedSelected.map((value) => (
-                    <Chip key={value} label={value} size="small" />
-                  ))
-                )}
-              </Box>
-            );
-          }}
-          MenuProps={{ PaperProps: { sx: { maxHeight: 240 } } }}
+
+      {isSingleSelect ? (
+        <RadioGroup
+          value={selectedSemesters[0] || ""}
+          onChange={handleRadioChange}
+          sx={{ flexDirection: "row", gap: 3 }}
         >
           {semesterItems.map((semester) => (
-            <MenuItem
+            <FormControlLabel
               key={semester}
               value={semester}
+              control={<Radio />}
+              label={semester}
               sx={{
-                borderRadius: 1,
-                mx: 1,
-                my: 0.5,
-                "&.Mui-selected": {
-                  fontWeight: "fontWeightBold",
-                  backgroundColor: "action.selected",
+                "& .MuiFormControlLabel-label": {
+                  fontWeight: selectedSemesters.includes(semester) ? 600 : 400,
+                  color: selectedSemesters.includes(semester)
+                    ? "primary.main"
+                    : "text.primary",
                 },
               }}
-            >
-              <Checkbox
-                checked={selectedSemesters.includes(semester)}
-                size="small"
-              />
-              <ListItemText
-                primary={semester}
-                primaryTypographyProps={{ variant: "body2" }}
-              />
-            </MenuItem>
+            />
           ))}
-        </Select>
-      </FormControl>
+        </RadioGroup>
+      ) : (
+        <FormControl fullWidth>
+          <InputLabel id="semester-select-label">
+            학기 선택 (다중 가능)
+          </InputLabel>
+          <Select
+            labelId="semester-select-label"
+            multiple
+            value={selectedSemesters}
+            onChange={handleSemesterChange}
+            label="학기 선택 (다중 가능)"
+            renderValue={(selected) => {
+              const sortedSelected = getSortedSelectedSemesters(
+                selected as string[]
+              );
+              return (
+                <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.75 }}>
+                  {sortedSelected.length === 0 ? (
+                    <Typography variant="body2" color="text.secondary">
+                      <em>선택 안 함</em>
+                    </Typography>
+                  ) : (
+                    sortedSelected.map((value) => (
+                      <Chip key={value} label={value} size="small" />
+                    ))
+                  )}
+                </Box>
+              );
+            }}
+            MenuProps={{ PaperProps: { sx: { maxHeight: 240 } } }}
+          >
+            {semesterItems.map((semester) => (
+              <MenuItem
+                key={semester}
+                value={semester}
+                sx={{
+                  borderRadius: 1,
+                  mx: 1,
+                  my: 0.5,
+                  "&.Mui-selected": {
+                    fontWeight: "fontWeightBold",
+                    backgroundColor: "action.selected",
+                  },
+                }}
+              >
+                <Checkbox
+                  checked={selectedSemesters.includes(semester)}
+                  size="small"
+                />
+                <ListItemText
+                  primary={semester}
+                  primaryTypographyProps={{ variant: "body2" }}
+                />
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+      )}
+
+      {isSingleSelect && selectedSemesters.length === 0 && (
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{ mt: 1, display: "block" }}
+        >
+          평어 생성할 학기를 선택해주세요
+        </Typography>
+      )}
     </Paper>
   );
 };

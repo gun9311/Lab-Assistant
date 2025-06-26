@@ -107,6 +107,38 @@ const getRedisChannelForceCloseStudents = (pin) =>
 const getTeacherViewingResultsFlagKey = (pin) =>
   `session:${pin}:teacher_viewing_results`;
 
+/**
+ * Redis에 rate limit 추적용 키를 생성합니다.
+ * @param {string} type - 유형
+ * @returns {string} Redis 키 (예: "anthropic:ratelimit:type")
+ */
+const getAnthropicRateLimitKey = (type) => `anthropic:ratelimit:${type}`;
+
+/**
+ * 현재 사용중인 입력 토큰 수를 저장하는 키
+ * @returns {string} Redis 키
+ */
+const getCurrentInputTokensKey = () => `anthropic:current_input_tokens`;
+
+/**
+ * 현재 사용중인 출력 토큰 수를 저장하는 키
+ * @returns {string} Redis 키
+ */
+const getCurrentOutputTokensKey = () => `anthropic:current_output_tokens`;
+
+/**
+ * 특정 요청의 토큰 정보를 저장하는 키 (1분 후 제거용)
+ * @param {string} requestId - 요청 ID
+ * @returns {string} Redis 키
+ */
+const getRequestTokenKey = (requestId) => `anthropic:request:${requestId}`;
+
+/**
+ * 토큰 제거 스케줄을 저장하는 키
+ * @returns {string} Redis 키
+ */
+const getTokenRemovalScheduleKey = () => `anthropic:token_removal_schedule`;
+
 module.exports = {
   getSessionKey,
   getParticipantKey,
@@ -120,4 +152,9 @@ module.exports = {
   getRedisChannelIndividualFeedbackList,
   getRedisChannelForceCloseStudents,
   getTeacherViewingResultsFlagKey,
+  getAnthropicRateLimitKey,
+  getCurrentInputTokensKey,
+  getCurrentOutputTokensKey,
+  getRequestTokenKey,
+  getTokenRemovalScheduleKey,
 };
