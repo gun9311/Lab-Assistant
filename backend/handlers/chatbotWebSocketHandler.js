@@ -4,28 +4,27 @@ const { redisClient } = require("../utils/redisClient");
 const logger = require("../utils/logger");
 const config = require("../config");
 const chatUsageService = require("../services/chatUsageService");
-const { preprocessUserMessage } = require("../services/chatbotMessageService"); // 수정: chatbotMessageService에서 함수 가져오기
-const chatbotInteractionService = require("../services/chatbotInteractionService"); // 수정: chatbotInteractionService 가져오기
-const chatSummaryService = require("../services/chatSummaryService"); // 추가: chatSummaryService 가져오기
+const { preprocessUserMessage } = require("../services/chatbotMessageService");
+const chatbotInteractionService = require("../services/chatbotInteractionService");
+const chatSummaryService = require("../services/chatSummaryService");
+const EventEmitter = require("events");
 
-// p-limit을 동적으로 import 하기 위한 즉시 실행 비동기 함수 (IIFE)
+// p-limit을 동적으로 import
 let pLimit;
 (async () => {
   const pLimitModule = await import("p-limit");
   pLimit = pLimitModule.default;
 })();
 
-let dbWriteLimit; // 선언만 하고
+let dbWriteLimit;
 
-// initializeChatConnection 함수 또는 이 모듈이 처음 사용될 때 dbWriteLimit 초기화
 async function initializeDbWriteLimit() {
   if (!pLimit) {
     const pLimitModule = await import("p-limit");
     pLimit = pLimitModule.default;
   }
   if (!dbWriteLimit && pLimit) {
-    // pLimit이 로드되었고 dbWriteLimit이 아직 초기화되지 않았다면
-    dbWriteLimit = pLimit(7); // 예시: 동시성 7
+    dbWriteLimit = pLimit(7);
     logger.info("[ChatbotHandler] dbWriteLimit initialized.");
   }
 }
@@ -34,20 +33,221 @@ let clients = {};
 
 const { RECENT_HISTORY_COUNT } = config.chatLimits;
 
-// --- queueChatSummarySave 함수 수정 ---
+// 🎯 큐 시스템
+const requestQueue = [];
+let isProcessingQueue = false;
+
+// 🎯 토큰 이벤트 에미터 생성
+const tokenEventEmitter = new EventEmitter();
+
+/**
+ * 🎯 큐에서 특정 사용자 요청 제거
+ * @param {string} userId - 제거할 사용자 ID
+ * @returns {boolean} - 제거 성공 여부
+ */
+function removeFromQueue(userId) {
+  const beforeLength = requestQueue.length;
+  for (let i = requestQueue.length - 1; i >= 0; i--) {
+    if (requestQueue[i].userId === userId) {
+      requestQueue.splice(i, 1);
+    }
+  }
+
+  const removedCount = beforeLength - requestQueue.length;
+  if (removedCount > 0) {
+    logger.info(
+      `[ChatbotHandler] Removed ${removedCount} queued request(s) for disconnected user ${userId}`
+    );
+    return true;
+  }
+  return false;
+}
+
+/**
+ * 🎯 큐에서 요청을 순차적으로 처리
+ */
+async function processRequestQueue() {
+  if (isProcessingQueue || requestQueue.length === 0) {
+    return;
+  }
+
+  isProcessingQueue = true;
+
+  try {
+    while (requestQueue.length > 0) {
+      const requestData = requestQueue[0];
+      const {
+        ws,
+        messagesForNLP,
+        userId,
+        clientId,
+        chatHistoryKey,
+        chatHistory,
+        finalUserMessageForHistory,
+      } = requestData;
+
+      // WebSocket 연결 유효성 확인 (이중 안전장치)
+      if (ws.readyState !== ws.OPEN) {
+        logger.warn(
+          `[ChatbotHandler] WebSocket closed for queued request: ${userId} (backup cleanup)`
+        );
+        requestQueue.shift();
+        continue;
+      }
+
+      const requestId = `${userId}_${Date.now()}`;
+
+      try {
+        ws.send(
+          JSON.stringify({
+            type: "queue_status",
+            status: "processing",
+            message: "답변을 생성하고 있어요...",
+          })
+        );
+
+        const streamResponse = getNLPResponse(
+          messagesForNLP.systemPrompt,
+          messagesForNLP.userMessages,
+          requestId
+        );
+
+        let rawBotResponseContent = "";
+        for await (const botResp of streamResponse) {
+          ws.send(JSON.stringify({ bot: botResp, isFinal: false }));
+          rawBotResponseContent += botResp;
+        }
+        ws.send(JSON.stringify({ bot: null, isFinal: true }));
+
+        await chatbotInteractionService.saveToChatHistory(
+          chatHistoryKey,
+          chatHistory,
+          finalUserMessageForHistory,
+          rawBotResponseContent,
+          userId
+        );
+
+        requestQueue.shift();
+        logger.info(
+          `[ChatbotHandler] Successfully processed queued request for user ${userId}`
+        );
+      } catch (error) {
+        if (error.message.startsWith("RATE_LIMIT_EXCEEDED:")) {
+          logger.info(
+            `[ChatbotHandler] Rate limit hit, keeping request in queue for user ${userId}`
+          );
+          break;
+        } else {
+          requestQueue.shift();
+          logger.error(
+            `[ChatbotHandler] Error processing queued request for user ${userId}:`,
+            error
+          );
+
+          if (error.message.startsWith("ANTHROPIC_OVERLOADED:")) {
+            ws.send(
+              JSON.stringify({
+                type: "anthropic_overloaded",
+                message:
+                  "AI 서버가 일시적으로 과부하 상태입니다. 30초 후 다시 시도해주세요.",
+              })
+            );
+          } else if (error.message.startsWith("ANTHROPIC_RATE_LIMIT:")) {
+            ws.send(
+              JSON.stringify({
+                type: "anthropic_rate_limit",
+                message: "API 한도에 도달했습니다. 잠시 후 다시 시도해주세요.",
+              })
+            );
+          } else {
+            ws.send(
+              JSON.stringify({ error: "메시지 처리 중 오류가 발생했습니다." })
+            );
+          }
+        }
+      }
+    }
+  } catch (error) {
+    logger.error(`[ChatbotHandler] Error in processRequestQueue:`, error);
+  } finally {
+    isProcessingQueue = false;
+  }
+}
+
+/**
+ * 🎯 요청을 큐에 추가
+ */
+async function addToQueue(userId, ws, requestData) {
+  const wasEmpty = requestQueue.length === 0;
+
+  requestQueue.push({ userId, ws, ...requestData, timestamp: Date.now() });
+
+  if (wasEmpty) {
+    logger.info(
+      `[ChatbotHandler] Adding first request to queue for user ${userId}, processing immediately`
+    );
+    processRequestQueue();
+  } else {
+    const queuePosition = requestQueue.length;
+    const estimatedWaitTime = (queuePosition - 1) * 5;
+
+    // 🎯 시간 포맷팅 개선
+    let timeMessage;
+    if (estimatedWaitTime < 60) {
+      timeMessage = `${estimatedWaitTime}초`;
+    } else {
+      const minutes = Math.ceil(estimatedWaitTime / 60);
+      timeMessage = `${minutes}분`;
+    }
+
+    ws.send(
+      JSON.stringify({
+        type: "queue_status",
+        status: "waiting",
+        position: queuePosition,
+        estimatedWaitTime,
+        message: `대기열 ${queuePosition}번째 순서입니다. 예상 대기시간: ${timeMessage}`,
+      })
+    );
+
+    logger.info(
+      `[ChatbotHandler] Added user ${userId} to queue at position ${queuePosition}`
+    );
+  }
+}
+
+// 토큰 제거 이벤트 리스너
+tokenEventEmitter.on("tokenRemoved", () => {
+  if (requestQueue.length > 0 && !isProcessingQueue) {
+    logger.info(
+      "[ChatbotHandler] Token removal event received, triggering queue processing"
+    );
+    processRequestQueue();
+  }
+});
+
+// 안전장치: 주기적 큐 체크
+setInterval(() => {
+  if (requestQueue.length > 0 && !isProcessingQueue) {
+    logger.debug(
+      `[ChatbotHandler] Safety check: ${requestQueue.length} requests in queue, triggering processing`
+    );
+    processRequestQueue();
+  }
+}, 5000);
+
 async function queueChatSummarySave(userId, subject, chatHistoryToSave) {
-  await initializeDbWriteLimit(); // dbWriteLimit 사용 전에 초기화 보장
+  await initializeDbWriteLimit();
   if (!dbWriteLimit) {
     logger.error(
       "[ChatbotHandler] dbWriteLimit is not initialized. Cannot queue chat summary save."
     );
-    return; // 또는 에러 throw
+    return;
   }
   if (chatHistoryToSave && chatHistoryToSave.length > 0) {
     logger.info(
-      `[ChatbotHandler] Queueing chat summary save for user ${userId}, subject ${subject}. History length: ${chatHistoryToSave.length}. Pending tasks: ${dbWriteLimit.pendingCount}`
+      `[ChatbotHandler] Queueing chat summary save for user ${userId}, subject ${subject}. History length: ${chatHistoryToSave.length}`
     );
-    // 수정: chatSummaryService.saveChatSummary 호출
     dbWriteLimit(() =>
       chatSummaryService.saveChatSummary(userId, subject, chatHistoryToSave)
     )
@@ -57,10 +257,8 @@ async function queueChatSummarySave(userId, subject, chatHistoryToSave) {
         );
       })
       .catch((error) => {
-        // chatSummaryService.saveChatSummary 내부에서 에러를 throw하지 않으면 이 catch는 dbWriteLimit 자체의 오류만 잡게 됨.
-        // chatSummaryService에서 로깅하므로 여기서는 간단히 로깅하거나, 서비스에서 throw된 에러를 잡도록 할 수 있음.
         logger.error(
-          `[ChatbotHandler] DB write task (chat summary) failed after being queued for user ${userId}, subject ${subject}:`,
+          `[ChatbotHandler] DB write task (chat summary) failed for user ${userId}, subject ${subject}:`,
           { message: error?.message }
         );
       });
@@ -72,7 +270,8 @@ async function queueChatSummarySave(userId, subject, chatHistoryToSave) {
 }
 
 const initializeChatConnection = async (ws, userId, subjectParam) => {
-  await initializeDbWriteLimit(); // 핸들러 시작 시 dbWriteLimit 초기화 보장
+  await initializeDbWriteLimit();
+
   const chatHistoryKey = `chatHistories:${userId}`;
   const clientId = uuidv4();
   clients[clientId] = ws;
@@ -151,7 +350,6 @@ const initializeChatConnection = async (ws, userId, subjectParam) => {
     } else if (initialUsageCheck.errorType === "user_not_found") {
       ws.send(JSON.stringify({ error: "사용자 정보를 찾을 수 없습니다." }));
     } else {
-      // usage_check_error 또는 기타
       ws.send(
         JSON.stringify({
           error: "usage_check_error",
@@ -178,7 +376,6 @@ const initializeChatConnection = async (ws, userId, subjectParam) => {
 
   ws.on("message", async (message) => {
     const startTime = process.hrtime();
-    let saveToHistory = true;
 
     try {
       const {
@@ -191,12 +388,10 @@ const initializeChatConnection = async (ws, userId, subjectParam) => {
       } = JSON.parse(message);
 
       if (!rawUserMessage || !rawUserMessage.trim()) {
-        saveToHistory = false;
         logger.info(
           `Initial or empty message received from user ${userId}, usage count not incremented.`
         );
 
-        // 수정: 초기 NLP 요청 메시지 구성 서비스 함수 호출
         const messagesForNLP =
           chatbotInteractionService.constructInitialNLPRequestMessages(
             grade,
@@ -205,30 +400,19 @@ const initializeChatConnection = async (ws, userId, subjectParam) => {
             topic
           );
 
-        const streamResponse = getNLPResponse(
-          messagesForNLP.systemPrompt,
-          messagesForNLP.userMessages
-        );
-        let botResponseContent = ""; // rawBotResponseContent 대신 botResponseContent로 통일
-        for await (const botResp of streamResponse) {
-          // 변수명 변경 botResponse -> botResp
-          ws.send(JSON.stringify({ bot: botResp, isFinal: false }));
-          botResponseContent += botResp;
-        }
-        ws.send(JSON.stringify({ bot: null, isFinal: true }));
-
-        // (초기 메시지에 대한 후처리는 필요시 chatbotMessageService.postprocessBotResponse 호출)
-        // const finalBotResponse = await chatbotMessageService.postprocessBotResponse(botResponseContent, userId, clientId);
-        // ws.send로 이미 전송했으므로, 후처리된 finalBotResponse를 다시 보내지는 않음.
-        // 히스토리에 저장하지 않으므로 이 단계에서는 추가 작업 불필요.
-
+        await addToQueue(userId, ws, {
+          messagesForNLP,
+          clientId,
+          chatHistoryKey,
+          chatHistory,
+          finalUserMessageForHistory: "",
+        });
         return;
       }
 
       const usageUpdateResult =
         await chatUsageService.incrementAndCheckUsageOnMessage(userId);
       if (!usageUpdateResult.success) {
-        // ... (사용량 제한 초과 처리) ...
         return;
       }
       logger.info(`[ChatbotCtrl] Usage count updated for user ${userId}.`);
@@ -238,21 +422,12 @@ const initializeChatConnection = async (ws, userId, subjectParam) => {
         finalUserMessageForHistory,
         isFiltered: userMessageIsFiltered,
         refusalResponse: userMessageRefusalResponse,
-        // filterDetails: userMessageFilterDetails // 이 변수는 현재 사용되지 않으므로 생략 가능
-      } = await preprocessUserMessage(rawUserMessage, userId, clientId); // chatbotMessageService의 함수
+      } = await preprocessUserMessage(rawUserMessage, userId, clientId);
 
       if (userMessageIsFiltered) {
-        // 사용자 메시지가 필터링된 경우, 거절 응답을 클라이언트에게 전송
         ws.send(
-          JSON.stringify({
-            bot: userMessageRefusalResponse, // 거절 메시지를 bot 필드에 담아 전송
-            isFinal: true, // 단일 메시지이므로 isFinal: true
-            // 여기에 추가적으로 filterDetails 같은 정보를 포함시켜 클라이언트에서 활용할 수도 있습니다.
-            // 예: filterType: userMessageFilterDetails?.type
-          })
+          JSON.stringify({ bot: userMessageRefusalResponse, isFinal: true })
         );
-
-        // 히스토리 저장 시 chatbotInteractionService.saveToChatHistory 사용
         await chatbotInteractionService.saveToChatHistory(
           chatHistoryKey,
           chatHistory,
@@ -263,11 +438,10 @@ const initializeChatConnection = async (ws, userId, subjectParam) => {
         logger.info(
           `Sent refusal response and saved filtered interaction to Redis for user ${userId}`
         );
-        return; // 여기서 함수가 종료됨
+        return;
       }
 
       const recentHistory = chatHistory.slice(-RECENT_HISTORY_COUNT);
-      // 수정: NLP 요청 메시지 구성 서비스 함수 호출
       const messagesForNLP =
         chatbotInteractionService.constructNLPRequestMessages(
           grade,
@@ -278,30 +452,13 @@ const initializeChatConnection = async (ws, userId, subjectParam) => {
           messageForProcessing
         );
 
-      // getNLPResponse 호출을 새로운 시그니처에 맞게 수정
-      const streamResponse = getNLPResponse(
-        messagesForNLP.systemPrompt,
-        messagesForNLP.userMessages
-      );
-      let rawBotResponseContent = "";
-      for await (const botResp of streamResponse) {
-        // 변수명 변경 botresponse -> botResp
-        ws.send(JSON.stringify({ bot: botResp, isFinal: false }));
-        rawBotResponseContent += botResp;
-      }
-      ws.send(JSON.stringify({ bot: null, isFinal: true }));
-
-      if (saveToHistory) {
-        // saveToHistory는 true일 것 (빈 메시지가 아니므로)
-        // 수정: 히스토리 저장 서비스 함수 호출
-        await chatbotInteractionService.saveToChatHistory(
-          chatHistoryKey,
-          chatHistory,
-          finalUserMessageForHistory,
-          rawBotResponseContent, // Claude 원본 응답을 히스토리에 저장
-          userId
-        );
-      }
+      await addToQueue(userId, ws, {
+        messagesForNLP,
+        clientId,
+        chatHistoryKey,
+        chatHistory,
+        finalUserMessageForHistory,
+      });
     } catch (error) {
       logger.error(
         `[chatbotController] Error handling message for client ${clientId}:`,
@@ -347,6 +504,10 @@ const initializeChatConnection = async (ws, userId, subjectParam) => {
         reason ? reason.toString() : "N/A"
       }`
     );
+
+    // 🎯 새로 추가: 큐에서 해당 사용자 요청 실시간 제거
+    removeFromQueue(userId);
+
     await cleanupConnection();
   });
 
@@ -355,10 +516,15 @@ const initializeChatConnection = async (ws, userId, subjectParam) => {
       `Chat WebSocket error for client ${clientId} (User: ${userId}): ${error.message}`,
       { stack: error.stack }
     );
+
+    // 🎯 새로 추가: 에러 시에도 큐에서 제거
+    removeFromQueue(userId);
+
     await cleanupConnection();
   });
 };
 
 module.exports = {
   initializeChatConnection,
+  tokenEventEmitter,
 };

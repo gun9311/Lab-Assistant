@@ -29,6 +29,7 @@ const timeRoutes = require("./routes/timeRoutes"); // 새로 추가
 const config = require("./config"); // 설정 파일 로드
 const { handleNewWebSocketConnection } = require("./websocketInitialSetup");
 const { initializeKahootPubSub } = require("./handlers/kahootShared"); // Pub/Sub 초기화 함수 import
+const { cleanupOrphanedTokens } = require("./services/nlpService");
 
 // 🎯 latency 미들웨어 추가
 // const latencyMetric = require("./middleware/latencyMetric");
@@ -117,12 +118,31 @@ app.use("/api/qna", qnaRoutes); // QnA 라우트 등록
 
 const serverPort = process.env.PORT || config.serverConfig.DEFAULT_PORT;
 
+// 🎯 서버 시작 시 토큰 정리
+async function initializeServer() {
+  try {
+    // 만료된 토큰 예약들 정리
+    await cleanupOrphanedTokens();
+
+    // 선택적: 주기적 정리 (10분마다)
+    setInterval(async () => {
+      logger.debug("[Server] Running periodic token cleanup...");
+      await cleanupOrphanedTokens();
+    }, 10 * 60 * 1000); // 10분마다
+  } catch (error) {
+    logger.error("[Server] Initialization failed:", error);
+  }
+}
+
 // 애플리케이션 시작을 위한 async 함수
 async function startServer() {
   try {
     // HTTP 서버 시작
-    const server = app.listen(serverPort, () => {
+    const server = app.listen(serverPort, async () => {
       logger.info(`Server running on port ${serverPort}`);
+
+      // 🎯 서버 초기화 실행
+      await initializeServer();
     });
 
     // 웹소켓 서버 생성

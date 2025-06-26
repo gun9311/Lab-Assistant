@@ -17,8 +17,17 @@ import {
   CircularProgress,
   useTheme,
   useMediaQuery,
+  LinearProgress,
+  Chip,
 } from "@mui/material";
-import { Mic, MicOff, Send, StopCircle } from "@mui/icons-material";
+import {
+  Mic,
+  MicOff,
+  Send,
+  StopCircle,
+  HourglassTop,
+  Schedule,
+} from "@mui/icons-material";
 import SmartToyIcon from "@mui/icons-material/SmartToy";
 import FaceIcon from "@mui/icons-material/Face";
 import { SxProps } from "@mui/system";
@@ -31,6 +40,14 @@ type ChatMessage = {
   sender: string;
   content: string;
 };
+
+// 새로운 타입 추가
+type QueueStatus = {
+  status: "waiting" | "processing";
+  position?: number;
+  estimatedWaitTime?: number;
+  message?: string;
+} | null;
 
 type ChatbotProps = {
   grade: string;
@@ -73,14 +90,47 @@ const Chatbot: React.FC<ChatbotProps> = ({
     null
   );
 
+  // 🎯 새로운 상태 추가
+  const [queueStatus, setQueueStatus] = useState<QueueStatus>(null);
+  const [remainingWaitTime, setRemainingWaitTime] = useState<number>(0);
+  const [rateLimitError, setRateLimitError] = useState<string | null>(null);
+
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const currentBotMessageIdRef = useRef<number | null>(null);
   const targetBotContentRef = useRef<string>("");
+  const waitTimeIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   const messageIdCounter = useRef<number>(0);
 
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+
+  // 대기시간 카운트다운
+  useEffect(() => {
+    if (queueStatus?.status === "waiting" && queueStatus.estimatedWaitTime) {
+      setRemainingWaitTime(queueStatus.estimatedWaitTime);
+
+      waitTimeIntervalRef.current = setInterval(() => {
+        setRemainingWaitTime((prev) => {
+          if (prev <= 1) {
+            if (waitTimeIntervalRef.current) {
+              clearInterval(waitTimeIntervalRef.current);
+              waitTimeIntervalRef.current = null;
+            }
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+
+    return () => {
+      if (waitTimeIntervalRef.current) {
+        clearInterval(waitTimeIntervalRef.current);
+        waitTimeIntervalRef.current = null;
+      }
+    };
+  }, [queueStatus]);
 
   const typeCharacter = useCallback(() => {
     if (currentBotMessageIdRef.current === null) {
@@ -114,6 +164,7 @@ const Chatbot: React.FC<ChatbotProps> = ({
         ];
       } else {
         setIsResponding(false);
+        setQueueStatus(null); // 응답 완료 시 큐 상태 초기화
         currentBotMessageIdRef.current = null;
         targetBotContentRef.current = "";
         if (typingTimeoutRef.current) {
@@ -129,6 +180,9 @@ const Chatbot: React.FC<ChatbotProps> = ({
     return () => {
       if (typingTimeoutRef.current) {
         clearTimeout(typingTimeoutRef.current);
+      }
+      if (waitTimeIntervalRef.current) {
+        clearInterval(waitTimeIntervalRef.current);
       }
     };
   }, []);
@@ -178,6 +232,53 @@ const Chatbot: React.FC<ChatbotProps> = ({
       try {
         const data = JSON.parse(event.data);
 
+        // 🎯 새로운 메시지 타입 처리
+        if (data.type === "queue_status") {
+          const {
+            status,
+            position,
+            estimatedWaitTime,
+            message: queueMessage,
+          } = data;
+
+          setQueueStatus({
+            status,
+            position,
+            estimatedWaitTime,
+            message: queueMessage,
+          });
+
+          if (status === "waiting") {
+            setIsResponding(false); // 대기 중일 때는 응답 중이 아님
+            console.log(`[Chatbot] Added to queue at position ${position}`);
+          } else if (status === "processing") {
+            setIsResponding(true);
+            console.log("[Chatbot] Queue processing started");
+          }
+
+          return;
+        }
+
+        if (data.type === "rate_limit_error") {
+          setRateLimitError(data.message);
+          setIsResponding(false);
+          setQueueStatus(null);
+          return;
+        }
+
+        if (data.type === "anthropic_overloaded") {
+          setRateLimitError(data.message);
+          setIsResponding(false);
+          return;
+        }
+
+        if (data.type === "anthropic_rate_limit") {
+          setRateLimitError(data.message);
+          setIsResponding(false);
+          return;
+        }
+
+        // 기존 에러 처리
         if (data.error) {
           console.error("WebSocket message error:", data.error);
           if (data.error === "daily_limit_exceeded") {
@@ -192,6 +293,7 @@ const Chatbot: React.FC<ChatbotProps> = ({
             setErrorAlertOpen(true);
           }
           setIsResponding(false);
+          setQueueStatus(null);
           if (typingTimeoutRef.current) {
             clearTimeout(typingTimeoutRef.current);
             typingTimeoutRef.current = null;
@@ -201,7 +303,10 @@ const Chatbot: React.FC<ChatbotProps> = ({
           return;
         }
 
+        // 에러 상태 초기화
         setLimitExceededError(null);
+        setRateLimitError(null);
+
         const { bot, isFinal } = data;
 
         if (bot !== undefined && bot !== null && typeof bot === "string") {
@@ -219,6 +324,7 @@ const Chatbot: React.FC<ChatbotProps> = ({
               newBotMessage,
             ]);
             setIsResponding(false);
+            setQueueStatus(null);
             targetBotContentRef.current = "";
             if (typingTimeoutRef.current) {
               clearTimeout(typingTimeoutRef.current);
@@ -261,6 +367,7 @@ const Chatbot: React.FC<ChatbotProps> = ({
         setIsResponding(false);
         setErrorAlertOpen(true);
         setLimitExceededError(null);
+        setQueueStatus(null);
         if (typingTimeoutRef.current) {
           clearTimeout(typingTimeoutRef.current);
           typingTimeoutRef.current = null;
@@ -275,6 +382,7 @@ const Chatbot: React.FC<ChatbotProps> = ({
       setErrorAlertOpen(true);
       setIsResponding(false);
       setLimitExceededError(null);
+      setQueueStatus(null);
     };
 
     newWs.onclose = (event) => {
@@ -284,6 +392,7 @@ const Chatbot: React.FC<ChatbotProps> = ({
         setIsResponding(false);
       }
       setLimitExceededError(null);
+      setQueueStatus(null);
     };
 
     setWs(newWs);
@@ -297,6 +406,8 @@ const Chatbot: React.FC<ChatbotProps> = ({
         newWs.close();
       }
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      if (waitTimeIntervalRef.current)
+        clearInterval(waitTimeIntervalRef.current);
     };
   }, [grade, semester, subject, unit, topic, typeCharacter]);
 
@@ -366,8 +477,13 @@ const Chatbot: React.FC<ChatbotProps> = ({
       setAlertOpen(true);
       return;
     }
-    if (limitExceededError) {
-      console.warn("Cannot send message due to usage limit exceeded.");
+    if (limitExceededError || rateLimitError) {
+      console.warn("Cannot send message due to limit exceeded.");
+      return;
+    }
+
+    // 🎯 대기 중일 때는 메시지 전송 불가
+    if (queueStatus?.status === "waiting") {
       return;
     }
 
@@ -429,6 +545,8 @@ const Chatbot: React.FC<ChatbotProps> = ({
     unit,
     topic,
     limitExceededError,
+    rateLimitError,
+    queueStatus,
     setChatUsage,
     chatUsage,
   ]);
@@ -454,7 +572,7 @@ const Chatbot: React.FC<ChatbotProps> = ({
   }, [ws, onChatbotEnd, onAlertOpen]);
 
   const handleStartListening = () => {
-    if (recognition && !isListening && !isResponding) {
+    if (recognition && !isListening && !isResponding && !queueStatus) {
       setMessage("");
       try {
         recognition.start();
@@ -483,10 +601,24 @@ const Chatbot: React.FC<ChatbotProps> = ({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
-    if (e.key === "Enter" && !e.shiftKey && !isResponding && message.trim()) {
+    if (
+      e.key === "Enter" &&
+      !e.shiftKey &&
+      !isResponding &&
+      message.trim() &&
+      !queueStatus
+    ) {
       e.preventDefault();
       handleSendMessage();
     }
+  };
+
+  const formatWaitTime = (seconds: number) => {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return minutes > 0
+      ? `${minutes}분 ${remainingSeconds}초`
+      : `${remainingSeconds}초`;
   };
 
   return (
@@ -505,6 +637,50 @@ const Chatbot: React.FC<ChatbotProps> = ({
         ...sx,
       }}
     >
+      {/* 🎯 대기열 상태 표시 헤더 */}
+      {queueStatus && (
+        <Box
+          sx={{
+            bgcolor:
+              queueStatus.status === "waiting" ? "warning.main" : "info.main",
+            color: "white",
+            p: 1.5,
+            display: "flex",
+            alignItems: "center",
+            gap: 1,
+          }}
+        >
+          {queueStatus.status === "waiting" ? (
+            <HourglassTop fontSize="small" />
+          ) : (
+            <Schedule fontSize="small" />
+          )}
+          <Typography variant="body2" sx={{ flexGrow: 1 }}>
+            {queueStatus.message}
+          </Typography>
+          {queueStatus.status === "waiting" && (
+            <Chip
+              label={`${formatWaitTime(remainingWaitTime)}`}
+              size="small"
+              sx={{ bgcolor: "rgba(255,255,255,0.2)", color: "white" }}
+            />
+          )}
+        </Box>
+      )}
+
+      {/* 🎯 대기열 진행 표시 */}
+      {queueStatus?.status === "waiting" && (
+        <LinearProgress
+          sx={{
+            height: 4,
+            bgcolor: "rgba(255,255,255,0.3)",
+            "& .MuiLinearProgress-bar": {
+              bgcolor: "rgba(255,255,255,0.8)",
+            },
+          }}
+        />
+      )}
+
       <Box
         ref={chatBoxRef}
         className="chatbot-response"
@@ -625,7 +801,9 @@ const Chatbot: React.FC<ChatbotProps> = ({
             </Avatar>
             <CircularProgress size={20} sx={{ mr: 1 }} />
             <Typography variant="body2" color="text.secondary">
-              답변을 준비하고 있어요...
+              {queueStatus?.status === "processing"
+                ? "답변을 생성하고 있어요..."
+                : "답변을 준비하고 있어요..."}
             </Typography>
           </Box>
         )}
@@ -650,14 +828,21 @@ const Chatbot: React.FC<ChatbotProps> = ({
           maxRows={6}
           value={message}
           onChange={(e) => setMessage(e.target.value)}
-          placeholder="챗봇에게 질문하거나 이야기해 보세요!"
+          placeholder={
+            queueStatus?.status === "waiting"
+              ? "대기 중입니다. 잠시만 기다려주세요..."
+              : "챗봇에게 질문하거나 이야기해 보세요!"
+          }
           variant="outlined"
           sx={{
             mb: 1.5,
             "& .MuiOutlinedInput-root": {
               borderRadius: "12px",
               fontSize: "1rem",
-              bgcolor: "white",
+              bgcolor:
+                queueStatus?.status === "waiting"
+                  ? "rgba(0,0,0,0.05)"
+                  : "white",
               "& fieldset": {
                 borderColor: theme.palette.grey[300],
               },
@@ -674,8 +859,24 @@ const Chatbot: React.FC<ChatbotProps> = ({
               opacity: 1,
             },
           }}
-          disabled={isResponding || !!limitExceededError}
-          onKeyDown={handleKeyDown}
+          disabled={
+            isResponding ||
+            !!limitExceededError ||
+            !!rateLimitError ||
+            queueStatus?.status === "waiting"
+          }
+          onKeyDown={(e) => {
+            if (
+              e.key === "Enter" &&
+              !e.shiftKey &&
+              !isResponding &&
+              message.trim() &&
+              !queueStatus
+            ) {
+              e.preventDefault();
+              handleSendMessage();
+            }
+          }}
         />
         <Box
           sx={{
@@ -691,7 +892,9 @@ const Chatbot: React.FC<ChatbotProps> = ({
                 !recognition ||
                 isListening ||
                 isResponding ||
-                !!limitExceededError
+                !!limitExceededError ||
+                !!rateLimitError ||
+                !!queueStatus
               }
               color={isListening ? "secondary" : "primary"}
               size={isMobile ? "medium" : "large"}
@@ -717,7 +920,11 @@ const Chatbot: React.FC<ChatbotProps> = ({
                 color="primary"
                 size="medium"
                 disabled={
-                  isResponding || !message.trim() || !!limitExceededError
+                  isResponding ||
+                  !message.trim() ||
+                  !!limitExceededError ||
+                  !!rateLimitError ||
+                  queueStatus?.status === "waiting"
                 }
                 aria-label="전송"
                 sx={{
@@ -737,7 +944,11 @@ const Chatbot: React.FC<ChatbotProps> = ({
                 endIcon={<Send />}
                 sx={{ borderRadius: "8px", fontWeight: "bold" }}
                 disabled={
-                  isResponding || !message.trim() || !!limitExceededError
+                  isResponding ||
+                  !message.trim() ||
+                  !!limitExceededError ||
+                  !!rateLimitError ||
+                  queueStatus?.status === "waiting"
                 }
               >
                 전송
@@ -748,7 +959,7 @@ const Chatbot: React.FC<ChatbotProps> = ({
               <IconButton
                 color="secondary"
                 size="medium"
-                onClick={handleDialogOpen}
+                onClick={() => setDialogOpen(true)}
                 aria-label="종료"
                 sx={{
                   border: `1px solid ${theme.palette.secondary.main}`,
@@ -763,7 +974,7 @@ const Chatbot: React.FC<ChatbotProps> = ({
                 color="secondary"
                 size="large"
                 startIcon={<StopCircle />}
-                onClick={handleDialogOpen}
+                onClick={() => setDialogOpen(true)}
                 sx={{ borderRadius: "8px" }}
               >
                 종료
@@ -790,7 +1001,21 @@ const Chatbot: React.FC<ChatbotProps> = ({
             취소
           </Button>
           <Button
-            onClick={() => handleDialogClose(true)}
+            onClick={() => {
+              setDialogOpen(false);
+              setChatHistory([]);
+              onChatbotEnd();
+              onAlertOpen();
+              if (
+                ws &&
+                (ws.readyState === WebSocket.OPEN ||
+                  ws.readyState === WebSocket.CONNECTING)
+              ) {
+                ws.close();
+              }
+              if (typingTimeoutRef.current)
+                clearTimeout(typingTimeoutRef.current);
+            }}
             color="secondary"
             autoFocus
           >
@@ -844,6 +1069,23 @@ const Chatbot: React.FC<ChatbotProps> = ({
           variant="filled"
         >
           {limitExceededError}
+        </Alert>
+      </Snackbar>
+
+      {/* 🎯 새로운 Rate Limit 에러 Snackbar */}
+      <Snackbar
+        open={!!rateLimitError}
+        autoHideDuration={6000}
+        onClose={() => setRateLimitError(null)}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert
+          onClose={() => setRateLimitError(null)}
+          severity="warning"
+          sx={{ width: "100%" }}
+          variant="filled"
+        >
+          {rateLimitError}
         </Alert>
       </Snackbar>
     </Paper>

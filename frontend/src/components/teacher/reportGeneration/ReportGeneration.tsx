@@ -566,6 +566,26 @@ const ReportGeneration: React.FC<ReportGenerationProps> = ({
     }
   };
 
+  // 🔥 다중 학기 선택용 핸들러 추가
+  const handleSemesterChange = (event: SelectChangeEvent<string[]>) => {
+    const newSemesters = event.target.value as string[];
+    setSelectedSemesters(newSemesters);
+  };
+
+  // 🔥 단일 학기 선택용 핸들러 추가
+  const handleSingleSemesterChange = (semester: string) => {
+    setSelectedSemesters([semester]); // 기존 배열 형태 유지하되 하나만 담기
+  };
+
+  // 🔥 전체 선택/해제 핸들러들 추가
+  const handleSelectAllSemesters = () => {
+    setSelectedSemesters(["1학기", "2학기"]);
+  };
+
+  const handleDeselectAllSemesters = () => {
+    setSelectedSemesters([]);
+  };
+
   const getStepContent = (step: number) => {
     if (tabValue === 0) {
       switch (step) {
@@ -573,16 +593,11 @@ const ReportGeneration: React.FC<ReportGenerationProps> = ({
           return (
             <StepTargetForm
               selectedSemesters={selectedSemesters}
-              handleSemesterChange={(e: SelectChangeEvent<string[]>) => {
-                const newSemesters = e.target.value as string[];
-                setSelectedSemesters(newSemesters);
-              }}
-              handleSelectAllSemesters={() => {
-                setSelectedSemesters(["1학기", "2학기"]);
-              }}
-              handleDeselectAllSemesters={() => {
-                setSelectedSemesters([]);
-              }}
+              handleSemesterChange={handleSemesterChange}
+              handleSelectAllSemesters={handleSelectAllSemesters}
+              handleDeselectAllSemesters={handleDeselectAllSemesters}
+              isSingleSelect={true}
+              onSingleSemesterChange={handleSingleSemesterChange}
               availableSubjects={availableSubjects}
               selectedSubjects={selectedSubjects}
               handleSubjectChange={(e: SelectChangeEvent<string[]>) => {
@@ -670,16 +685,10 @@ const ReportGeneration: React.FC<ReportGenerationProps> = ({
           return (
             <StepTargetForm
               selectedSemesters={selectedSemesters}
-              handleSemesterChange={(e: SelectChangeEvent<string[]>) => {
-                const newSemesters = e.target.value as string[];
-                setSelectedSemesters(newSemesters);
-              }}
-              handleSelectAllSemesters={() => {
-                setSelectedSemesters(["1학기", "2학기"]);
-              }}
-              handleDeselectAllSemesters={() => {
-                setSelectedSemesters([]);
-              }}
+              handleSemesterChange={handleSemesterChange}
+              handleSelectAllSemesters={handleSelectAllSemesters}
+              handleDeselectAllSemesters={handleDeselectAllSemesters}
+              isSingleSelect={false}
               availableSubjects={availableSubjects}
               selectedSubjects={selectedSubjects}
               handleSubjectChange={(e: SelectChangeEvent<string[]>) => {

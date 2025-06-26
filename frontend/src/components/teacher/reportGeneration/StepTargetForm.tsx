@@ -18,12 +18,14 @@ type Student = {
 };
 
 type StepTargetFormProps = {
-//   icon: React.ReactElement;
-//   label: string;
+  //   icon: React.ReactElement;
+  //   label: string;
   selectedSemesters: string[];
   handleSemesterChange: (event: SelectChangeEvent<string[]>) => void;
   handleSelectAllSemesters: () => void;
   handleDeselectAllSemesters: () => void;
+  isSingleSelect?: boolean;
+  onSingleSemesterChange?: (semester: string) => void;
   availableSubjects: string[];
   selectedSubjects: string[];
   handleSubjectChange: (event: SelectChangeEvent<string[]>) => void;
@@ -37,12 +39,14 @@ type StepTargetFormProps = {
 };
 
 const StepTargetForm: React.FC<StepTargetFormProps> = ({
-//   icon,
-//   label,
+  //   icon,
+  //   label,
   selectedSemesters,
   handleSemesterChange,
   handleSelectAllSemesters,
   handleDeselectAllSemesters,
+  isSingleSelect = false,
+  onSingleSemesterChange,
   availableSubjects,
   selectedSubjects,
   handleSubjectChange,
@@ -71,6 +75,8 @@ const StepTargetForm: React.FC<StepTargetFormProps> = ({
             handleSemesterChange={handleSemesterChange}
             handleSelectAllSemesters={handleSelectAllSemesters}
             handleDeselectAllSemesters={handleDeselectAllSemesters}
+            isSingleSelect={isSingleSelect}
+            onSingleSemesterChange={onSingleSemesterChange}
             sx={{ height: "100%" }}
           />
         </Grid>
