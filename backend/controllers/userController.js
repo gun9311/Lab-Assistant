@@ -52,7 +52,12 @@ const getStudents = async (req, res) => {
       grade, // 인덱스 활용 2
       class: classNumber, // 인덱스 활용 3
       // loginId가 생성된 prefix로 시작하는지 검사 (인덱스 활용 4)
-      loginId: { $regex: `^${expectedLoginIdPrefix}` },
+      loginId: {
+        $regex: `^${expectedLoginIdPrefix.replace(
+          /[-\/\\^$*+?.()|[\]{}]/g,
+          "\\$&"
+        )}`,
+      },
     }).select("-password -tokens"); // 응답 시 민감 정보 제외
 
     // 학생 목록 정렬 (필요 시, 예: studentId 기준 오름차순)
@@ -762,7 +767,12 @@ const bulkUpdateStudentInfo = async (req, res) => {
       school: schoolName,
       grade: currentGrade,
       class: currentClassNum,
-      loginId: { $regex: `^${expectedLoginIdPrefix}` },
+      loginId: {
+        $regex: `^${expectedLoginIdPrefix.replace(
+          /[-\/\\^$*+?.()|[\]{}]/g,
+          "\\$&"
+        )}`,
+      },
     });
 
     if (studentsToUpdate.length === 0) {
@@ -798,11 +808,9 @@ const bulkUpdateStudentInfo = async (req, res) => {
       logger.warn(
         `Bulk update by teacher ${teacherId} failed due to internal loginId collision.`
       );
-      return res
-        .status(400)
-        .send({
-          error: "변경 후 학생 아이디가 중복됩니다. 일괄 변경을 취소합니다.",
-        });
+      return res.status(400).send({
+        error: "변경 후 학생 아이디가 중복됩니다. 일괄 변경을 취소합니다.",
+      });
     }
 
     // Check for duplicates in the database (outside the current batch)

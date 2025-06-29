@@ -43,6 +43,9 @@
   },
   "scripts": {
     "test": "jest",
-    "start": "node server.js"
+    "start": "node server.js",
+    "test:websocket": "node tests/performance/websocket-broadcast-test.js",
+    "test:websocket:single": "node tests/performance/websocket-broadcast-test.js --single",
+    "test:performance": "node tests/performance/report-generation-performance.test.js"
   }
 }
