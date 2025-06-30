@@ -76,7 +76,7 @@ const determineImageUrl = (
 
 // Helper function for validation (can be reused for create and update)
 const validateQuizData = (body, files) => {
-  const { title, grade, subject, semester, questions } = body;
+  const { title, grade, subject, semester, unit, questions } = body;
   let parsedQuestions;
 
   if (!title || typeof title !== "string" || title.trim() === "") {
