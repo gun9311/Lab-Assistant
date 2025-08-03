@@ -4,6 +4,7 @@ const Admin = require("../models/Admin");
 const Notification = require("../models/Notification");
 const { sendNotification } = require("../services/fcmService");
 const logger = require("../utils/logger");
+const { redisClient } = require("../utils/redisClient"); // 🔹 Redis 캐시용
 
 // 질문 생성 (교사 전용)
 const createQuestion = async (req, res, next) => {
@@ -134,8 +135,9 @@ const getQuestions = async (req, res, next) => {
       .sort(sort)
       .skip(skip)
       .limit(limitNum)
+      .select("-attachments -__v") // 🔹 큰/민감 필드 제외
       .populate("author", "name email school")
-      .populate("answeredBy", "name");
+      .populate("answeredBy", "name")
 
     const totalCount = await QnA.countDocuments(filter);
 
@@ -414,50 +416,63 @@ const updateQuestionStatus = async (req, res, next) => {
 // QnA 통계 조회 (관리자 전용)
 const getQnAStatistics = async (req, res, next) => {
   try {
-    // 전체 통계
-    const totalQuestions = await QnA.countDocuments();
-    const unansweredQuestions = await QnA.countDocuments({ status: "대기중" });
-    const answeredQuestions = await QnA.countDocuments({ status: "답변완료" });
-    const resolvedQuestions = await QnA.countDocuments({ status: "해결됨" });
+    // �� 1) 캐시 조회 (TTL 5분)
+    const cached = await redisClient.get("qna:stats");
+    if (cached) {
+      return res.status(200).json(JSON.parse(cached));
+    }
 
-    // 카테고리별 통계
-    const categoryStats = await QnA.aggregate([
-      { $group: { _id: "$category", count: { $sum: 1 } } },
-      { $sort: { count: -1 } },
-    ]);
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
-    // 우선순위별 통계
-    const priorityStats = await QnA.aggregate([
-      { $group: { _id: "$priority", count: { $sum: 1 } } },
-      { $sort: { count: -1 } },
-    ]);
-
-    // 학교별 통계 (상위 10개)
-    const schoolStats = await QnA.aggregate([
-      { $group: { _id: "$authorSchool", count: { $sum: 1 } } },
-      { $sort: { count: -1 } },
-      { $limit: 10 },
-    ]);
-
-    // 최근 7일간 질문 수
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    const recentQuestions = await QnA.countDocuments({
-      createdAt: { $gte: sevenDaysAgo },
-    });
-
-    res.status(200).json({
-      overview: {
-        total: totalQuestions,
-        unanswered: unansweredQuestions,
-        answered: answeredQuestions,
-        resolved: resolvedQuestions,
-        recent7Days: recentQuestions,
+    // �� 2) 단일 aggregate 파이프라인
+    const [stats] = await QnA.aggregate([
+      {
+        $facet: {
+          overview: [{ $group: { _id: "$status", count: { $sum: 1 } } }],
+          categoryStats: [
+            { $group: { _id: "$category", count: { $sum: 1 } } },
+            { $sort: { count: -1 } },
+          ],
+          priorityStats: [
+            { $group: { _id: "$priority", count: { $sum: 1 } } },
+            { $sort: { count: -1 } },
+          ],
+          schoolStats: [
+            { $group: { _id: "$authorSchool", count: { $sum: 1 } } },
+            { $sort: { count: -1 } },
+            { $limit: 10 },
+          ],
+          recent7Days: [
+            { $match: { createdAt: { $gte: sevenDaysAgo } } },
+            { $count: "count" },
+          ],
+          total: [{ $count: "count" }],
+        },
       },
-      categoryStats,
-      priorityStats,
-      schoolStats,
-    });
+    ]);
+
+    // 🔹 3) facet 결과를 원하는 형태로 재구성
+    const overviewMap = Object.fromEntries(
+      (stats.overview || []).map((o) => [o._id, o.count])
+    );
+
+    const result = {
+      overview: {
+        total: stats.total?.[0]?.count || 0,
+        unanswered: overviewMap["대기중"] || 0,
+        answered: overviewMap["답변완료"] || 0,
+        resolved: overviewMap["해결됨"] || 0,
+        recent7Days: stats.recent7Days?.[0]?.count || 0,
+      },
+      categoryStats: stats.categoryStats || [],
+      priorityStats: stats.priorityStats || [],
+      schoolStats: stats.schoolStats || [],
+    };
+
+    // 🔹 4) 캐시 저장 (EX 300초 = 5분)
+    await redisClient.set("qna:stats", JSON.stringify(result), { EX: 300 });
+
+    res.status(200).json(result);
   } catch (error) {
     logger.error("Failed to get QnA statistics:", {
       error: error.message,

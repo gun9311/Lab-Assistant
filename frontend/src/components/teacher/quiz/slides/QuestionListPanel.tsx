@@ -34,6 +34,7 @@ import {
   ViewList as ViewListIcon,
   Add as AddIcon,
   DeleteSweep as DeleteSweepIcon,
+  UploadFile as UploadFileIcon,
 } from "@mui/icons-material";
 
 type QuestionListPanelProps = {
@@ -55,6 +56,7 @@ type QuestionListPanelProps = {
   onToggleCollapse: () => void;
   addQuestion: () => void;
   removeSelectedQuestions: () => void;
+  onCsvUpload: () => void;
 };
 
 const QuestionListPanel: React.FC<QuestionListPanelProps> = ({
@@ -72,6 +74,7 @@ const QuestionListPanel: React.FC<QuestionListPanelProps> = ({
   onToggleCollapse,
   addQuestion,
   removeSelectedQuestions,
+  onCsvUpload,
 }) => {
   const [batchTimeLimit, setBatchTimeLimit] = useState<number>(30);
   const [batchQuestionType, setBatchQuestionType] =
@@ -179,7 +182,7 @@ const QuestionListPanel: React.FC<QuestionListPanelProps> = ({
           sx={{
             position: "absolute",
             top: isCollapsed ? "calc(50% - 20px)" : "8px",
-            right: isCollapsed ? "-18px" : "8px",
+            right: isCollapsed ? "-18px" : "-18px",
             zIndex: 10,
             backgroundColor: "#fff",
             border: "1px solid #ddd",
@@ -197,17 +200,51 @@ const QuestionListPanel: React.FC<QuestionListPanelProps> = ({
 
       {!isCollapsed && (
         <>
-          <Typography
-            variant="h6"
+          <Box
             sx={{
-              fontWeight: "bold",
-              color: "#333",
-              marginBottom: "1rem",
-              textAlign: isCollapsed ? "center" : "left",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              mb: 1,
+              pr: 3,
             }}
           >
-            {isCollapsed ? <ViewListIcon /> : "문제 목록"}
-          </Typography>
+            <Typography
+              variant="h6"
+              sx={{
+                fontWeight: "bold",
+                color: "#333",
+                textAlign: "left",
+              }}
+            >
+              문제 목록
+            </Typography>
+
+            {!isReadOnly && (
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<UploadFileIcon />}
+                onClick={onCsvUpload}
+                sx={{
+                  fontSize: "0.75rem",
+                  py: 0.5,
+                  px: 1,
+                  borderRadius: "6px",
+                  borderColor: "#e0e0e0",
+                  color: "#666",
+                  minWidth: "auto",
+                  "&:hover": {
+                    borderColor: "#1976d2",
+                    color: "#1976d2",
+                    backgroundColor: "rgba(25, 118, 210, 0.04)",
+                  },
+                }}
+              >
+                CSV
+              </Button>
+            )}
+          </Box>
 
           {!isReadOnly && (
             <Accordion

@@ -24,12 +24,14 @@ function constructNLPRequestMessages(
 ) {
   // 시스템 메시지 동적 구성
   const systemMessageContent = `<role_definition>
-    너는 **${grade}학년** ${subject} ${unit ? `${unit} 단원 ` : ""}${topic} 학습을 돕는 초등학생 AI 튜터야. 
+    너는 **${grade}학년** ${subject} ${
+    unit ? `${unit} 단원 ` : ""
+  }${topic} 학습을 돕는 초등학생 AI 튜터야. 
     한국 초등학생 눈높이에 맞춰 다음 원칙을 지켜야 해:
 
     **<safety_rules>**
     1. 유해 콘텐츠 금지: 폭력, 차별, 성적, 정치/종교, 거짓정보, 개인정보 등
-    2. 정확성: 모르면 "잘 모르겠어요" 답변, 추측 금지
+    2. 정확성: 부정확한 정보에 대해 답변, 추측 금지 및 "잘 모르겠어요" 답변
     3. 학습 집중: ${topic}에 집중, 벗어나면 학습으로 유도
     4. 긍정적 격려: 칭찬과 자신감 부여 (이모지 적절히 사용 ✨👍🤔📌😊🎉💡)
     5. 존댓말 필수
@@ -46,8 +48,7 @@ function constructNLPRequestMessages(
     **<response_style>**
     핵심만 간결명확 / 필요시 마크다운 사용
     </response_style>
-    `; 
-
+    `;
 
   const systemPrompt = systemMessageContent; // 시스템 메시지 내용
   const userMessages = [
