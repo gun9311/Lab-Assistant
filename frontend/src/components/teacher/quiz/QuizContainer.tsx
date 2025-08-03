@@ -29,11 +29,13 @@ import { getUnits, createQuiz, updateQuiz } from "../../../utils/quizApi";
 import { getSubjects } from "../../../utils/api";
 import { useNavigate } from "react-router-dom";
 import QuizPreviewModal from "./QuizPreviewModal";
+import CsvImportDialog from "./CsvImportDialog";
 
 export interface QuizContainerRef {
   save: () => void;
   openPreview: () => void;
   navigate: (direction: "prev" | "next") => void;
+  importQuestions: (qs: Question[]) => void;
 }
 
 export interface ActionBarState {
@@ -113,6 +115,7 @@ const QuizContainer = forwardRef<QuizContainerRef, QuizContainerProps>(
     const [validationAttempted, setValidationAttempted] = useState(false); // 유효성 검사 시도 상태 추가
     const [showDeleteConfirmDialog, setShowDeleteConfirmDialog] =
       useState(false); // 일괄 삭제 확인 다이얼로그
+    const [isCsvDialogOpen, setIsCsvDialogOpen] = useState(false);
 
     useEffect(() => {
       if (!isEdit && !initialData && !isReadOnly) {
@@ -603,6 +606,15 @@ const QuizContainer = forwardRef<QuizContainerRef, QuizContainerProps>(
       }
     };
 
+    const importQuestions = (qs: Question[]) => {
+      setQuestions(qs);
+      setCurrentSlideIndex(1);
+      setError("CSV가 성공적으로 적용되었습니다.");
+    };
+
+    const handleOpenCsvDialog = () => setIsCsvDialogOpen(true);
+    const handleCloseCsvDialog = () => setIsCsvDialogOpen(false);
+
     useEffect(() => {
       onStateChange?.({
         currentSlideIndex,
@@ -614,13 +626,11 @@ const QuizContainer = forwardRef<QuizContainerRef, QuizContainerProps>(
     useImperativeHandle(ref, () => ({
       save: saveQuiz,
       openPreview: handleOpenPreviewModal,
-      navigate: (direction) => {
-        if (direction === "prev") {
-          handleNavigateItem(currentSlideIndex - 1);
-        } else {
-          handleNavigateItem(currentSlideIndex + 1);
-        }
-      },
+      navigate: (direction) =>
+        handleNavigateItem(
+          direction === "prev" ? currentSlideIndex - 1 : currentSlideIndex + 1
+        ),
+      importQuestions,
     }));
 
     return (
@@ -697,6 +707,7 @@ const QuizContainer = forwardRef<QuizContainerRef, QuizContainerProps>(
               onToggleCollapse={toggleQuestionListCollapse}
               addQuestion={addQuestion}
               removeSelectedQuestions={removeSelectedQuestions}
+              onCsvUpload={handleOpenCsvDialog}
             />
           </Box>
 
@@ -811,6 +822,12 @@ const QuizContainer = forwardRef<QuizContainerRef, QuizContainerProps>(
             </Button>
           </DialogActions>
         </Dialog>
+
+        <CsvImportDialog
+          open={isCsvDialogOpen}
+          onClose={handleCloseCsvDialog}
+          onImport={importQuestions}
+        />
       </Box>
     );
   }

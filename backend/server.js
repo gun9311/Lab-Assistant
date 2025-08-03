@@ -160,6 +160,3 @@ async function startServer() {
 
 // 서버 시작 함수 호출
 startServer();
-
-// 크론 작업 설정은 현재 주석 처리되어 있으므로 그대로 둡니다.
-// ...
